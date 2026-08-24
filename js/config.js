@@ -14,5 +14,10 @@ const API_BASE = "https://api.iqbible.com/api/v2";
 // check in that inline script, not this line.
 const BASE_PATH = window.BASE_PATH;
 
-// Shown in the left nav footer. Bump alongside a CHANGELOG.md version cut.
-const APP_VERSION = "1.1.1";
+// Offline fallback for the left nav footer / About page version display —
+// js/main.js's refreshAppVersionFromChangelog() reads the real, current
+// version out of CHANGELOG.md at load time and overwrites this whenever that
+// fetch succeeds, so this constant only shows if the fetch fails (e.g. no
+// network). Bump alongside a CHANGELOG.md version cut anyway, so the offline
+// case doesn't drift too far.
+const APP_VERSION = "1.2.2";

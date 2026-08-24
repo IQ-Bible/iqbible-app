@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file. This CHANGE
 ## [Unreleased]
 - n/a
 
+## [1.2.2] - 2026-08-24
+- **fixed:** The footer/About "vX.Y.Z" version display was a hardcoded constant
+  (`APP_VERSION` in `js/config.js`) that had no way to catch itself drifting out
+  of sync with this file — it had, showing 1.1.1 while this file was already at
+  1.2.1. `js/main.js`'s new `refreshAppVersionFromChangelog()` now reads the
+  latest version straight out of this file's newest `## [x.y.z]` heading at
+  load time and overwrites the display with it; `APP_VERSION` remains only as
+  the offline fallback shown until that fetch resolves (or if it fails), and
+  has been corrected to 1.2.2 to match.
+
 ## [1.2.1] - 2026-08-24
 - **fixed:** Three mobile-viewport bugs. (1) Tapping a Places/People/Prophecies/Timeline card from
   the mobile "Chapter Info" bottom sheet opened that card's detail modal underneath the still-open

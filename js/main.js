@@ -229,12 +229,29 @@ document.addEventListener("click", e => {
   if (wrap && !wrap.contains(e.target)) closeProfilePanel();
 });
 
+// Reads the live version straight out of CHANGELOG.md's newest `## [x.y.z]`
+// heading, so the footer/About display can't silently drift from an
+// un-bumped APP_VERSION constant the way it already had (see this file's own
+// CHANGELOG entry). Runs unawaited from init() below — the constant is shown
+// first so there's no blank flash, and this only overwrites it on success.
+// Fails silently offline/on a fetch error, leaving the constant in place.
+async function refreshAppVersionFromChangelog() {
+  try {
+    const text = await (await fetch("CHANGELOG.md")).text();
+    const version = text.match(/^## \[(\d+\.\d+\.\d+)\]/m)?.[1];
+    if (!version) return;
+    document.getElementById("navVersion").textContent = version;
+    document.getElementById("aboutVersion").textContent = version;
+  } catch { /* offline or CHANGELOG.md unreachable — keep APP_VERSION shown */ }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    INIT */
 (async function init() {
   document.getElementById("navYear").textContent = new Date().getFullYear();
   document.getElementById("navVersion").textContent = APP_VERSION;
   document.getElementById("aboutVersion").textContent = APP_VERSION;
+  refreshAppVersionFromChangelog();
   setTheme(getTheme());
   setFontSize(getFontSize());
   setUiFontSize(getUiFontSize());
