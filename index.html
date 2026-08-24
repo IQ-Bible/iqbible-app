@@ -5,10 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>IQ Bible</title>
 <meta name="description" content="A worked example of building a real app on the IQ Bible API — a free, open-source Bible reader with no backend of its own.">
+<script>
+// Single source of truth for this app's GitHub Pages project-site prefix —
+// computed here, once, instead of hand-maintained per branch (see
+// CHANGELOG's 1.1.0 hotfix for what happens when that manual step gets
+// missed on a main merge). Everything below this point (css/js/img refs in
+// this file, 404.html, and js/config.js's BASE_PATH) is relative to the
+// <base> this sets, so main and develop can stay byte-identical. Forking to
+// your own GitHub Pages project site: change the hostname/path below.
+window.BASE_PATH = location.hostname === "jody-pm.github.io" ? "/iqbible-app" : "";
+document.head.appendChild(Object.assign(document.createElement("base"), { href: (window.BASE_PATH || "") + "/" }));
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&family=Josefin+Sans:wght@300;400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/styles.css">
-<link rel="icon" type="image/png" href="/img/logo.png">
+<link rel="stylesheet" href="css/styles.css">
+<link rel="icon" type="image/png" href="img/logo.png">
 <!-- Leaflet — the app's one runtime dependency, added specifically so place
      maps can use English-labeled (Esri World Street Map) tiles for the
      interactive lightbox view; OpenStreetMap's own embeddable page has no
@@ -26,7 +37,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
 <div id="app">
 
   <div id="topbar">
-    <div class="wordmark"><img src="/img/logo.png" alt="" class="logo-icon">IQ <span>Bible</span></div>
+    <div class="wordmark"><img src="img/logo.png" alt="" class="logo-icon">IQ <span>Bible</span></div>
     <div id="topActions">
       <button id="searchTrigger" onclick="openSearch()" title="Search" aria-label="Search">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
@@ -452,7 +463,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
         </div>
         <div class="dictbody">
           <div class="about-hero">
-            <img src="/img/logo.png" alt="" class="about-hero-logo">
+            <img src="img/logo.png" alt="" class="about-hero-logo">
             <h1>About IQ Bible</h1>
             <p>A free, open-source Bible reader — and a worked example of building a real app on the <a href="https://api.iqbible.com" target="_blank" rel="noopener">IQ Bible API</a>. Every feature here comes from a real API call.</p>
           </div>
@@ -1001,21 +1012,21 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
      index.html and opening it directly still works (ES modules don't run
      over file:// in Chrome). Order matters: each file after config.js/api.js
      references state and helpers defined in the ones before it. -->
-<script src="/js/config.js"></script>
-<script src="/js/api.js"></script>
-<script src="/js/catalog.js"></script>
-<script src="/js/reader.js"></script>
-<script src="/js/search.js"></script>
-<script src="/js/notes.js"></script>
-<script src="/js/devotionals.js"></script>
-<script src="/js/profile.js"></script>
-<script src="/js/share.js"></script>
-<script src="/js/explore.js"></script>
-<script src="/js/study.js"></script>
-<script src="/js/plans.js"></script>
-<script src="/js/progress.js"></script>
-<script src="/js/router.js"></script>
-<script src="/js/tour.js"></script>
-<script src="/js/main.js"></script>
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script src="js/catalog.js"></script>
+<script src="js/reader.js"></script>
+<script src="js/search.js"></script>
+<script src="js/notes.js"></script>
+<script src="js/devotionals.js"></script>
+<script src="js/profile.js"></script>
+<script src="js/share.js"></script>
+<script src="js/explore.js"></script>
+<script src="js/study.js"></script>
+<script src="js/plans.js"></script>
+<script src="js/progress.js"></script>
+<script src="js/router.js"></script>
+<script src="js/tour.js"></script>
+<script src="js/main.js"></script>
 </body>
 </html>

@@ -23,7 +23,7 @@ Every user of this app — including you, running it locally — needs their own
 
 This is a plain static site, so any static host works. Two are pre-configured:
 
-- **GitHub Pages**: enable Pages on your fork (Settings → Pages → deploy from a branch). `404.html` (a copy of `index.html`) makes deep links like `/gen/1/1` work on a fresh page load, which GitHub Pages doesn't otherwise support for a single-page app. If your fork is a *project* site (`username.github.io/reponame/`, not `username.github.io` itself), set `BASE_PATH` in `js/config.js` to `/reponame` so the router accounts for that subpath.
+- **GitHub Pages**: enable Pages on your fork (Settings → Pages → deploy from a branch). `404.html` (a copy of `index.html`) makes deep links like `/gen/1/1` work on a fresh page load, which GitHub Pages doesn't otherwise support for a single-page app. The project-site subpath (`username.github.io/reponame/`) is auto-detected at runtime by the inline script at the top of `index.html`'s/`404.html`'s `<head>` — if you fork this to a different GitHub Pages project site, change the hostname check there (not `js/config.js`, which just reads what that script computes).
 - **Cloudflare Pages**: point it at this repo — `_redirects` already routes every path to `index.html`. No `BASE_PATH` needed on a custom domain.
 
 ### If you're deploying for other people to use, not just yourself

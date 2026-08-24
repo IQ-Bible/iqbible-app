@@ -4,19 +4,15 @@
 const API_BASE = "https://api.iqbible.com/api/v2";
 
 // GitHub Pages *project* sites (username.github.io/reponame/) serve this app
-// from a subpath, so the router needs to know it to build correct URLs. A
-// custom domain, Cloudflare Pages, or a GitHub Pages *user/org* site
-// (reponame == username.github.io, served at the root) all want "". Only
-// set this if you're deploying to a GitHub Pages project site under a repo
-// name other than the site's root.
-//
-// Note: index.html/404.html load css/styles.css and js/*.js via root-absolute
-// paths (e.g. "/css/styles.css") so a deep-link page refresh still finds them
-// regardless of how deep the URL path is. On a project-site subpath, those
-// tags also need the "/reponame" prefix added by hand — this constant alone
-// doesn't reach them, since it's defined in a script tag that loads after
-// the <link>/<script> tags that need it.
-const BASE_PATH = "";
+// from a subpath, so the router needs to know it to build correct URLs. Set
+// once, at runtime, by the inline script at the very top of index.html's/
+// 404.html's <head> (before this file — before any <link>/<script src> tag —
+// even loads), so this file, index.html, and 404.html can all stay byte-
+// identical between the `main` (deployed) and `develop` (local root-served)
+// branches instead of needing a `/reponame` prefix hand-maintained on one of
+// them. Forking to your own GitHub Pages project site: edit the hostname
+// check in that inline script, not this line.
+const BASE_PATH = window.BASE_PATH;
 
 // Shown in the left nav footer. Bump alongside a CHANGELOG.md version cut.
-const APP_VERSION = "1.1.0";
+const APP_VERSION = "1.1.1";
