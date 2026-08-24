@@ -17,7 +17,10 @@ function openLibrary() {
   document.getElementById("librarySearchInput").value = "";
   closeNoteComposer();
   switchLibraryTab(libraryActiveTab);
-  setTimeout(() => document.getElementById("librarySearchInput").focus(), 80);
+  // Skip the autofocus while the tour is driving this overlay — it's just
+  // pointing at each tab in turn, and focusing the search input pops the
+  // mobile keyboard up over the tour tooltip for no reason.
+  if (!tourActive) setTimeout(() => document.getElementById("librarySearchInput").focus(), 80);
 }
 function closeLibrary() {
   switchMainView("read");

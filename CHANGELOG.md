@@ -3,7 +3,12 @@
 All notable changes to this project will be documented in this file. This CHANGELOG follows SemVer, see https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
-- n/a
+
+## [1.2.4] - 2026-08-24
+- **fixed:** The Advanced Tour's My Library steps (Notes, Bookmarks, Highlights, History) opened
+  the overlay via `openLibrary()`, which autofocuses its search input on every open — popping the
+  mobile keyboard up over the tour tooltip for each of those four steps even though the tour never
+  needs the visitor to type there. The autofocus is now skipped while a tour is driving the overlay.
 
 ## [1.2.3] - 2026-08-24
 - **fixed:** Several mobile-viewport bugs in Take a Tour. (1) The Basic Tour's My Library/My
