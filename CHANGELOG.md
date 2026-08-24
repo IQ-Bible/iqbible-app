@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. This CHANGELOG follows SemVer, see https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
+- n/a
+
+## [1.0.0] - 2026-08-23
+- **fixed:** `404.html` (served by GitHub Pages for any deep-linked page load) had drifted out of
+  sync with `index.html` again — missing the bottom nav bar, the Cards sheet trigger/sheet, the
+  "More" dropup, My Progress, and Help entirely. Re-synced.
 - **changed:** Deployed to GitHub Pages as a project site
   (`https://jody-pm.github.io/iqbible-app/`) — set `BASE_PATH` (`js/config.js`) to `/iqbible-app`
   and prefixed `index.html`/`404.html`'s root-absolute `css`/`js`/`img` references accordingly, per

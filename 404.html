@@ -76,7 +76,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
         <hr class="navdivider">
         <button class="navitem" data-nav="library" onclick="navMenuClick('library')">My Library</button>
         <button class="navitem" data-nav="progress" onclick="navMenuClick('progress')">My Progress</button>
-        <button class="navitem" data-nav="plans" onclick="navMenuClick('plans')">Plans</button>
+        <button class="navitem" data-nav="plans" onclick="navMenuClick('plans')">Reading Plans</button>
         <button class="navitem" data-nav="devotionals" onclick="navMenuClick('devotionals')">Devotionals</button>
         <hr class="navdivider">
         <button class="navitem" data-nav="help" onclick="navMenuClick('help')">Help</button>
@@ -112,6 +112,14 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
               <button class="bookinfo-btn" id="btnBookInfo" title="About this book" aria-label="About this book" onclick="openBookInfoModal(current.book)">&#9432;</button>
               <button class="titlepick" id="btnPickChapter" onclick="openChapterPicker()">1 <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
               <button class="verpick" id="btnPickVersion" onclick="openVersionPicker()">KJV <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+              <!-- Below 1180px #rightRail's places/characters/prophecies/timeline
+                   cards have nowhere to live (the rail itself is hidden) — this
+                   opens the same #cardStack content as a bottom sheet instead of
+                   duplicating its markup/fetch logic. Hidden above 1180px since
+                   the rail is visible there already. -->
+              <button class="iconbtn cardsheet-trigger" id="btnCardsSheet" title="Chapter info" aria-label="Chapter info" onclick="toggleCardsSheet()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+              </button>
             </div>
             <div id="audioPlayer" class="inline-audio" style="display:none">
               <div class="audio-controls-row">
@@ -302,15 +310,18 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
 
       <!-- Reading Plans — GET /bibles/{version}/reading-plan (General/Topic/
            M'Cheyne). Same one-body-JS-renders-into-it shell as Explore/Study
-           Tools above; js/plans.js swaps #plansBody between the builder form
-           and the active-plan view depending on whether iqb_active_plan is
-           set. -->
-      <div id="plansView" class="mainview mainview-narrow" role="region" aria-label="Plans">
+           Tools above; js/plans.js swaps #plansBody between three states
+           (list of saved plans / builder form / a plan's calendar) rather
+           than a single active-plan view — not mainview-narrow like it used
+           to be, since the plans grid and month calendar both want more
+           width than the 640px text-content cap. -->
+      <div id="plansView" class="mainview" role="region" aria-label="Reading Plans">
         <div class="overlay-topbar">
           <span class="overlay-title">Reading Plans</span>
           <button class="overlay-close" onclick="closePlans()" title="Back to Reading (Esc)">&times;</button>
         </div>
         <div class="dictbody" id="plansBody"></div>
+        <input type="file" id="planImportFile" accept=".json,.csv" style="display:none" onchange="handlePlanImportFile(event)">
       </div>
 
       <!-- devotionals view — Spurgeon's Morning &amp; Evening (GET
@@ -330,6 +341,10 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
           <button class="filter-chip" onclick="goDevotionalToday()">Today</button>
         </div>
         <div class="dictbody" id="devotionalsBody"></div>
+        <!-- "Did you read this devotional?" — js/devotionals.js's
+             renderDevoReadPrompt(), called after every render. A sibling of
+             #devotionalsBody, not a child, so its innerHTML replacement
+             never wipes it (same pattern as #chapterReadPrompt). -->
         <div id="devoReadPrompt"></div>
       </div>
 
@@ -481,6 +496,9 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
         </div>
       </div>
 
+      <!-- Help — static content, no fetches (same pattern as About). Keep
+           this in sync whenever a nav feature is added/renamed/removed —
+           see CLAUDE.md. -->
       <div id="helpView" class="mainview mainview-narrow" role="region" aria-label="Help">
         <div class="overlay-topbar">
           <span class="overlay-title">Help</span>
@@ -611,6 +629,10 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
         </div>
       </div>
 
+      <!-- My Progress — dynamic, rendered by js/progress.js from the same
+           local reading Progress the chapter/devotional "did you read?"
+           prompts write to, plus each plan's own completedDays. Richer than
+           the profile popover's "Your Reading" quick-glance stats. -->
       <div id="myProgressView" class="mainview mainview-narrow" role="region" aria-label="My Progress">
         <div class="overlay-topbar">
           <span class="overlay-title">My Progress</span>
@@ -652,8 +674,61 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
     </div>
 
     <div id="rightRail">
+      <!-- Only rendered/visible below 1180px, where #rightRail is repositioned
+           (css/styles.css) into a bottom sheet toggled by #btnCardsSheet
+           instead of a static side column. -->
+      <div class="rightrail-sheethead">
+        <span class="overlay-title">Chapter Info</span>
+        <button class="overlay-close" onclick="closeCardsSheet()" title="Close">&times;</button>
+      </div>
       <div class="cardstack" id="cardStack"></div>
     </div>
+  </div>
+
+  <!-- Backdrop for the #rightRail bottom sheet above — a .modalscrim like
+       every other detail popup, so the existing generic
+       "click the scrim to close" listener (js/main.js) needs only the one
+       #cardsSheetScrim special case to also toggle #rightRail's own .show
+       class (the scrim and the sheet are two separate elements here, unlike
+       a normal modal, since the sheet slides from #rightRail's real DOM
+       position rather than being centered). -->
+  <div class="modalscrim" id="cardsSheetScrim"></div>
+
+  <!-- Fixed bottom nav — replaces #navrail below 1180px, where the left rail
+       is hidden entirely. Search is deliberately left out (already reachable
+       via #searchTrigger in the topbar at every width); "More" opens
+       #moreMenuSheet with the rest of #navMenu's items. -->
+  <nav id="mobileFooterNav" aria-label="Primary">
+    <button class="mfn-item" data-nav="read" onclick="navMenuClick('read')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      <span>Read</span>
+    </button>
+    <button class="mfn-item" data-nav="explore" onclick="navMenuClick('explore')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m9 15 1.5-4.5L15 9l-1.5 4.5z"/></svg>
+      <span>Explore</span>
+    </button>
+    <button class="mfn-item" data-nav="study" onclick="navMenuClick('study')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M9 7h6M9 11h6"/></svg>
+      <span>Study</span>
+    </button>
+    <button class="mfn-item" data-nav="share" onclick="navMenuClick('share')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.8"/><circle cx="6" cy="12" r="2.8"/><circle cx="18" cy="19" r="2.8"/><path d="M8.5 10.5l7-4M8.5 13.5l7 4"/></svg>
+      <span>Share</span>
+    </button>
+    <button class="mfn-item" id="mfnMoreBtn" onclick="toggleMoreMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>
+      <span>More</span>
+    </button>
+  </nav>
+  <div id="moreMenuSheet">
+    <button class="navitem" data-nav="library" onclick="navMenuClick('library');closeMoreMenu()">My Library</button>
+    <button class="navitem" data-nav="progress" onclick="navMenuClick('progress');closeMoreMenu()">My Progress</button>
+    <button class="navitem" data-nav="plans" onclick="navMenuClick('plans');closeMoreMenu()">Reading Plans</button>
+    <button class="navitem" data-nav="devotionals" onclick="navMenuClick('devotionals');closeMoreMenu()">Devotionals</button>
+    <hr class="navdivider">
+    <button class="navitem" data-nav="help" onclick="navMenuClick('help');closeMoreMenu()">Help</button>
+    <button class="navitem" data-nav="about" onclick="navMenuClick('about');closeMoreMenu()">About</button>
+    <button class="navitem" data-nav="settings" onclick="navMenuClick('settings');closeMoreMenu()">Settings</button>
   </div>
 
   <!-- API key gate — shown whenever no key is set (first load, or after
@@ -786,6 +861,17 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
     </div>
   </div>
 
+  <!-- day drawer — opened from a Reading Plans calendar day cell (js/plans.js
+       openDayDrawer). The day box itself already shows the readings inline;
+       this is for the "mark day complete" checkbox and the full
+       hover-previewable reference list (verse-level Topic refs get the
+       citation-preview treatment here, same as everywhere else). -->
+  <div class="modalscrim" id="dayDrawerScrim">
+    <div class="modal" style="width:460px">
+      <div class="dictbody" id="dayDrawerBody"></div>
+    </div>
+  </div>
+
   <!-- timeline modal — opened from the right rail's always-shown Timeline
        card. /chronology has no per-chapter filter server-side, so this
        shows the full curated list (already fetched once and cached) with
@@ -860,6 +946,10 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
     </div>
   </div>
 
+  <!-- Take a Tour — welcome dialog (shown once, first visit; see
+       maybeShowTourWelcome, js/tour.js) plus the guided walkthrough itself
+       (#tourOverlay), a spotlight over real topbar/nav-rail elements rather
+       than a fake screenshot of them. -->
   <div class="modalscrim" id="tourWelcomeScrim">
     <div class="tour-welcome-box">
       <div class="tour-welcome-icon">

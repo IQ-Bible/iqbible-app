@@ -19,4 +19,4 @@ const API_BASE = "https://api.iqbible.com/api/v2";
 const BASE_PATH = "/iqbible-app";
 
 // Shown in the left nav footer. Bump alongside a CHANGELOG.md version cut.
-const APP_VERSION = "0.1.0";
+const APP_VERSION = "1.0.0";
