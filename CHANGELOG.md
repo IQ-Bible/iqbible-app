@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file. This CHANGE
 
 ## [Unreleased]
 
+## [1.2.5] - 2026-08-24
+- **fixed:** Typo ('naviagating') in README.md for the word 'navigating.'
+
 ## [1.2.4] - 2026-08-24
 - **fixed:** The Advanced Tour's My Library steps (Notes, Bookmarks, Highlights, History) opened
   the overlay via `openLibrary()`, which autofocuses its search input on every open — popping the

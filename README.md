@@ -21,7 +21,7 @@ Every user of this app — including you, running it locally — needs their own
 
 ## Demo
 
-You can experiment with the live version of this app (GitHub Pages) by naviagating to [https://jody-pm.github.io/iqbible-app](https://jody-pm.github.io/iqbible-app) and entering your API Key. 
+You can experiment with the live version of this app (GitHub Pages) by navigating to [https://jody-pm.github.io/iqbible-app](https://jody-pm.github.io/iqbible-app) and entering your API Key. 
 
 ## Deploying your own copy
 
