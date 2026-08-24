@@ -16,6 +16,12 @@ All notable changes to this project will be documented in this file. This CHANGE
   fallback chain) and tribe/nation, when available.
 - **changed:** Dictionary-term underlining now fetches a chapter's candidate words in one
   `GET /dictionaries/easton/bulk` call (API beta-36) instead of one call per word.
+- **fixed (main only):** Merging `develop` into `main` for this release carried over `develop`'s
+  local-dev, unprefixed `BASE_PATH`/asset paths (`js/config.js`, `index.html`, `404.html`) — GitHub
+  Pages served no CSS or JS at all on `main` as a result. Re-applied the `/iqbible-app` prefix these
+  three files need on `main` specifically; `develop` is unaffected and correctly stays unprefixed
+  for local root-served dev (see `dc4d95f`). Re-apply this prefix by hand on `main` after every
+  future `develop` merge until this is automated.
 
 ## [1.0.0] - 2026-08-23
 - **fixed:** `404.html` (served by GitHub Pages for any deep-linked page load) had drifted out of
