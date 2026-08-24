@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IQ Bible</title>
+<meta name="description" content="A worked example of building a real app on the IQ Bible API — a free, open-source Bible reader with no backend of its own.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&family=Josefin+Sans:wght@300;400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/styles.css">
+<link rel="icon" type="image/png" href="/img/logo.png">
+<!-- Leaflet — the app's one runtime dependency, added specifically so place
+     maps can use English-labeled (Esri World Street Map) tiles for the
+     interactive lightbox view; OpenStreetMap's own embeddable page has no
+     language option. Loaded from unpkg via a plain <script> tag, no
+     npm/bundler, per CLAUDE.md's development rules. -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+// Applied before first paint so a stored dark-mode preference doesn't flash
+// light on load — the rest of the app's JS only loads at the end of <body>.
+try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme") || "light"; } catch (e) { }
+</script>
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <div class="wordmark"><img src="/img/logo.png" alt="" class="logo-icon">IQ <span>Bible</span></div>
+    <div id="topActions">
+      <button id="searchTrigger" onclick="openSearch()" title="Search" aria-label="Search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      </button>
+      <button id="fontSizeTrigger" onclick="openFontSizeModal()" title="Change font size">
+        <svg width="19" height="16" viewBox="0 0 26 22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 18l3.2-9 3.2 9"/><path d="M4.1 15h4.2"/>
+          <path d="M14 20L19.5 3.5 25 20"/><path d="M16.1 14.5h6.8"/>
+        </svg>
+      </button>
+      <button id="themeTrigger" onclick="toggleTheme()" title="Toggle day/night mode">
+        <svg id="themeIconSun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4l1.4-1.4M18 6l1.4-1.4"/></svg>
+        <svg id="themeIconMoon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.8 6.8 0 0 0 10.5 10.5Z"/></svg>
+      </button>
+      <div id="profileWrap">
+        <button id="profileTrigger" onclick="toggleProfilePanel()" title="Reading dashboard">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c1.4-3.6 4.4-5.5 7.5-5.5s6.1 1.9 7.5 5.5"/></svg>
+        </button>
+        <!-- Reading dashboard popover — replaces the old bare "open Settings"
+             shortcut. Everything here (streak/counts/continue-reading) is
+             derived from data this app already tracks locally (History/Notes/
+             Bookmarks/Highlights); the one live API call is a cached today's-
+             devotional teaser. See js/profile.js. -->
+        <div id="profilePanel">
+          <div class="pp-head">Your Reading</div>
+          <div class="pp-stats" id="ppStats"></div>
+          <div class="pp-continue" id="ppContinue"></div>
+          <div class="pp-devo" id="ppDevo"></div>
+          <div class="pp-actions">
+            <button onclick="closeProfilePanel();openMyProgress()">Progress</button>
+            <button onclick="closeProfilePanel();openLibrary()">My Library</button>
+            <button onclick="closeProfilePanel();openSettings()">Settings</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="shell">
+    <nav id="navrail">
+      <div class="navmenu" id="navMenu">
+        <button class="navitem active" data-nav="read" onclick="navMenuClick('read')">Read</button>
+        <button class="navitem" data-nav="search" onclick="navMenuClick('search')">Search</button>
+        <button class="navitem" data-nav="explore" onclick="navMenuClick('explore')">Explore</button>
+        <button class="navitem" data-nav="study" onclick="navMenuClick('study')">Study Tools</button>
+        <button class="navitem" data-nav="share" onclick="navMenuClick('share')">Share Tools</button>
+        <hr class="navdivider">
+        <button class="navitem" data-nav="library" onclick="navMenuClick('library')">My Library</button>
+        <button class="navitem" data-nav="progress" onclick="navMenuClick('progress')">My Progress</button>
+        <button class="navitem" data-nav="plans" onclick="navMenuClick('plans')">Reading Plans</button>
+        <button class="navitem" data-nav="devotionals" onclick="navMenuClick('devotionals')">Devotionals</button>
+        <hr class="navdivider">
+        <button class="navitem" data-nav="help" onclick="navMenuClick('help')">Help</button>
+        <button class="navitem" data-nav="about" onclick="navMenuClick('about')">About</button>
+        <button class="navitem" data-nav="settings" onclick="navMenuClick('settings')">Settings</button>
+        <div class="navfooter">&copy; <span id="navYear"></span> IQ Bible &middot; v<span id="navVersion"></span> &middot; <a href="https://api.iqbible.com" target="_blank" rel="noopener">API</a></div>
+      </div>
+    </nav>
+
+    <div id="readMain">
+      <div id="readViewGroup">
+        <button class="chapternav prev" id="btnPrevChapter" title="Previous chapter" onclick="goAdjacentChapter(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>
+        <button class="chapternav next" id="btnNextChapter" title="Next chapter" onclick="goAdjacentChapter(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
+
+        <!-- One-time (first save) + periodic nudge that notes/bookmarks/
+             highlights live only in this browser — see js/reader.js's DATA
+             BACKUP AWARENESS section. Same box styling as #keyBanner's
+             .kb-box, but rendered inline (not a full-screen blocking
+             overlay) since showDataBackupBanner()/dismissDataBackupBanner()
+             don't share showKeyBanner()'s "block the rest of the app"
+             behavior. -->
+        <div id="dataBackupBanner">
+          <p id="dataBackupBannerText"></p>
+          <button onclick="dismissDataBackupBanner();openLibrary()">Open My Library</button>
+          <button onclick="dismissDataBackupBanner()">Got it</button>
+        </div>
+
+        <div id="readCol">
+          <div class="chhead">
+            <div id="chBookIcon" class="bookicon-badge" style="display:none"></div>
+            <div class="chtitlewrap">
+              <button class="titlepick" id="btnPickBook" onclick="openBookPicker()">Genesis <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+              <button class="bookinfo-btn" id="btnBookInfo" title="About this book" aria-label="About this book" onclick="openBookInfoModal(current.book)">&#9432;</button>
+              <button class="titlepick" id="btnPickChapter" onclick="openChapterPicker()">1 <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+              <button class="verpick" id="btnPickVersion" onclick="openVersionPicker()">KJV <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+              <!-- Below 1180px #rightRail's places/characters/prophecies/timeline
+                   cards have nowhere to live (the rail itself is hidden) — this
+                   opens the same #cardStack content as a bottom sheet instead of
+                   duplicating its markup/fetch logic. Hidden above 1180px since
+                   the rail is visible there already. -->
+              <button class="iconbtn cardsheet-trigger" id="btnCardsSheet" title="Chapter info" aria-label="Chapter info" onclick="toggleCardsSheet()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+              </button>
+            </div>
+            <div id="audioPlayer" class="inline-audio" style="display:none">
+              <div class="audio-controls-row">
+                <button class="playbtn" id="playBtn" onclick="toggleAudio()"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5.5v13l11-6.5-11-6.5Z"/></svg></button>
+                <div class="time" id="audioCur">0:00</div>
+                <div id="scrubTrack" onclick="seekAudio(event)"><div id="scrubFill"></div></div>
+                <div class="time" id="audioDur">0:00</div>
+                <button class="verpick iconcaret" id="btnPickNarration" style="display:none" onclick="openNarrationPicker()" title="Choose narration voice" aria-label="Choose narration voice"><svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+                <audio id="audioEl" preload="none"></audio>
+              </div>
+            </div>
+          </div>
+
+          <div id="readingText"><div class="spin"></div></div>
+          <!-- "Did you read this chapter?" — js/plans.js's
+               renderChapterReadPrompt(), called from loadChapter (reader.js)
+               after every render. A sibling of #readingText, not a child, so
+               renderChapter()'s innerHTML replacement never wipes it. -->
+          <div id="chapterReadPrompt"></div>
+        </div>
+      </div>
+
+      <!-- Search / Explore / Study Tools / My Library / Devotionals / Share
+           Tools all render here too (see switchMainView, js/main.js) instead
+           of as separate full-page overlays — one .mainview shown at a time,
+           #readViewGroup hidden while any of them is active, with the
+           clicked left-nav item shown .active the same way "Read" always
+           was. Each still keeps its own overlay-topbar close (×) button:
+           #navrail (the only other way to switch views) is hidden below
+           1180px, so it's the sole way back to Read on a narrow viewport. -->
+      <div id="searchOverlay" class="mainview" role="region" aria-label="Search">
+        <div class="overlay-inner">
+          <div class="overlay-topbar">
+            <span class="overlay-title">Search the Scriptures</span>
+            <button class="overlay-close" onclick="closeSearch()" title="Back to Reading (Esc)">&times;</button>
+          </div>
+          <div class="overlay-search-area">
+            <div class="overlay-input-wrap">
+              <span class="overlay-search-icon">⌕</span>
+              <input type="text" id="overlaySearchInput" placeholder="What are you looking for?" oninput="onOverlayType()"
+                onkeydown="if(event.key==='Enter') overlaySearch(true); if(event.key==='Escape') closeSearch()" autocomplete="off">
+              <button type="button" class="mclear" aria-label="Clear" onclick="clearSearchInput('overlaySearchInput')">&times;</button>
+            </div>
+            <div class="overlay-filters">
+              <span class="filter-label">Mode:</span>
+              <button class="filter-chip active" data-mode="all" onclick="setMode(this)">All words</button>
+              <button class="filter-chip" data-mode="phrase" onclick="setMode(this)">Exact phrase</button>
+            </div>
+          </div>
+          <div class="overlay-results-area">
+            <div class="overlay-results-inner">
+              <div id="overlayResultsMeta" class="overlay-results-meta"></div>
+              <div id="overlayResultList"></div>
+              <button id="overlayLoadMore" onclick="overlaySearch(false)">Load More</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- My Library overlay — Notes / Bookmarks / History / Highlights share one shell -->
+      <div id="libraryOverlay" class="mainview" role="region" aria-label="My Library">
+        <div class="overlay-inner">
+          <div class="overlay-topbar">
+            <span class="overlay-title">My Library</span>
+            <button class="overlay-close" onclick="closeLibrary()" title="Back to Reading (Esc)">&times;</button>
+          </div>
+          <div class="overlay-search-area">
+            <div class="lib-tabs">
+              <button class="lib-tab" data-tab="notes" onclick="switchLibraryTab('notes')">Notes</button>
+              <button class="lib-tab" data-tab="bookmarks" onclick="switchLibraryTab('bookmarks')">Bookmarks</button>
+              <button class="lib-tab" data-tab="highlights" onclick="switchLibraryTab('highlights')">Highlights</button>
+              <button class="lib-tab" data-tab="history" onclick="switchLibraryTab('history')">History</button>
+            </div>
+            <div class="overlay-input-wrap">
+              <span class="overlay-search-icon">⌕</span>
+              <input type="text" id="librarySearchInput" placeholder="Search…" oninput="onLibrarySearchType()"
+                onkeydown="if(event.key==='Escape') closeLibrary()" autocomplete="off">
+              <button type="button" class="mclear" aria-label="Clear" onclick="clearSearchInput('librarySearchInput')">&times;</button>
+            </div>
+            <div class="overlay-filters" id="notesTagChips"></div>
+            <div class="overlay-filters" id="librarySortRow">
+              <span class="filter-label">Sort:</span>
+              <button class="filter-chip" id="librarySortBookChip" onclick="setLibrarySort('book')">By Book</button>
+              <button class="filter-chip" id="librarySortDateChip" onclick="setLibrarySort('date')">By Date</button>
+              <span id="librarySortColorChip" style="display:none;align-items:center;gap:6px">
+                <span class="filter-label">By Color:</span>
+                <button class="vtswatch hl-yellow" data-color="yellow" onclick="setLibraryColorFilter('yellow')" title="Yellow" aria-label="Sort by yellow highlights"></button>
+                <button class="vtswatch hl-green" data-color="green" onclick="setLibraryColorFilter('green')" title="Green" aria-label="Sort by green highlights"></button>
+                <button class="vtswatch hl-blue" data-color="blue" onclick="setLibraryColorFilter('blue')" title="Blue" aria-label="Sort by blue highlights"></button>
+                <button class="vtswatch hl-pink" data-color="pink" onclick="setLibraryColorFilter('pink')" title="Pink" aria-label="Sort by pink highlights"></button>
+              </span>
+            </div>
+            <div class="notes-toolbar" id="notesToolbar">
+              <button onclick="openNoteComposer()">+ New Note</button>
+              <button onclick="exportNotesMarkdown()">Export Markdown</button>
+              <button onclick="exportNotesJSON()">Export JSON</button>
+              <button onclick="triggerNotesImport()">Import</button>
+              <input type="file" id="notesImportInput" accept="application/json" style="display:none" onchange="importNotesFile(this)">
+            </div>
+            <div class="new-note-composer" id="newNoteComposer" style="display:none">
+              <input type="text" id="newNoteTitle" class="vt-note-tags" placeholder="Title (optional)">
+              <textarea id="newNoteText" class="vt-note-input" placeholder="Write a note…"></textarea>
+              <input type="text" id="newNoteTags" class="vt-note-tags" placeholder="Tags, comma-separated">
+              <div class="new-note-composer-actions">
+                <button class="setsave" onclick="saveGeneralNote()">Save Note</button>
+                <button class="vt-note-delete" onclick="closeNoteComposer()">Cancel</button>
+              </div>
+            </div>
+            <div class="notes-toolbar" id="bookmarksToolbar" style="display:none">
+              <button onclick="exportBookmarksMarkdown()">Export Markdown</button>
+              <button onclick="exportBookmarksJSON()">Export JSON</button>
+              <button onclick="triggerBookmarksImport()">Import</button>
+              <input type="file" id="bookmarksImportInput" accept="application/json" style="display:none" onchange="importBookmarksFile(this)">
+            </div>
+            <div class="notes-toolbar" id="highlightsToolbar" style="display:none">
+              <button onclick="exportHighlightsMarkdown()">Export Markdown</button>
+              <button onclick="exportHighlightsJSON()">Export JSON</button>
+              <button onclick="triggerHighlightsImport()">Import</button>
+              <input type="file" id="highlightsImportInput" accept="application/json" style="display:none" onchange="importHighlightsFile(this)">
+            </div>
+            <div class="notes-toolbar" id="libraryClearHistory">
+              <button onclick="clearHistory()">Clear History</button>
+              <button onclick="exportHistoryMarkdown()">Export Markdown</button>
+              <button onclick="exportHistoryJSON()">Export JSON</button>
+              <button onclick="triggerHistoryImport()">Import</button>
+              <input type="file" id="historyImportInput" accept="application/json" style="display:none" onchange="importHistoryFile(this)">
+            </div>
+          </div>
+          <div class="overlay-results-area">
+            <div class="overlay-results-inner">
+              <div id="libraryResultList"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- explore view — Harmony of the Gospels, Topics, Bible Atlas,
+           Genealogy Explorer, and a Collections tab (Parables/Miracles/
+           Prayers/Names of God/Titles of Jesus/Weights & Measures/Stories) —
+           six endpoint families the app didn't surface anywhere before. Same
+           one-body-many-tabs shell as #libraryOverlay; each tab's controls +
+           results are all rendered by js/explore.js into #exploreBody,
+           including its own list/detail views, rather than pre-built
+           per-tab markup. -->
+      <div id="exploreOverlay" class="mainview" role="region" aria-label="Explore">
+        <div class="overlay-inner">
+          <div class="overlay-topbar">
+            <span class="overlay-title">Explore</span>
+            <button class="overlay-close" onclick="closeExplore()" title="Back to Reading (Esc)">&times;</button>
+          </div>
+          <div class="overlay-search-area">
+            <div class="lib-tabs" id="exploreTabs">
+              <button class="lib-tab" data-tab="atlas" onclick="switchExploreTab('atlas')">Atlas</button>
+              <button class="lib-tab" data-tab="collections" onclick="switchExploreTab('collections')">Collections</button>
+              <button class="lib-tab" data-tab="extrabiblical" onclick="switchExploreTab('extrabiblical')">Extrabiblical</button>
+              <button class="lib-tab" data-tab="genealogy" onclick="switchExploreTab('genealogy')">Genealogy</button>
+              <button class="lib-tab" data-tab="harmony" onclick="switchExploreTab('harmony')">Harmony</button>
+              <button class="lib-tab" data-tab="topics" onclick="switchExploreTab('topics')">Topics</button>
+            </div>
+          </div>
+          <div class="overlay-results-area">
+            <div class="overlay-results-inner" id="exploreBody"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- study tools view — Word Study (Strong's lexicon + every-occurrence
+           lookup), Book Guide, and Textual Variants. Same shell as
+           #exploreOverlay. -->
+      <div id="studyOverlay" class="mainview" role="region" aria-label="Study Tools">
+        <div class="overlay-inner">
+          <div class="overlay-topbar">
+            <span class="overlay-title">Study Tools</span>
+            <button class="overlay-close" onclick="closeStudy()" title="Back to Reading (Esc)">&times;</button>
+          </div>
+          <div class="overlay-search-area">
+            <div class="lib-tabs" id="studyTabs">
+              <button class="lib-tab" data-tab="word" onclick="switchStudyTab('word')">Word Study</button>
+              <button class="lib-tab" data-tab="book" onclick="switchStudyTab('book')">Book Guide</button>
+              <button class="lib-tab" data-tab="variants" onclick="switchStudyTab('variants')">Textual Variants</button>
+            </div>
+          </div>
+          <div class="overlay-results-area">
+            <div class="overlay-results-inner" id="studyBody"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reading Plans — GET /bibles/{version}/reading-plan (General/Topic/
+           M'Cheyne). Same one-body-JS-renders-into-it shell as Explore/Study
+           Tools above; js/plans.js swaps #plansBody between three states
+           (list of saved plans / builder form / a plan's calendar) rather
+           than a single active-plan view — not mainview-narrow like it used
+           to be, since the plans grid and month calendar both want more
+           width than the 640px text-content cap. -->
+      <div id="plansView" class="mainview" role="region" aria-label="Reading Plans">
+        <div class="overlay-topbar">
+          <span class="overlay-title">Reading Plans</span>
+          <button class="overlay-close" onclick="closePlans()" title="Back to Reading (Esc)">&times;</button>
+        </div>
+        <div class="dictbody" id="plansBody"></div>
+        <input type="file" id="planImportFile" accept=".json,.csv" style="display:none" onchange="handlePlanImportFile(event)">
+      </div>
+
+      <!-- devotionals view — Spurgeon's Morning &amp; Evening (GET
+           /devotionals/today or /devotionals/{month}/{day}). Calendar-date
+           only, no year concept and no archive/list endpoint (see
+           NOTES.md) — day-at-a-time browsing only, not a fabricated
+           calendar grid. -->
+      <div id="devotionalsView" class="mainview mainview-narrow" role="region" aria-label="Devotionals">
+        <div class="overlay-topbar">
+          <span class="overlay-title">Devotionals</span>
+          <button class="overlay-close" onclick="switchMainView('read')" title="Back to Reading (Esc)">&times;</button>
+        </div>
+        <div class="devo-daynav">
+          <button class="ov-back" onclick="shiftDevotionalDay(-1)" aria-label="Previous day">&lsaquo;</button>
+          <input type="date" id="devotionalDateInput" onchange="onDevotionalDatePick()">
+          <button class="ov-back ov-back-fwd" onclick="shiftDevotionalDay(1)" aria-label="Next day">&lsaquo;</button>
+          <button class="filter-chip" onclick="goDevotionalToday()">Today</button>
+        </div>
+        <div class="dictbody" id="devotionalsBody"></div>
+        <!-- "Did you read this devotional?" — js/devotionals.js's
+             renderDevoReadPrompt(), called after every render. A sibling of
+             #devotionalsBody, not a child, so its innerHTML replacement
+             never wipes it (same pattern as #chapterReadPrompt). -->
+        <div id="devoReadPrompt"></div>
+      </div>
+
+      <!-- share tools view — GET /embed/verse and GET /image/verse, both
+           deliberately public/unauthenticated endpoints in the API
+           (registered outside the key-gated route group), so this works
+           with zero friction. -->
+      <div id="shareToolView" class="mainview mainview-narrow" role="region" aria-label="Share Tools">
+        <div class="overlay-topbar">
+          <span class="overlay-title">Share Tools</span>
+          <button class="overlay-close" onclick="switchMainView('read')" title="Back to Reading (Esc)">&times;</button>
+        </div>
+        <div class="dictbody" id="shareToolBody"></div>
+      </div>
+
+      <!-- Settings — same mainview pattern as Search/Explore/Devotionals
+           above (switchMainView, js/main.js), not a modal: browsable/
+           linkable the same way, and a narrow centered column
+           (.mainview-narrow) gives the form more room than the old
+           fixed-width modal did. Must live inside #readMain like every
+           other mainview here — it was previously a stray sibling of
+           #shell, which made it a 3rd flex child of #app's column layout:
+           opening it squeezed #shell (nav rail + reading column + right
+           rail) down to a sliver that #app's overflow:hidden then clipped,
+           instead of actually replacing the reading column. -->
+      <div id="settingsView" class="mainview mainview-narrow" role="region" aria-label="Settings">
+        <div class="overlay-topbar">
+          <span class="overlay-title">Settings</span>
+          <button class="overlay-close" onclick="closeSettings()" title="Back to Reading (Esc)">&times;</button>
+        </div>
+        <div class="dictbody">
+          <div class="settingsbody">
+            <!-- Wrapped in its own <form> so Chrome's password-manager heuristics
+                 (which, absent any <form> boundary, treat the *entire* page as one
+                 implicit form) stop pairing this password field with unrelated text
+                 inputs elsewhere in the DOM — that pairing was surfacing "Save
+                 password?" prompts when typing in, e.g., the version-search box. -->
+            <form autocomplete="off" onsubmit="return false">
+              <div class="setfield">
+                <label for="settingsKeyInput">API Key</label>
+                <input type="password" id="settingsKeyInput" placeholder="iqb_live_…" autocomplete="off">
+                <div class="hint">Free at <a href="https://developer.iqbible.com" target="_blank" rel="noopener">developer.iqbible.com</a>. Stored only in this browser's local storage — never sent anywhere but the IQ Bible API.</div>
+              </div>
+              <button class="setsave" onclick="saveSettings()">Save</button>
+            </form>
+
+            <!-- Display prefs apply immediately (no Save/reload needed) — kept
+                 outside the API-key <form> above so they're independent of it.
+                 Wrapped so body.no-key-lockdown (js/api.js's showKeyBanner())
+                 can disable this whole group while leaving the API Key field/
+                 Save button above as the only usable thing in Settings until
+                 a key is actually saved — see css/styles.css. -->
+            <div id="settingsPrefs">
+              <div class="setfield">
+                <label for="settingsIllustSelect">Illustrations</label>
+                <select id="settingsIllustSelect" onchange="setIllustPack(this.value)">
+                  <option value="off">Off</option>
+                  <option value="schnorr">Schnorr</option>
+                  <option value="dore">Doré</option>
+                  <option value="sweet">Sweet</option>
+                </select>
+              </div>
+              <div class="setfield-check">
+                <input type="checkbox" id="settingsIllustBW" onchange="setIllustBW(this.checked)">
+                <label for="settingsIllustBW">Black &amp; White Illustrations</label>
+              </div>
+              <div class="setfield">
+                <label for="settingsIconSelect">Book Icons</label>
+                <select id="settingsIconSelect" onchange="setIconStyle(this.value)">
+                  <option value="off">Off</option>
+                  <option value="color">Color</option>
+                  <option value="bw">Black &amp; White</option>
+                </select>
+              </div>
+              <div class="setfield">
+                <label for="settingsFontSlider">Reading Font Size</label>
+                <input type="range" id="settingsFontSlider" min="14" max="26" step="1" oninput="setFontSize(this.value)">
+              </div>
+              <div class="setfield">
+                <label for="settingsUiFontSlider">Interface Font Size</label>
+                <input type="range" id="settingsUiFontSlider" min="13" max="20" step="1" oninput="setUiFontSize(this.value)">
+                <div class="hint">Menus, buttons, and labels — everything except the Bible text above.</div>
+              </div>
+              <div class="setfield-check">
+                <input type="checkbox" id="settingsExportReminder" onchange="setExportReminderEnabled(this.checked)">
+                <label for="settingsExportReminder">Remind me to back up my data</label>
+              </div>
+              <div class="setfield">
+                <label>Compare Versions <span class="hint" style="display:inline">— used in Verse Tools &gt; Compare</span></label>
+                <div class="compare-chip-row" id="settingsCompareChips"></div>
+                <button class="filter-chip" style="margin-top:8px" onclick="openVersionPicker('compare-default')">+ Add Version</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- About — static content, no fetches. Mirrors README.md's public
+           framing; must never reference the private backend repo or its
+           internal versioning (see CLAUDE.md's public-facing-content rule). -->
+      <div id="aboutView" class="mainview mainview-narrow" role="region" aria-label="About">
+        <div class="overlay-topbar">
+          <span class="overlay-title">About</span>
+          <button class="overlay-close" onclick="closeAbout()" title="Back to Reading (Esc)">&times;</button>
+        </div>
+        <div class="dictbody">
+          <div class="about-hero">
+            <img src="/img/logo.png" alt="" class="about-hero-logo">
+            <h1>About IQ Bible</h1>
+            <p>A free, open-source Bible reader — and a worked example of building a real app on the <a href="https://api.iqbible.com" target="_blank" rel="noopener">IQ Bible API</a>. Every feature here comes from a real API call.</p>
+          </div>
+
+          <div class="about-section-label">What It Demonstrates</div>
+          <div class="about-chips">
+            <span class="filter-chip">Version / book / chapter nav</span>
+            <span class="filter-chip">1,000+ languages</span>
+            <span class="filter-chip">Full-text search</span>
+            <span class="filter-chip">Inline illustrations</span>
+            <span class="filter-chip">Audio narration</span>
+            <span class="filter-chip">Cross-references</span>
+            <span class="filter-chip">Commentaries</span>
+            <span class="filter-chip">Original-language lookups</span>
+            <span class="filter-chip">Bible atlas</span>
+            <span class="filter-chip">Reading plans</span>
+          </div>
+
+          <p class="about-runs">It runs as a plain static site with zero backend of its own — no server, no build step, no framework, just HTML/CSS and a handful of vanilla JavaScript files. Every visitor brings their own free API key, stored only in this browser's local storage.</p>
+
+          <div class="about-callouts">
+            <div class="about-callout">
+              <div class="about-callout-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.73.5.75 5.48.75 11.75c0 5.02 3.26 9.28 7.78 10.78.57.1.78-.25.78-.55v-2.1c-3.17.69-3.83-1.36-3.83-1.36-.52-1.31-1.26-1.66-1.26-1.66-1.03-.7.08-.69.08-.69 1.14.08 1.74 1.17 1.74 1.17 1.01 1.73 2.65 1.23 3.3.94.1-.73.4-1.23.72-1.51-2.53-.29-5.19-1.27-5.19-5.63 0-1.24.44-2.26 1.17-3.06-.12-.29-.51-1.45.11-3.02 0 0 .96-.31 3.14 1.17a10.9 10.9 0 0 1 5.72 0c2.18-1.48 3.14-1.17 3.14-1.17.62 1.57.23 2.73.11 3.02.73.8 1.17 1.82 1.17 3.06 0 4.37-2.67 5.34-5.21 5.62.41.36.77 1.07.77 2.16v3.2c0 .3.21.66.79.55 4.51-1.51 7.77-5.76 7.77-10.78C23.25 5.48 18.27.5 12 .5z"/></svg>
+              </div>
+              <div class="about-callout-title">Open Source</div>
+              <div class="about-callout-body">MIT-licensed and open on GitHub. Fork it, self-host it, or use it as a reference for your own app on the API.</div>
+              <a class="about-callout-link" href="https://github.com/jody-pm/iqbible-app" target="_blank" rel="noopener">github.com/jody-pm/iqbible-app</a>
+            </div>
+            <div class="about-callout">
+              <div class="about-callout-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-9.5 9.5"/><path d="M15 4l5 5-2 2-5-5z"/><circle cx="7" cy="17" r="4"/></svg>
+              </div>
+              <div class="about-callout-title">Get an API Key</div>
+              <div class="about-callout-body">Free, no card required — used only by this browser, stored only in this browser.</div>
+              <a class="about-callout-link about-callout-link-brand" href="https://developer.iqbible.com" target="_blank" rel="noopener">developer.iqbible.com</a>
+            </div>
+          </div>
+
+          <p class="hint about-version">IQ Bible App v<span id="aboutVersion"></span></p>
+        </div>
+      </div>
+
+      <!-- Help — static content, no fetches (same pattern as About). Keep
+           this in sync whenever a nav feature is added/renamed/removed —
+           see CLAUDE.md. -->
+      <div id="helpView" class="mainview mainview-narrow" role="region" aria-label="Help">
+        <div class="overlay-topbar">
+          <span class="overlay-title">Help</span>
+          <button class="overlay-close" onclick="closeHelp()" title="Back to Reading (Esc)">&times;</button>
+        </div>
+        <div class="dictbody">
+
+          <div class="help-hero">
+            <div class="help-hero-text">
+              <h1>How can we help you read?</h1>
+              <p>Everything below is a real feature, one call away from the IQ Bible API. New here? The tour walks you through the app in about two minutes.</p>
+            </div>
+            <div class="help-hero-actions">
+              <button class="help-tour-btn" onclick="startTour()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                Take a Tour
+              </button>
+              <button class="help-tour-btn secondary" onclick="startAdvancedTour()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                Advanced Tour
+              </button>
+            </div>
+          </div>
+
+          <div class="about-section-label" style="text-align:left">Getting Started</div>
+          <div class="help-grid">
+            <div class="help-card">
+              <div class="help-card-num">01</div>
+              <div class="help-card-title">Get a free API key</div>
+              <div class="help-card-body">Grab one at developer.iqbible.com — no card required.</div>
+            </div>
+            <div class="help-card">
+              <div class="help-card-num">02</div>
+              <div class="help-card-title">Add it in Settings</div>
+              <div class="help-card-body">Paste the key in; it stays only in this browser.</div>
+            </div>
+            <div class="help-card">
+              <div class="help-card-num">03</div>
+              <div class="help-card-title">Start reading</div>
+              <div class="help-card-body">Pick a version and book, or jump in with Take a Tour.</div>
+            </div>
+          </div>
+
+          <div class="about-section-label" style="text-align:left">Explore the Features</div>
+          <div class="help-grid">
+            <div class="help-card">
+              <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>
+              <div class="help-card-title">Read</div>
+              <div class="help-card-body">Version, book and chapter navigation across 1,000+ languages.</div>
+            </div>
+            <div class="help-card">
+              <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></div>
+              <div class="help-card-title">Search</div>
+              <div class="help-card-body">Full-text search across the whole Bible, any version.</div>
+            </div>
+            <div class="help-card">
+              <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z"/></svg></div>
+              <div class="help-card-title">Explore</div>
+              <div class="help-card-body">A Gospel harmony, topic browser, Bible atlas, genealogy explorer and curated collections.</div>
+            </div>
+            <div class="help-card">
+              <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h6M10 2v6.5L4.5 18a2 2 0 0 0 1.7 3h11.6a2 2 0 0 0 1.7-3L14 8.5V2"/></svg></div>
+              <div class="help-card-title">Study Tools</div>
+              <div class="help-card-body">A Strong's word study, a cross-reference graph, per-book guides and NT textual variants.</div>
+            </div>
+            <div class="help-card">
+              <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.5 15.4 6.5M8.6 13.5l6.8 4"/></svg></div>
+              <div class="help-card-title">Share Tools</div>
+              <div class="help-card-body">Turn any verse into an image, link or embeddable card.</div>
+            </div>
+            <div class="help-card">
+              <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-6-4-6 4z"/></svg></div>
+              <div class="help-card-title">My Library</div>
+              <div class="help-card-body">Notes, bookmarks, highlights and history, all in one place.</div>
+            </div>
+            <div class="help-card">
+              <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg></div>
+              <div class="help-card-title">My Progress</div>
+              <div class="help-card-body">A streak calendar, read counts and your active plan's progress, all in one place.</div>
+            </div>
+            <div class="help-card">
+              <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div>
+              <div class="help-card-title">Reading Plans</div>
+              <div class="help-card-body">Build or import a plan and track it day by day on a calendar.</div>
+            </div>
+            <div class="help-card">
+              <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2c-1 4-5 5-5 10a5 5 0 0 0 10 0c0-2-1-3-2-4 .5 2-1 3-2 2-1.5-1-1-3-1-3s-1 1-1 3c0-3 2-4 1-8z"/></svg></div>
+              <div class="help-card-title">Devotionals</div>
+              <div class="help-card-body">A new reading each day, with its own progress tracking.</div>
+            </div>
+            <div class="help-card">
+              <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 0 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 0 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.55V3a2 2 0 0 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.55 1H21a2 2 0 0 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1z"/></svg></div>
+              <div class="help-card-title">Settings</div>
+              <div class="help-card-body">Your API key, font size, and reading preferences.</div>
+            </div>
+          </div>
+
+          <div class="about-section-label" style="text-align:left">Frequently Asked</div>
+          <div class="help-faq-item">
+            <div class="help-faq-q">Do I need an account?</div>
+            <div class="help-faq-a">No — just a free API key, stored only in your browser's local storage.</div>
+          </div>
+          <div class="help-faq-item">
+            <div class="help-faq-q">Why is a feature missing something I expected?</div>
+            <div class="help-faq-a">Every feature here is a direct call to the IQ Bible API — if the data isn't in the API's response, it isn't shown.</div>
+          </div>
+          <div class="help-faq-item">
+            <div class="help-faq-q">Does this include audio narration?</div>
+            <div class="help-faq-a">Versions with narration available show an inline player above the reading text — a caret next to it lets you pick a different narrator when a version has more than one recorded.</div>
+          </div>
+          <div class="help-faq-item">
+            <div class="help-faq-q">What are the cards next to the reading pane?</div>
+            <div class="help-faq-a">Per-chapter context, pulled live for whatever chapter you're reading — places (with maps), characters, prophecy fulfillments and a timeline.</div>
+          </div>
+          <div class="help-faq-item">
+            <div class="help-faq-q">Can I use this on my phone?</div>
+            <div class="help-faq-a">Yes, the reader is fully responsive; the side rails hide below about 1180px wide.</div>
+          </div>
+          <div class="help-faq-item">
+            <div class="help-faq-q">Is my data backed up anywhere?</div>
+            <div class="help-faq-a">Notes, bookmarks, highlights and progress live in local storage on this device only — export from My Library to back them up.</div>
+          </div>
+          <div class="help-faq-item">
+            <div class="help-faq-q">Is this open source?</div>
+            <div class="help-faq-a">Yes, MIT-licensed — see the About page for the repository link.</div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- My Progress — dynamic, rendered by js/progress.js from the same
+           local reading Progress the chapter/devotional "did you read?"
+           prompts write to, plus each plan's own completedDays. Richer than
+           the profile popover's "Your Reading" quick-glance stats. -->
+      <div id="myProgressView" class="mainview mainview-narrow" role="region" aria-label="My Progress">
+        <div class="overlay-topbar">
+          <span class="overlay-title">My Progress</span>
+          <button class="overlay-close" onclick="closeMyProgress()" title="Back to Reading (Esc)">&times;</button>
+        </div>
+        <div class="dictbody" id="myProgressBody"></div>
+      </div>
+    </div>
+
+    <!-- Verse Tools panel — click a verse number to select it (shift-click
+         extends a range) and this pops up immediately with every tool ready
+         to go, no separate "open" click. Deliberately NOT a .modalscrim: it
+         has no backdrop and doesn't block the page, so the reading text
+         stays clickable underneath it — shift-clicking another verse number
+         to extend the range still works while it's open. -->
+    <div id="verseToolsPanel">
+      <div class="vtp-head">
+        <span id="vtTitle">Verse Tools</span>
+        <button class="panel-close" onclick="closeVerseTools()" title="Close" aria-label="Close">&times;</button>
+      </div>
+      <div class="vtgrid">
+        <div class="vtcell vtcolors">
+          <button class="vtswatch hl-yellow" data-color="yellow" onclick="applyHighlightColor('yellow')" title="Yellow highlight" aria-label="Yellow highlight"></button>
+          <button class="vtswatch hl-green" data-color="green" onclick="applyHighlightColor('green')" title="Green highlight" aria-label="Green highlight"></button>
+          <button class="vtswatch hl-blue" data-color="blue" onclick="applyHighlightColor('blue')" title="Blue highlight" aria-label="Blue highlight"></button>
+          <button class="vtswatch hl-pink" data-color="pink" onclick="applyHighlightColor('pink')" title="Pink highlight" aria-label="Pink highlight"></button>
+        </div>
+        <button class="vtcell vtbtn" onclick="toggleBookmarkSelection()">Bookmark</button>
+        <button class="vtcell vtbtn" onclick="openNoteTool()">Note</button>
+        <button class="vtcell vtbtn" onclick="copySelection()">Copy</button>
+        <button class="vtcell vtbtn" onclick="showShareTool()">Share</button>
+        <button class="vtcell vtbtn" onclick="showOriginalLanguageTool()">Orig. Language</button>
+        <button class="vtcell vtbtn" onclick="showCrossRefsTool()">Cross-refs</button>
+        <button class="vtcell vtbtn" onclick="showCommentaryTool()">Commentary</button>
+        <button class="vtcell vtbtn" onclick="showCompareTool()">Compare</button>
+        <button class="vtcell vtbtn" onclick="showTopicsTool()">Topics</button>
+      </div>
+      <div class="vtp-body" id="vtBody"><div class="dd-empty">Choose a tool above.</div></div>
+    </div>
+
+    <div id="rightRail">
+      <!-- Only rendered/visible below 1180px, where #rightRail is repositioned
+           (css/styles.css) into a bottom sheet toggled by #btnCardsSheet
+           instead of a static side column. -->
+      <div class="rightrail-sheethead">
+        <span class="overlay-title">Chapter Info</span>
+        <button class="overlay-close" onclick="closeCardsSheet()" title="Close">&times;</button>
+      </div>
+      <div class="cardstack" id="cardStack"></div>
+    </div>
+  </div>
+
+  <!-- Backdrop for the #rightRail bottom sheet above — a .modalscrim like
+       every other detail popup, so the existing generic
+       "click the scrim to close" listener (js/main.js) needs only the one
+       #cardsSheetScrim special case to also toggle #rightRail's own .show
+       class (the scrim and the sheet are two separate elements here, unlike
+       a normal modal, since the sheet slides from #rightRail's real DOM
+       position rather than being centered). -->
+  <div class="modalscrim" id="cardsSheetScrim"></div>
+
+  <!-- Fixed bottom nav — replaces #navrail below 1180px, where the left rail
+       is hidden entirely. Search is deliberately left out (already reachable
+       via #searchTrigger in the topbar at every width); "More" opens
+       #moreMenuSheet with the rest of #navMenu's items. -->
+  <nav id="mobileFooterNav" aria-label="Primary">
+    <button class="mfn-item" data-nav="read" onclick="navMenuClick('read')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      <span>Read</span>
+    </button>
+    <button class="mfn-item" data-nav="explore" onclick="navMenuClick('explore')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m9 15 1.5-4.5L15 9l-1.5 4.5z"/></svg>
+      <span>Explore</span>
+    </button>
+    <button class="mfn-item" data-nav="study" onclick="navMenuClick('study')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M9 7h6M9 11h6"/></svg>
+      <span>Study</span>
+    </button>
+    <button class="mfn-item" data-nav="share" onclick="navMenuClick('share')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.8"/><circle cx="6" cy="12" r="2.8"/><circle cx="18" cy="19" r="2.8"/><path d="M8.5 10.5l7-4M8.5 13.5l7 4"/></svg>
+      <span>Share</span>
+    </button>
+    <button class="mfn-item" id="mfnMoreBtn" onclick="toggleMoreMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>
+      <span>More</span>
+    </button>
+  </nav>
+  <div id="moreMenuSheet">
+    <button class="navitem" data-nav="library" onclick="navMenuClick('library');closeMoreMenu()">My Library</button>
+    <button class="navitem" data-nav="progress" onclick="navMenuClick('progress');closeMoreMenu()">My Progress</button>
+    <button class="navitem" data-nav="plans" onclick="navMenuClick('plans');closeMoreMenu()">Reading Plans</button>
+    <button class="navitem" data-nav="devotionals" onclick="navMenuClick('devotionals');closeMoreMenu()">Devotionals</button>
+    <hr class="navdivider">
+    <button class="navitem" data-nav="help" onclick="navMenuClick('help');closeMoreMenu()">Help</button>
+    <button class="navitem" data-nav="about" onclick="navMenuClick('about');closeMoreMenu()">About</button>
+    <button class="navitem" data-nav="settings" onclick="navMenuClick('settings');closeMoreMenu()">Settings</button>
+  </div>
+
+  <!-- API key gate — shown whenever no key is set (first load, or after
+       clearing one in Settings). A full-screen blocking overlay of its own
+       rather than a .modalscrim: every feature in this app needs a key, so
+       unlike every other modal there's deliberately no backdrop-click/
+       Escape dismissal and nothing underneath (topbar, nav rail, any
+       mainview) is reachable while it's up. See showKeyBanner()/
+       hideKeyBanner(), js/api.js. -->
+  <div id="keyBanner">
+    <div class="kb-box">
+      <p>Set your API key in Settings to start reading — get one free at <a href="https://developer.iqbible.com" target="_blank" rel="noopener">developer.iqbible.com</a>. Want to see what the API can do first? Learn more at <a href="https://api.iqbible.com" target="_blank" rel="noopener">api.iqbible.com</a>.</p>
+      <button onclick="hideKeyBanner();openSettings()">Open Settings</button>
+    </div>
+  </div>
+
+  <!-- version picker -->
+  <div class="modalscrim" id="versionPickerScrim">
+    <div class="modal">
+      <div class="mhead">
+        <div class="row"><h2 id="versionPickerTitle">Choose a translation</h2><button class="closebtn" onclick="closeModal('versionPickerScrim')">&times;</button></div>
+        <div class="msearch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8"/></svg><input type="text" id="versionSearchInput" placeholder="Search 1,000+ languages or a version name…" oninput="onVersionSearch()" autocomplete="off"></div>
+        <div class="mfilters">
+          <button class="filter-chip" id="audioFilterChip" onclick="toggleAudioFilter()">
+            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 5V4L8 9H4Z"/><path d="M17 8a5 5 0 0 1 0 8"/></svg>
+            Has audio
+          </button>
+        </div>
+      </div>
+      <div class="langrow" id="langRow"></div>
+      <div class="mlist" id="versionList"></div>
+    </div>
+  </div>
+
+  <!-- book picker -->
+  <div class="modalscrim" id="bookPickerScrim">
+    <div class="modal" style="width:660px">
+      <div class="mhead">
+        <div class="row"><h2>Choose a book</h2><button class="closebtn" onclick="closeModal('bookPickerScrim')">&times;</button></div>
+        <div class="msearch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8"/></svg><input type="text" id="bookSearchInput" placeholder="Search books…" oninput="onBookSearch()" autocomplete="off"></div>
+      </div>
+      <div class="mlist" id="bookList"></div>
+    </div>
+  </div>
+
+  <!-- chapter picker -->
+  <div class="modalscrim" id="chapterPickerScrim">
+    <div class="modal narrow" style="width:400px">
+      <div class="mhead"><div class="row"><h2 id="chapterPickerTitle">Choose a chapter</h2><button class="closebtn" onclick="closeModal('chapterPickerScrim')">&times;</button></div></div>
+      <div class="chipgrid" id="chapterGrid"></div>
+    </div>
+  </div>
+
+  <!-- quick book-info modal — opened via the reading header's (i) button; a
+       lightweight preview of GET /books/{book}/info (author/date/canonical
+       significance/short introduction) before committing to the full Study
+       Tools > Book Guide. -->
+  <div class="modalscrim" id="bookInfoScrim">
+    <div class="modal narrow">
+      <div class="mhead"><div class="row"><h2 id="bookInfoTitle">Book</h2><button class="closebtn" onclick="closeModal('bookInfoScrim')">&times;</button></div></div>
+      <div class="dictbody" id="bookInfoBody"></div>
+    </div>
+  </div>
+
+  <!-- narration picker — only opened when a chapter has more than one active narration -->
+  <div class="modalscrim" id="narrationPickerScrim">
+    <div class="modal narrow" style="width:400px">
+      <div class="mhead"><div class="row"><h2>Choose a voice</h2><button class="closebtn" onclick="closeModal('narrationPickerScrim')">&times;</button></div></div>
+      <div class="mlist" id="narrationList"></div>
+    </div>
+  </div>
+
+  <!-- Quick font-size popover — the same two sliders as Settings, surfaced
+       next to Search/day-night in the topbar so changing text size doesn't
+       need a trip through the full Settings modal. setFontSize/setUiFontSize
+       (js/api.js) keep this and the Settings sliders in sync either way. -->
+  <div class="modalscrim" id="fontSizeScrim">
+    <div class="modal narrow" style="width:340px">
+      <div class="mhead"><div class="row"><h2>Font Size</h2><button class="closebtn" onclick="closeModal('fontSizeScrim')">&times;</button></div></div>
+      <div class="settingsbody">
+        <div class="setfield">
+          <label for="fontSizeSlider">Reading Font Size</label>
+          <input type="range" id="fontSizeSlider" min="14" max="26" step="1" oninput="setFontSize(this.value)">
+        </div>
+        <div class="setfield">
+          <label for="fontSizeUiSlider">Interface Font Size</label>
+          <input type="range" id="fontSizeUiSlider" min="13" max="20" step="1" oninput="setUiFontSize(this.value)">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- API error modal — 429/5xx only (a routine 404, which this app relies
+       on constantly for "no illustrations/places/characters/etc. here",
+       still just toasts — a mandatory-dismiss modal on every one of those
+       would make normal browsing unusable). Has to be dismissed rather than
+       auto-hiding like the toast, since the whole point is making sure a
+       developer testing against a free-tier key actually sees what
+       happened and why, not a glance-and-forget. -->
+  <div class="modalscrim" id="apiErrorScrim">
+    <div class="modal narrow">
+      <div class="mhead"><div class="row"><h2 id="apiErrorTitle">API Error</h2><button class="closebtn" onclick="closeModal('apiErrorScrim')">&times;</button></div></div>
+      <div class="dictbody" id="apiErrorBody"></div>
+      <div style="padding:0 24px 24px"><button class="setsave" style="margin-bottom:0" onclick="closeModal('apiErrorScrim')">Dismiss</button></div>
+    </div>
+  </div>
+
+  <!-- dictionary term modal — opened by clicking an underlined word in the
+       reading text; tabs let the reader check the same term across all 5
+       dictionary sources instead of just the Easton's entry that triggered
+       the underline. -->
+  <div class="modalscrim" id="dictTermScrim">
+    <div class="modal narrow">
+      <div class="mhead">
+        <div class="row"><h2 id="dictTermTitle">Term</h2><button class="closebtn" onclick="closeModal('dictTermScrim')">&times;</button></div>
+        <div class="dicttabs" id="dictTabs"></div>
+      </div>
+      <div class="dictbody" id="dictBody"></div>
+    </div>
+  </div>
+
+  <!-- places modal — opened from the right rail's Places card; embeds a
+       plain OpenStreetMap iframe per place with resolved coordinates (no
+       mapping library, just a URL-based embed, same spirit as the Google
+       Fonts <link> already in <head>). -->
+  <div class="modalscrim" id="placesScrim">
+    <div class="modal" style="width:560px">
+      <div class="mhead"><div class="row"><h2 id="placesTitle">Places</h2><button class="closebtn" onclick="closeModal('placesScrim')">&times;</button></div></div>
+      <div class="dictbody" id="placesBody"></div>
+    </div>
+  </div>
+
+  <!-- day drawer — opened from a Reading Plans calendar day cell (js/plans.js
+       openDayDrawer). The day box itself already shows the readings inline;
+       this is for the "mark day complete" checkbox and the full
+       hover-previewable reference list (verse-level Topic refs get the
+       citation-preview treatment here, same as everywhere else). -->
+  <div class="modalscrim" id="dayDrawerScrim">
+    <div class="modal" style="width:460px">
+      <div class="dictbody" id="dayDrawerBody"></div>
+    </div>
+  </div>
+
+  <!-- timeline modal — opened from the right rail's always-shown Timeline
+       card. /chronology has no per-chapter filter server-side, so this
+       shows the full curated list (already fetched once and cached) with
+       the current chapter's own entries, if any, highlighted and
+       scrolled-to. -->
+  <div class="modalscrim" id="timelineScrim">
+    <div class="modal" style="width:560px">
+      <div class="mhead"><div class="row"><h2>Timeline</h2><button class="closebtn" onclick="closeModal('timelineScrim')">&times;</button></div></div>
+      <div class="dictbody" id="timelineBody"></div>
+    </div>
+  </div>
+
+  <!-- prophecies modal — opened from the right rail's Prophecies card. -->
+  <div class="modalscrim" id="propheciesScrim">
+    <div class="modal" style="width:560px">
+      <div class="mhead"><div class="row"><h2 id="propheciesTitle">Prophecies</h2><button class="closebtn" onclick="closeModal('propheciesScrim')">&times;</button></div></div>
+      <div class="dictbody" id="propheciesBody"></div>
+    </div>
+  </div>
+
+  <!-- characters modal — opened from the right rail's Characters card. List
+       view shows the raw, unfiltered chapter character list (see reader.js's
+       loadCharactersCard / NOTES.md — no client-side filtering, per
+       CLAUDE.md's GOLDEN RULE); detail view resolves one name via the
+       exact-match GET /bible-characters/{name} lookup, a real endpoint this
+       app didn't use before. -->
+  <div class="modalscrim" id="charactersScrim">
+    <div class="modal" style="width:560px">
+      <div class="mhead">
+        <div class="row">
+          <div class="mhead-titlewrap">
+            <button class="ov-back" id="charactersBackBtn" style="display:none" onclick="renderCharactersList()" aria-label="Back">&lsaquo;</button>
+            <h2 id="charactersTitle">Characters</h2>
+          </div>
+          <button class="closebtn" onclick="closeModal('charactersScrim')">&times;</button>
+        </div>
+      </div>
+      <div class="dictbody" id="charactersBody"></div>
+    </div>
+  </div>
+
+  <!-- Verse Tools > Share — a real modal (not squeezed into the small
+       #verseToolsPanel) so there's room for the image preview and every
+       share action. Closing it just hides the modal (closeModal) without
+       touching #vtBody, so the small panel underneath still shows whatever
+       tool was open before Share was clicked, instead of losing it. -->
+  <div class="modalscrim" id="vtShareScrim">
+    <div class="modal" style="width:640px">
+      <div class="mhead"><div class="row"><h2>Share</h2><button class="closebtn" onclick="closeModal('vtShareScrim')">&times;</button></div></div>
+      <div class="dictbody" id="vtShareBody"></div>
+    </div>
+  </div>
+
+  <!-- Verse Tools > Original Language — same "real modal, not squeezed into
+       the small panel" treatment as Share above. -->
+  <div class="modalscrim" id="vtOrigLangScrim">
+    <div class="modal" style="width:640px">
+      <div class="mhead"><div class="row"><h2 id="vtOrigLangTitle">Original Language</h2><button class="closebtn" onclick="closeModal('vtOrigLangScrim')">&times;</button></div></div>
+      <div class="dictbody" id="vtOrigLangBody"></div>
+    </div>
+  </div>
+
+  <!-- full-size illustration/place-photo/map viewer — #imageViewMap is a
+       real interactive Leaflet map (English-labeled tiles) for a place with
+       coordinates. -->
+  <div class="modalscrim" id="imageViewScrim">
+    <div class="modal">
+      <button class="closebtn" onclick="closeImageView()">&times;</button>
+      <img id="imageViewImg" src="" alt="">
+      <div id="imageViewMap" style="display:none"></div>
+      <div class="cap" id="imageViewCap"></div>
+    </div>
+  </div>
+
+  <!-- Take a Tour — welcome dialog (shown once, first visit; see
+       maybeShowTourWelcome, js/tour.js) plus the guided walkthrough itself
+       (#tourOverlay), a spotlight over real topbar/nav-rail elements rather
+       than a fake screenshot of them. -->
+  <div class="modalscrim" id="tourWelcomeScrim">
+    <div class="tour-welcome-box">
+      <div class="tour-welcome-icon">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
+      </div>
+      <h2>Welcome to IQ Bible</h2>
+      <p>Want a two-minute tour of what's here — search, reading plans, notes and more?</p>
+      <button class="setsave" style="margin-bottom:0" onclick="startTourFromWelcome()">Take the Tour</button>
+      <button class="tour-welcome-later" onclick="dismissTourWelcome()">Maybe later</button>
+    </div>
+  </div>
+  <!-- Offered right when the basic tour finishes (tourNext(), js/tour.js) —
+       its last step is Verse Tools, so the panel's already open on a demo
+       verse; accepting continues straight into ADVANCED_VERSE_TOOLS_STEPS
+       (the same steps as the first section of the Advanced Tour) without
+       re-selecting anything. -->
+  <div class="modalscrim" id="tourAdvancedOfferScrim">
+    <div class="tour-welcome-box">
+      <div class="tour-welcome-icon">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
+      </div>
+      <h2>Want to go deeper on Verse Tools?</h2>
+      <p>Highlight, bookmark, notes, cross-refs, and more — see what each button does, one at a time.</p>
+      <button class="setsave" style="margin-bottom:0" onclick="acceptAdvancedOffer()">Show Me</button>
+      <button class="tour-welcome-later" onclick="closeModal('tourAdvancedOfferScrim')">No Thanks</button>
+    </div>
+  </div>
+  <div id="tourOverlay">
+    <div id="tourClickBlock"></div>
+    <div id="tourSpotlight"></div>
+    <div id="tourTooltip">
+      <div id="tourTooltipText"></div>
+      <div class="tour-tooltip-foot">
+        <div id="tourDots" class="tour-dots"></div>
+        <div class="tour-tooltip-actions">
+          <button id="tourBackBtn" class="tour-text-btn" onclick="tourBack()">Back</button>
+          <button class="tour-text-btn" onclick="tourSkip()">Skip</button>
+          <button id="tourNextBtn" class="tour-next-btn" onclick="tourNext()">Next</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+  <div id="dictTooltip" class="dict-tooltip"></div>
+</div>
+
+<!-- Plain sequential scripts, no bundler, no ES modules — so double-clicking
+     index.html and opening it directly still works (ES modules don't run
+     over file:// in Chrome). Order matters: each file after config.js/api.js
+     references state and helpers defined in the ones before it. -->
+<script src="/js/config.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/catalog.js"></script>
+<script src="/js/reader.js"></script>
+<script src="/js/search.js"></script>
+<script src="/js/notes.js"></script>
+<script src="/js/devotionals.js"></script>
+<script src="/js/profile.js"></script>
+<script src="/js/share.js"></script>
+<script src="/js/explore.js"></script>
+<script src="/js/study.js"></script>
+<script src="/js/plans.js"></script>
+<script src="/js/progress.js"></script>
+<script src="/js/router.js"></script>
+<script src="/js/tour.js"></script>
+<script src="/js/main.js"></script>
+</body>
+</html>
