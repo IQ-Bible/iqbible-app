@@ -16,7 +16,7 @@ const API_BASE = "https://api.iqbible.com/api/v2";
 // tags also need the "/reponame" prefix added by hand — this constant alone
 // doesn't reach them, since it's defined in a script tag that loads after
 // the <link>/<script> tags that need it.
-const BASE_PATH = "";
+const BASE_PATH = "/iqbible-app";
 
 // Shown in the left nav footer. Bump alongside a CHANGELOG.md version cut.
 const APP_VERSION = "0.1.0";

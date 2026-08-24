@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file. This CHANGELOG follows SemVer, see https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
+- **changed:** Deployed to GitHub Pages as a project site
+  (`https://jody-pm.github.io/iqbible-app/`) — set `BASE_PATH` (`js/config.js`) to `/iqbible-app`
+  and prefixed `index.html`/`404.html`'s root-absolute `css`/`js`/`img` references accordingly, per
+  the setup those files already documented for this exact case.
 - **added:** A fixed bottom nav bar below 1180px (where the left nav rail has no room) — Read,
   Explore, Study Tools, Share Tools, and a "More" dropup for My Library/My Progress/Reading
   Plans/Devotionals/Help/About/Settings. Search is reachable from the topbar instead, at every width.
