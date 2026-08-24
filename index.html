@@ -776,7 +776,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
 
   <!-- book picker -->
   <div class="modalscrim" id="bookPickerScrim">
-    <div class="modal" style="width:660px">
+    <div class="modal">
       <div class="mhead">
         <div class="row"><h2>Choose a book</h2><button class="closebtn" onclick="closeModal('bookPickerScrim')">&times;</button></div>
         <div class="msearch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8"/></svg><input type="text" id="bookSearchInput" placeholder="Search books…" oninput="onBookSearch()" autocomplete="off"></div>

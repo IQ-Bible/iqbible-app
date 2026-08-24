@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file. This CHANGE
 ## [Unreleased]
 - n/a
 
+## [1.2.1] - 2026-08-24
+- **fixed:** Three mobile-viewport bugs. (1) Tapping a Places/People/Prophecies/Timeline card from
+  the mobile "Chapter Info" bottom sheet opened that card's detail modal underneath the still-open
+  sheet (the sheet's z-index is higher), making it invisible until the sheet was manually closed —
+  the sheet now closes itself when any of those modals opens. (2) The book picker's grid rendered up
+  to 10 columns across a 660px-wide modal that had no responsive width at all (a hardcoded inline
+  style, immune to the existing mobile CSS meant to shrink it) — abbreviations were unreadable and
+  much of the grid sat off-screen with no way to reach it. The modal now actually shrinks on mobile,
+  and the grid is fixed at 4 columns there regardless of book count. (3) Choose a Book/Translation
+  both autofocused their search field on open, popping the keyboard immediately even before the
+  reader asked to search, and once typing did happen the keyboard covered the bottom of the results
+  list with no compensation — autofocus is now skipped below the mobile breakpoint, and both modals
+  track the actual visible (keyboard-shrunk) viewport height so results stay above the keyboard.
+
 ## [1.2.0] - 2026-08-24
 - **changed:** The Characters rail card, modal, and detail view are now labeled People throughout
   (card label, modal title/heading, empty states, Help/Tour copy), to match the `GET /bible-people`

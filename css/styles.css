@@ -11,6 +11,7 @@
   --shadow:rgba(45,27,88,.12); --shadow-lg:rgba(45,27,88,.18);
   --overlay-scrim:rgba(247,246,252,.94);
   --mfn-h:58px; /* #mobileFooterNav's height — referenced by everything below 1180px that needs to clear it */
+  --vvh:100vh; /* actual visible height, kept in sync with window.visualViewport by trackVisualViewport (js/main.js) — falls back to 100vh until that runs / on browsers without the API. Needed because a fixed-position element sized in vh doesn't shrink when the on-screen keyboard opens, so content lower in it silently renders behind the keyboard instead of scrolling into view. */
 }
 /* Day/night toggle (toggleTheme, in main.js) sets data-theme on <html>,
    read before first paint by the inline script in <head> so there's no
@@ -545,6 +546,12 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 .modalscrim.show{ display:flex; }
 .modal{ width:600px; max-height:80vh; background:var(--surface); border:1px solid var(--divider); border-radius:12px; box-shadow:0 30px 70px var(--shadow-lg); display:flex; flex-direction:column; overflow:hidden; }
 .modal.narrow{ width:440px; }
+/* The book grid (39 OT + 27 NT + apocrypha books) needs more breathing room
+   than the default 600px — kept as a same-specificity #id-scoped override
+   (rather than the old inline style="width:660px" index.html/404.html used
+   to carry) so the mobile override below can win on source order alone,
+   without needing !important. */
+#bookPickerScrim .modal{ width:660px; }
 .mhead{ padding:20px 24px 16px; border-bottom:1px solid var(--divider); }
 .mhead .row{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
 .mhead h2{ font-family:'Cormorant Garamond',serif; font-weight:600; font-size:1.3rem; color:var(--brand); }
@@ -975,4 +982,28 @@ details.bg-accordion{ border:1px solid var(--divider); border-radius:10px; margi
   .help-tour-btn{ justify-content:center; }
 
   .modal,.modal.narrow{ width:92vw; max-height:86vh; }
+  /* Same-selector override of the #bookPickerScrim .modal desktop rule
+     above — needed because that ID-scoped selector outranks the plain
+     .modal one right above on specificity, not just source order. */
+  #bookPickerScrim .modal{ width:92vw; }
+
+  /* The row-major column count above (Math.ceil(count/4)) gives 10 columns
+     for the Old Testament at desktop's 660px modal width — far too tight for
+     92vw on a phone, squeezing abbreviations down to unreadable slivers.
+     Fixed at 4 across here instead; row-major flow still keeps canonical
+     order, it just wraps into more rows rather than staying at exactly 4.
+     !important is required to beat the inline style bookGridSection (js/
+     catalog.js) sets per render. */
+  .bookgrid{ grid-template-columns:repeat(4,1fr) !important; }
+
+  /* Choose a Translation / Choose a Book both open on a search field: once
+     the on-screen keyboard is up, the modal needs to actually shrink to the
+     shrunken visible area (var(--vvh), see :root) rather than stay centered
+     in the full, unshrunk layout viewport — otherwise results scrolled
+     inside .mlist render under the keyboard instead of above it. Top-aligned
+     too, so the search field + first results dock right under the topbar
+     instead of the modal's vertical centering fighting the keyboard for
+     which half of the screen it gets. */
+  #versionPickerScrim,#bookPickerScrim{ align-items:flex-start; padding-top:max(16px,env(safe-area-inset-top,0)); }
+  #versionPickerScrim .modal,#bookPickerScrim .modal{ max-height:min(86vh,calc(var(--vvh) - 32px)); }
 }

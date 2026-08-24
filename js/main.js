@@ -100,6 +100,16 @@ document.addEventListener("click", e => {
   if (sheet.classList.contains("show") && !sheet.contains(e.target) && !e.target.closest("#mfnMoreBtn")) closeMoreMenu();
 });
 
+// Keeps --vvh (css/styles.css :root) in sync with the actual visible height
+// so mobile modals with a search field (Choose a Translation/Book) can size
+// themselves to what's left once the on-screen keyboard opens, instead of a
+// plain vh unit that ignores the keyboard and lets content render behind it.
+if (window.visualViewport) {
+  const syncVVH = () => document.documentElement.style.setProperty("--vvh", window.visualViewport.height + "px");
+  syncVVH();
+  window.visualViewport.addEventListener("resize", syncVVH);
+}
+
 /* About / Help — static mainviews, same shell/pattern as Settings (js/api.js
    openSettings/closeSettings), just no form to save. */
 function openAbout() { switchMainView("about"); }

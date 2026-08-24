@@ -306,6 +306,7 @@ async function loadPlacesCard() {
 // places only resolve to a `special` marker instead — see domain.GeoPlace's
 // doc comment in the API source).
 async function openPlacesModal() {
+  closeCardsSheet(); // else this modal (.modalscrim, z-index 130) opens beneath the still-open mobile Chapter Info sheet (z-index 425), invisible
   const book = current.book, chapter = current.chapter, label = `${current.bookName} ${chapter}`;
   document.getElementById("placesTitle").textContent = `Places in ${label}`;
   const body = document.getElementById("placesBody");
@@ -384,6 +385,7 @@ async function loadPeopleCard() {
 // error, since that's honest API behavior rather than a bug.
 let personDetailToken = 0;
 function openPeopleModal() {
+  closeCardsSheet(); // else this modal opens beneath the still-open mobile Chapter Info sheet — see openPlacesModal
   document.getElementById("peopleBackBtn").style.display = "none";
   document.getElementById("peopleTitle").textContent = `People in ${current.bookName} ${current.chapter}`;
   renderPeopleList();
@@ -531,6 +533,7 @@ async function loadPropheciesCard() {
   } catch (e) { return null; }
 }
 async function openPropheciesModal() {
+  closeCardsSheet(); // else this modal opens beneath the still-open mobile Chapter Info sheet — see openPlacesModal
   const book = current.book, chapter = current.chapter, label = `${current.bookName} ${chapter}`;
   document.getElementById("propheciesTitle").textContent = `Prophecies in ${label}`;
   const body = document.getElementById("propheciesBody");
@@ -577,6 +580,7 @@ async function loadTimelineCard() {
   return railCard("Timeline", lines + more, "openTimelineModal()");
 }
 async function openTimelineModal() {
+  closeCardsSheet(); // else this modal opens beneath the still-open mobile Chapter Info sheet — see openPlacesModal
   const book = current.book, chapter = current.chapter, bookName = current.bookName;
   const body = document.getElementById("timelineBody");
   body.innerHTML = `<div class="spin"></div>`;

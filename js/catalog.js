@@ -91,7 +91,12 @@ async function openVersionPicker(mode) {
   document.getElementById("audioFilterChip").classList.remove("active");
   renderLangRow();
   renderVersionList("");
-  setTimeout(() => document.getElementById("versionSearchInput").focus(), 60);
+  // Skip autofocus below the mobile breakpoint (1180px, matching every other
+  // mobile check in this app) — it pops the on-screen keyboard immediately on
+  // open, before the reader has asked to search, eating half the screen for
+  // no reason on a touch device (unlike desktop, where jumping straight to
+  // typing is the point).
+  if (window.innerWidth > 1180) setTimeout(() => document.getElementById("versionSearchInput").focus(), 60);
 }
 function pickVersionRow(id) {
   if (versionPickerMode === "navigate") { selectVersion(id); return; }
@@ -195,7 +200,8 @@ async function openBookPicker() {
   document.getElementById("bookSearchInput").value = "";
   if (!bookList.length) await loadBooks();
   renderBookList("");
-  setTimeout(() => document.getElementById("bookSearchInput").focus(), 60);
+  // See openVersionPicker's matching comment — same reason to skip autofocus below 1180px.
+  if (window.innerWidth > 1180) setTimeout(() => document.getElementById("bookSearchInput").focus(), 60);
 }
 function onBookSearch() { renderBookList(document.getElementById("bookSearchInput").value); }
 // Row-major grid, 4 rows per testament: column count is Math.ceil(count/4),

@@ -19,6 +19,10 @@ Deep links (`/gen/1`, `/gen/1/1`, etc.) are resolved client-side by `js/router.j
 
 Every user of this app — including you, running it locally — needs their own IQ Bible API key. Get one free at [developer.iqbible.com](https://developer.iqbible.com), then paste it into the app's Settings (the profile icon in the top bar, or Settings in the left-hand menu). It's saved only in your browser's local storage; it's never written anywhere else and never leaves your browser except in requests to the API itself.
 
+## Demo
+
+You can experiment with the live version of this app (GitHub Pages) by naviagating to [https://jody-pm.github.io/iqbible-app](https://jody-pm.github.io/iqbible-app) and entering your API Key. 
+
 ## Deploying your own copy
 
 This is a plain static site, so any static host works. Two are pre-configured:
