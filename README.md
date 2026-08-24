@@ -40,7 +40,7 @@ The default behavior — each visitor enters their own key via Settings — is t
 - Inline audio narration playback where available, with a narrator picker when a version has more than one recorded
 - Full-text search with pagination
 - Shareable deep links (`/gen/1/1`) with browser back/forward support
-- Per-chapter context: places (with maps), a raw character list with per-character detail lookups,
+- Per-chapter context: places (with maps), a raw people list with per-person detail lookups,
   prophecy fulfillment pairs, and a curated biblical timeline
 - Verse-level study tools: highlights/bookmarks/notes, original-language word data, cross-references,
   commentary, parallel-translation comparison, and topics

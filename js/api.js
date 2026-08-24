@@ -65,7 +65,7 @@ async function apiFetch(url, opts = {}) {
 // that has to be dismissed, so a developer testing against a free-tier key
 // actually sees what happened and why instead of a feature just quietly not
 // rendering. A routine 404 (this app relies on those constantly — "no
-// illustrations/places/characters for this chapter" is a normal response,
+// illustrations/places/people for this chapter" is a normal response,
 // not a problem) still just toasts; a blocking modal on every one of those
 // would make ordinary browsing unusable.
 const RATE_LIMIT_HEADER_SCOPES = [
@@ -113,7 +113,7 @@ async function apiJSON(path) {
     const code = (body && body.error && body.error.code) || "http_" + res.status;
     if (res.status === 429 || res.status >= 500) showApiErrorModal(res.status, body, res.headers, path);
     // A 404 is routine, expected control flow throughout this app — "no
-    // illustrations/places/characters/dictionary entry/genealogy record for
+    // illustrations/places/people/dictionary entry/genealogy record for
     // this" happens dozens of times per chapter by design, not a problem
     // worth a toast every time. Anything else 4xx (a real client mistake)
     // still surfaces.
@@ -127,7 +127,7 @@ async function apiJSON(path) {
 
 // Session-lifetime cache for GET calls whose response can't change under a
 // visitor's feet mid-session (chapter text, illustrations, book icons,
-// per-chapter places/characters, audio file URLs...) — most of the app's
+// per-chapter places/people, audio file URLs...) — most of the app's
 // browsing is back-and-forth over the same handful of chapters/books, and
 // re-fetching those every time was pure waste. Keyed by the full path
 // (already includes query params, so distinct params naturally miss), and

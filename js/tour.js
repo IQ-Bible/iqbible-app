@@ -32,7 +32,7 @@ const TOUR_STEPS = [
   { selector: "#readCol .chhead", title: "Reading", body: "Pick a version, book and chapter up here, then just start reading." },
   { selector: "#audioPlayer", title: "Audio Narration", body: "Versions with narration available show a player right here — tap play to hear the chapter read aloud." },
   { selector: "#btnPickNarration", title: "Choose a Voice", body: "Some versions have more than one narrator recorded — pick whichever you like." },
-  { selector: "#cardStack", title: "Chapter Context", body: "Places (with maps), characters, prophecy fulfillments and a timeline for whatever chapter you're reading, right in the sidebar.", before: () => { switchMainView("read"); if (window.innerWidth <= 1180) openCardsSheet(true); } },
+  { selector: "#cardStack", title: "Chapter Context", body: "Places (with maps), people, prophecy fulfillments and a timeline for whatever chapter you're reading, right in the sidebar.", before: () => { switchMainView("read"); if (window.innerWidth <= 1180) openCardsSheet(true); } },
   { selector: "#searchTrigger", title: "Search", body: "Tap here any time to search the whole Bible instantly." },
   // Bare [data-nav] (not .navitem) — below 1180px this is #mobileFooterNav's
   // .mfn-item instead of #navrail's (hidden) .navitem, a different class;

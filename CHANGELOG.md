@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file. This CHANGE
 ## [Unreleased]
 - n/a
 
+## [1.2.0] - 2026-08-24
+- **changed:** The Characters rail card, modal, and detail view are now labeled People throughout
+  (card label, modal title/heading, empty states, Help/Tour copy), to match the `GET /bible-people`
+  endpoint family the chapter list already reads from. Purely a naming change — the detail lookup
+  still calls `GET /bible-characters/{name}`, which remains the API's real, permanent path for a
+  person profile.
+
+## [1.1.1] - 2026-08-24
+- **fixed:** `js/config.js`'s `BASE_PATH`, and `index.html`/`404.html`'s asset paths, had to be
+  hand-maintained differently between `main` (GitHub Pages, `/iqbible-app` prefix) and `develop`
+  (local dev, unprefixed). Merging `develop` into `main` for the 1.1.0 release silently reverted
+  `main`'s prefix, breaking every CSS/JS asset on the live site — patched live with a `main`-only
+  hand-hotfix, then fixed properly here: an inline script at the top of `<head>` now detects the
+  deploy target from `location.hostname` at runtime and injects a `<base>` tag, so these three files
+  are byte-identical between branches and this class of bug can't recur on a merge.
+
 ## [1.1.0] - 2026-08-24
 - **fixed:** The Characters rail card and detail modal called `GET /bible-characters/chapter/{book}/
   {chapter}`, an endpoint the API removed (2.0.0-beta-37) — every chapter's Characters card was
@@ -16,15 +32,6 @@ All notable changes to this project will be documented in this file. This CHANGE
   fallback chain) and tribe/nation, when available.
 - **changed:** Dictionary-term underlining now fetches a chapter's candidate words in one
   `GET /dictionaries/easton/bulk` call (API beta-36) instead of one call per word.
-
-## [1.1.1] - 2026-08-24
-- **fixed:** `js/config.js`'s `BASE_PATH`, and `index.html`/`404.html`'s asset paths, had to be
-  hand-maintained differently between `main` (GitHub Pages, `/iqbible-app` prefix) and `develop`
-  (local dev, unprefixed). Merging `develop` into `main` for the 1.1.0 release silently reverted
-  `main`'s prefix, breaking every CSS/JS asset on the live site — patched live with a `main`-only
-  hand-hotfix, then fixed properly here: an inline script at the top of `<head>` now detects the
-  deploy target from `location.hostname` at runtime and injects a `<base>` tag, so these three files
-  are byte-identical between branches and this class of bug can't recur on a merge.
 
 ## [1.0.0] - 2026-08-23
 - **fixed:** `404.html` (served by GitHub Pages for any deep-linked page load) had drifted out of

@@ -206,7 +206,7 @@ function alignRails() {
 window.addEventListener("resize", alignRails);
 
 /* ═══════════════════════════════════════════════════════════════════════
-   RIGHT-RAIL CARDS — per-chapter contextual cards (places, characters,
+   RIGHT-RAIL CARDS — per-chapter contextual cards (places, people,
    prophecies) plus an always-shown timeline card (chronology has no
    per-chapter filter to key off of, unlike the other three). Each API call
    404s when there's nothing for this chapter — caught and treated as "no
@@ -363,54 +363,56 @@ function goToAtlasPlace(id) {
 // per-person classification, not a heuristic, so (unlike the old
 // bible-characters/chapter endpoint this replaces) there's nothing left to
 // filter client-side.
-let currentChapterCharacters = [];
-async function loadCharactersCard() {
+let currentChapterPeople = [];
+async function loadPeopleCard() {
   try {
     const d = await apiJSONCached(`/bible-people/${current.book}/${current.chapter}`);
     const people = d.data || [];
-    currentChapterCharacters = people;
+    currentChapterPeople = people;
     if (!people.length) return null;
     const names = people.slice(0, 4).map(p => escHtml(p.name)).join(", ");
-    return railCard("Characters", names + (people.length > 4 ? ` +${people.length - 4} more` : ""), "openCharactersModal()");
-  } catch (e) { currentChapterCharacters = []; return null; }
+    return railCard("People", names + (people.length > 4 ? ` +${people.length - 4} more` : ""), "openPeopleModal()");
+  } catch (e) { currentChapterPeople = []; return null; }
 }
 // Detail view resolves one name via the exact-match GET /bible-characters/{name}
-// lookup (name-keyed, not ustrong — TIPNR disambiguation between two
-// same-named individuals is out of scope for this endpoint). A name from the
-// chapter list can still occasionally 404 here in principle; shown as a
-// plain empty state, not an error, since that's honest API behavior rather
-// than a bug.
-let charDetailToken = 0;
-function openCharactersModal() {
-  document.getElementById("charactersBackBtn").style.display = "none";
-  document.getElementById("charactersTitle").textContent = `Characters in ${current.bookName} ${current.chapter}`;
-  renderCharactersList();
-  openModal("charactersScrim");
+// lookup — that's the real, permanent API path for a person profile (kept
+// distinct from /bible-people, which only ever lists; see biblecharacters.go's
+// own doc comment), not something to rename along with the UI. Name-keyed,
+// not ustrong — TIPNR disambiguation between two same-named individuals is
+// out of scope for this endpoint. A name from the chapter list can still
+// occasionally 404 here in principle; shown as a plain empty state, not an
+// error, since that's honest API behavior rather than a bug.
+let personDetailToken = 0;
+function openPeopleModal() {
+  document.getElementById("peopleBackBtn").style.display = "none";
+  document.getElementById("peopleTitle").textContent = `People in ${current.bookName} ${current.chapter}`;
+  renderPeopleList();
+  openModal("peopleScrim");
 }
-function renderCharactersList() {
-  document.getElementById("charactersBackBtn").style.display = "none";
-  document.getElementById("charactersTitle").textContent = `Characters in ${current.bookName} ${current.chapter}`;
-  const body = document.getElementById("charactersBody");
-  if (!currentChapterCharacters.length) { body.innerHTML = `<div class="dd-empty">No characters found for this chapter.</div>`; return; }
-  body.innerHTML = currentChapterCharacters.map(p =>
-    `<button class="char-row" onclick="openCharacterDetail('${p.name.replace(/'/g, "\\'")}')">${escHtml(p.name)}<span class="char-row-arrow">›</span></button>`
+function renderPeopleList() {
+  document.getElementById("peopleBackBtn").style.display = "none";
+  document.getElementById("peopleTitle").textContent = `People in ${current.bookName} ${current.chapter}`;
+  const body = document.getElementById("peopleBody");
+  if (!currentChapterPeople.length) { body.innerHTML = `<div class="dd-empty">No people found for this chapter.</div>`; return; }
+  body.innerHTML = currentChapterPeople.map(p =>
+    `<button class="person-row" onclick="openPersonDetail('${p.name.replace(/'/g, "\\'")}')">${escHtml(p.name)}<span class="person-row-arrow">›</span></button>`
   ).join("");
 }
-async function openCharacterDetail(name) {
-  const token = ++charDetailToken;
-  document.getElementById("charactersBackBtn").style.display = "flex";
-  document.getElementById("charactersTitle").textContent = name;
-  const body = document.getElementById("charactersBody");
+async function openPersonDetail(name) {
+  const token = ++personDetailToken;
+  document.getElementById("peopleBackBtn").style.display = "flex";
+  document.getElementById("peopleTitle").textContent = name;
+  const body = document.getElementById("peopleBody");
   body.innerHTML = `<div class="spin"></div>`;
   let d;
   try { d = await apiJSON(`/bible-characters/${encodeURIComponent(name)}`); }
   catch (e) {
-    if (token !== charDetailToken) return;
+    if (token !== personDetailToken) return;
     body.innerHTML = `<div class="dd-empty">No further details on file for "${escHtml(name)}".</div>`;
     return;
   }
-  if (token !== charDetailToken) return;
-  body.innerHTML = await renderCharacterProfile(d);
+  if (token !== personDetailToken) return;
+  body.innerHTML = await renderPersonProfile(d);
 }
 // d is the raw { status, data: BibleCharacter } envelope — data (and every
 // field on it) is entirely omitempty, so a real profile can legitimately
@@ -423,8 +425,8 @@ async function openCharacterDetail(name) {
 // parents/siblings/partners/children (TIPNR, bible_people_relationships)
 // carry no per-edge verse citation — the related person's own name is the
 // only thing to show, so those rows just drill into that name's own
-// profile via openCharacterDetail rather than jumping to a verse.
-async function renderCharacterProfile(d) {
+// profile via openPersonDetail rather than jumping to a verse.
+async function renderPersonProfile(d) {
   const c = d && d.data;
   if (!c) return `<div class="dd-empty">No further details on file for this name.</div>`;
   const bookName = usfm => (bookList.find(b => b.usfm === usfm) || {}).name || usfm;
@@ -439,8 +441,8 @@ async function renderCharacterProfile(d) {
 
   const summaryText = c.briefest || c.brief || c.short || "";
   if (summaryText) {
-    const tribeHtml = c.tribe_nation ? `<div class="char-def-src">${escHtml(c.tribe_nation)}</div>` : "";
-    sections.push(`<div class="char-section">${tribeHtml}<div class="char-def-text">${escHtml(summaryText)}</div></div>`);
+    const tribeHtml = c.tribe_nation ? `<div class="person-def-src">${escHtml(c.tribe_nation)}</div>` : "";
+    sections.push(`<div class="person-section">${tribeHtml}<div class="person-def-text">${escHtml(summaryText)}</div></div>`);
   }
 
   if (c.definitions && c.definitions.length) {
@@ -449,9 +451,9 @@ async function renderCharacterProfile(d) {
       const defHtml = await linkifyCitations(def.definition || "");
       const refsHtml = (def.scripture_refs && def.scripture_refs.length)
         ? `<div class="rc-more">${escHtml(def.scripture_refs.join(", "))}</div>` : "";
-      return `<div class="char-def"><div class="char-def-src">${escHtml(src ? src.name : def.source)}</div><div class="char-def-text">${defHtml}</div>${refsHtml}</div>`;
+      return `<div class="person-def"><div class="person-def-src">${escHtml(src ? src.name : def.source)}</div><div class="person-def-text">${defHtml}</div>${refsHtml}</div>`;
     }));
-    sections.push(`<div class="char-section"><div class="char-section-label">Definitions</div>${defs.join("")}</div>`);
+    sections.push(`<div class="person-section"><div class="person-section-label">Definitions</div>${defs.join("")}</div>`);
   }
 
   if (c.key_events && c.key_events.length) {
@@ -459,30 +461,30 @@ async function renderCharacterProfile(d) {
       const v = e.verses && e.verses[0];
       const text = v && previewByRef[`${v.book}.${v.chapter}.${v.verse}`];
       const citeAttr = text ? ` data-cite-id="${registerCiteId(e.citation, text)}"` : "";
-      const jump = v ? ` onclick="closeModal('charactersScrim');jumpToVerse('${v.book}',${v.chapter},${v.verse})"` : "";
+      const jump = v ? ` onclick="closeModal('peopleScrim');jumpToVerse('${v.book}',${v.chapter},${v.verse})"` : "";
       return `<button class="prophecy-ref" style="margin:0 6px 8px 0"${citeAttr}${jump}>${e.label ? escHtml(e.label) + ": " : ""}${escHtml(e.citation)}</button>`;
     }).join("");
-    sections.push(`<div class="char-section"><div class="char-section-label">Key Events</div>${html}</div>`);
+    sections.push(`<div class="person-section"><div class="person-section-label">Key Events</div>${html}</div>`);
   }
 
-  const relRow = r => `<div class="char-relative">
-      <span class="char-relative-rel">${escHtml(r.relationship)}</span>
-      <button class="prophecy-ref" onclick="openCharacterDetail('${r.name.replace(/'/g, "\\'")}')">${escHtml(r.name)}</button>
+  const relRow = r => `<div class="person-relative">
+      <span class="person-relative-rel">${escHtml(r.relationship)}</span>
+      <button class="prophecy-ref" onclick="openPersonDetail('${r.name.replace(/'/g, "\\'")}')">${escHtml(r.name)}</button>
     </div>`;
-  if (c.parents && c.parents.length) sections.push(`<div class="char-section"><div class="char-section-label">Parents</div>${c.parents.map(relRow).join("")}</div>`);
-  if (c.siblings && c.siblings.length) sections.push(`<div class="char-section"><div class="char-section-label">Siblings</div>${c.siblings.map(relRow).join("")}</div>`);
-  if (c.partners && c.partners.length) sections.push(`<div class="char-section"><div class="char-section-label">Partners</div>${c.partners.map(relRow).join("")}</div>`);
-  if (c.children && c.children.length) sections.push(`<div class="char-section"><div class="char-section-label">Children</div>${c.children.map(relRow).join("")}</div>`);
+  if (c.parents && c.parents.length) sections.push(`<div class="person-section"><div class="person-section-label">Parents</div>${c.parents.map(relRow).join("")}</div>`);
+  if (c.siblings && c.siblings.length) sections.push(`<div class="person-section"><div class="person-section-label">Siblings</div>${c.siblings.map(relRow).join("")}</div>`);
+  if (c.partners && c.partners.length) sections.push(`<div class="person-section"><div class="person-section-label">Partners</div>${c.partners.map(relRow).join("")}</div>`);
+  if (c.children && c.children.length) sections.push(`<div class="person-section"><div class="person-section-label">Children</div>${c.children.map(relRow).join("")}</div>`);
 
   const appearanceRow = (label, v) => {
     if (!v) return "";
     const text = previewByRef[`${v.book}.${v.chapter}.${v.verse}`];
     const refLabel = `${bookName(v.book)} ${v.chapter}:${v.verse}`;
     const citeAttr = text ? ` data-cite-id="${registerCiteId(refLabel, text)}"` : "";
-    return `<div class="rc-entry" style="margin-bottom:8px">${escHtml(label)}: <button class="prophecy-ref"${citeAttr} onclick="closeModal('charactersScrim');jumpToVerse('${v.book}',${v.chapter},${v.verse})">${escHtml(refLabel)}</button></div>`;
+    return `<div class="rc-entry" style="margin-bottom:8px">${escHtml(label)}: <button class="prophecy-ref"${citeAttr} onclick="closeModal('peopleScrim');jumpToVerse('${v.book}',${v.chapter},${v.verse})">${escHtml(refLabel)}</button></div>`;
   };
   const appearances = appearanceRow("First appearance", c.first_appearance) + appearanceRow("Last appearance", c.last_appearance);
-  if (appearances) sections.push(`<div class="char-section"><div class="char-section-label">Appearances</div>${appearances}</div>`);
+  if (appearances) sections.push(`<div class="person-section"><div class="person-section-label">Appearances</div>${appearances}</div>`);
 
   return sections.length ? sections.join("") : `<div class="dd-empty">No further details on file for "${escHtml(c.name)}".</div>`;
 }
@@ -651,10 +653,10 @@ async function jumpFreeTextRef(refText, onClose) {
 async function loadSidebarCards() {
   const stack = document.getElementById("cardStack");
   if (!stack) return;
-  const [places, characters, prophecies, timeline] = await Promise.all([
-    loadPlacesCard(), loadCharactersCard(), loadPropheciesCard(), loadTimelineCard()
+  const [places, people, prophecies, timeline] = await Promise.all([
+    loadPlacesCard(), loadPeopleCard(), loadPropheciesCard(), loadTimelineCard()
   ]);
-  stack.innerHTML = [places, timeline, characters, prophecies].filter(Boolean).join("");
+  stack.innerHTML = [places, timeline, people, prophecies].filter(Boolean).join("");
 }
 
 /* ═══════════════════════════════════════════════════════════════════════

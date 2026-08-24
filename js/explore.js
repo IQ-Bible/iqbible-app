@@ -265,8 +265,8 @@ async function fetchAtlasPlaceDescription(name) {
   const tabBtns = hits.length > 1
     ? `<div class="dict-tab-btns">${hits.map((h, i) => `<button type="button" class="filter-chip dict-tab-btn${i === 0 ? " active" : ""}" data-idx="${i}">${escHtml(h.source)}</button>`).join("")}</div>`
     : "";
-  const panels = rows.map((html, i) => `<div class="dict-tab-panel${i === 0 ? " active" : ""}" data-idx="${i}"><div class="char-def-src">${escHtml(hits[i].source)}</div><div class="char-def-text">${html}</div></div>`).join("");
-  return `<div class="char-section dict-tabs"><div class="char-section-label">Description</div>${tabBtns}${panels}</div>`;
+  const panels = rows.map((html, i) => `<div class="dict-tab-panel${i === 0 ? " active" : ""}" data-idx="${i}"><div class="person-def-src">${escHtml(hits[i].source)}</div><div class="person-def-text">${html}</div></div>`).join("");
+  return `<div class="person-section dict-tabs"><div class="person-section-label">Description</div>${tabBtns}${panels}</div>`;
 }
 async function openAtlasPlace(id) {
   const backRow = `<div class="tool-back-row"><button onclick="renderExploreAtlas()">‹ Search Places</button></div>`;
@@ -294,7 +294,7 @@ async function openAtlasPlace(id) {
   const mediaHtml = !thumb && !map ? "" :
     descHtml ? `<div class="atlas-media">${thumb}${map}</div>` :
     (thumb && map) ? `<div class="place-media-row">${thumb}${map}</div>` : (thumb || map);
-  const versesHtml = verses.length ? `<div class="char-section"><div class="char-section-label">Appears In${allVerses.length > verses.length ? ` (showing ${verses.length} of ${allVerses.length})` : ""}</div>${verses.map(v => {
+  const versesHtml = verses.length ? `<div class="person-section"><div class="person-section-label">Appears In${allVerses.length > verses.length ? ` (showing ${verses.length} of ${allVerses.length})` : ""}</div>${verses.map(v => {
     const text = previewByRef[`${v.book}.${v.chapter}.${v.verse}`];
     const refLabel = `${(bookList.find(b => b.usfm === v.book) || {}).name || v.book} ${v.chapter}:${v.verse}`;
     const citeAttr = text ? ` data-cite-id="${registerCiteId(refLabel, text)}"` : "";
@@ -338,9 +338,9 @@ function renderGenealogyPerson(person) {
   const crumbs = genealogyBreadcrumb.length > 1
     ? `<div class="tool-filter-row">${genealogyBreadcrumb.map((n, i) => `<button class="filter-chip${i === genealogyBreadcrumb.length - 1 ? " active" : ""}" onclick="jumpGenealogyBreadcrumb(${i})">${escHtml(n)}</button>`).join("")}</div>`
     : "";
-  const relRow = r => `<div class="char-relative"><span class="char-relative-rel">${escHtml(r.relationship)}</span><button class="prophecy-ref" onclick="runGenealogyLookup('${r.name.replace(/'/g, "\\'")}')">${escHtml(r.name)}</button></div>`;
-  const parents = (person.parents || []).length ? `<div class="char-section"><div class="char-section-label">Parents</div>${person.parents.map(relRow).join("")}</div>` : `<div class="tool-hint">No recorded parents.</div>`;
-  const children = (person.children || []).length ? `<div class="char-section"><div class="char-section-label">Children</div>${person.children.map(relRow).join("")}</div>` : `<div class="tool-hint">No recorded children.</div>`;
+  const relRow = r => `<div class="person-relative"><span class="person-relative-rel">${escHtml(r.relationship)}</span><button class="prophecy-ref" onclick="runGenealogyLookup('${r.name.replace(/'/g, "\\'")}')">${escHtml(r.name)}</button></div>`;
+  const parents = (person.parents || []).length ? `<div class="person-section"><div class="person-section-label">Parents</div>${person.parents.map(relRow).join("")}</div>` : `<div class="tool-hint">No recorded parents.</div>`;
+  const children = (person.children || []).length ? `<div class="person-section"><div class="person-section-label">Children</div>${person.children.map(relRow).join("")}</div>` : `<div class="tool-hint">No recorded children.</div>`;
   return `${crumbs}<h3 style="font-family:'Cormorant Garamond',serif;font-weight:600;font-size:1.35rem;margin:10px 0 14px">${escHtml(person.name)}</h3>${parents}${children}`;
 }
 function jumpGenealogyBreadcrumb(i) {
@@ -358,9 +358,9 @@ async function runGenealogyPath() {
   try { const d = await apiJSON(`/genealogies?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`); path = d.path || []; }
   catch (e) { area.innerHTML = `<div class="dd-empty">No path found between "${escHtml(from)}" and "${escHtml(to)}".</div>`; return; }
   if (!path.length) { area.innerHTML = `<div class="dd-empty">No path found between "${escHtml(from)}" and "${escHtml(to)}".</div>`; return; }
-  area.innerHTML = `<div class="char-section"><div class="char-section-label">${escHtml(from)} → ${escHtml(to)}</div>${path.map(step => `
-    <div class="char-relative">
-      ${step.relationship ? `<span class="char-relative-rel">${escHtml(step.relationship)}</span>` : ""}
+  area.innerHTML = `<div class="person-section"><div class="person-section-label">${escHtml(from)} → ${escHtml(to)}</div>${path.map(step => `
+    <div class="person-relative">
+      ${step.relationship ? `<span class="person-relative-rel">${escHtml(step.relationship)}</span>` : ""}
       <button class="prophecy-ref" onclick="genealogyBreadcrumb=[];runGenealogyLookup('${step.name.replace(/'/g, "\\'")}')">${escHtml(step.name)}</button>
     </div>`).join("")}</div>`;
 }

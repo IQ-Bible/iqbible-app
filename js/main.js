@@ -206,7 +206,7 @@ document.addEventListener("keydown", e => {
     closeMoreMenu();
     closeCardsSheet();
     if (tourActive) endTour();
-    ["bookPickerScrim", "chapterPickerScrim", "versionPickerScrim", "narrationPickerScrim", "dictTermScrim", "placesScrim", "propheciesScrim", "timelineScrim", "apiErrorScrim", "charactersScrim", "fontSizeScrim", "vtShareScrim", "vtOrigLangScrim", "bookInfoScrim", "dayDrawerScrim", "tourWelcomeScrim", "tourAdvancedOfferScrim"].forEach(closeModal);
+    ["bookPickerScrim", "chapterPickerScrim", "versionPickerScrim", "narrationPickerScrim", "dictTermScrim", "placesScrim", "propheciesScrim", "timelineScrim", "apiErrorScrim", "peopleScrim", "fontSizeScrim", "vtShareScrim", "vtOrigLangScrim", "bookInfoScrim", "dayDrawerScrim", "tourWelcomeScrim", "tourAdvancedOfferScrim"].forEach(closeModal);
     closeVerseTools();
     setMenuHash(null);
     // Escape bypasses closeSettings() (goes straight to switchMainView above),

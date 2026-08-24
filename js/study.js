@@ -49,7 +49,7 @@ async function renderGenericFields(obj, skipKeys) {
     const label = k.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
     const raw = Array.isArray(v) ? v.join("; ") : (typeof v === "object" ? JSON.stringify(v) : String(v));
     const html = await linkifyCitations(raw);
-    return `<div class="char-def"><div class="char-def-src">${escHtml(label)}</div><div class="char-def-text">${html}</div></div>`;
+    return `<div class="person-def"><div class="person-def-src">${escHtml(label)}</div><div class="person-def-text">${html}</div></div>`;
   }));
   return rows.join("");
 }
@@ -89,8 +89,8 @@ async function renderLexiconEntry(row, sourceLabel) {
   const bodyKey = LEX_BODY_KEYS.find(k => row[k]);
   const bodyHtml = bodyKey ? await linkifyCitations(String(row[bodyKey])) : "";
   const extraHtml = await renderGenericFields(row, [...LEX_SKIP_KEYS]);
-  return `<div class="char-section lw-card">
-    <div class="char-section-label">${escHtml(sourceLabel)}</div>
+  return `<div class="person-section lw-card">
+    <div class="person-section-label">${escHtml(sourceLabel)}</div>
     <div class="lw-headline">
       ${wordText ? `<span class="lw-orig">${escHtml(wordText)}</span>` : ""}
       ${row.transliteration ? `<span class="lw-translit">${escHtml(row.transliteration)}</span>` : ""}
@@ -134,7 +134,7 @@ async function runWordStudy(key) {
         return `<button class="prophecy-ref" style="margin:0 6px 6px 0"${citeAttr} onclick="closeStudy();jumpToVerse('${o.book}',${o.chapter},${o.verse})">${escHtml(label)}</button>`;
       }).join("");
       const moreNote = d.total_matches && d.total_matches > occ.length ? `<div class="rc-more">Showing ${occ.length} of ${d.total_matches} occurrences.</div>` : "";
-      occHtml = `<div class="char-section"><div class="char-section-label">Every Occurrence</div>${rows}${moreNote}</div>`;
+      occHtml = `<div class="person-section"><div class="person-section-label">Every Occurrence</div>${rows}${moreNote}</div>`;
     }
   } catch (e) { /* no occurrences — normal */ }
   if (token !== wordStudyToken) return;
@@ -186,8 +186,8 @@ async function bookInfoPreviewHTML(usfm, closeScrimId) {
   const closeCall = closeScrimId ? `closeModal('${closeScrimId}');` : "";
   return `
     ${metaBits.length ? `<div class="place-meta" style="margin-bottom:12px">${escHtml(metaBits.join(" · "))}</div>` : ""}
-    ${sigHtml ? `<div class="char-def"><div class="char-def-src">Canonical Significance</div><div class="char-def-text">${sigHtml}</div></div>` : ""}
-    ${introHtml ? `<div class="char-def" style="margin-top:10px"><div class="char-def-src">Introduction</div><div class="char-def-text">${introHtml}</div></div>` : ""}
+    ${sigHtml ? `<div class="person-def"><div class="person-def-src">Canonical Significance</div><div class="person-def-text">${sigHtml}</div></div>` : ""}
+    ${introHtml ? `<div class="person-def" style="margin-top:10px"><div class="person-def-src">Introduction</div><div class="person-def-text">${introHtml}</div></div>` : ""}
     ${!sigHtml && !introHtml ? `<div class="dd-empty">No book guide data on file for this book.</div>` : ""}
     <button class="filter-chip" style="margin-top:12px" onclick="${closeCall}openBookGuide('${usfm}')">Read More in Book Guide →</button>`;
 }
@@ -213,7 +213,7 @@ async function renderFieldGroup(obj, fieldList) {
   const rows = await Promise.all(present.map(async ([k, label]) => {
     const raw = Array.isArray(obj[k]) ? obj[k].join("; ") : String(obj[k]);
     const html = await linkifyCitations(raw);
-    return `<div class="char-def"><div class="char-def-src">${escHtml(label)}</div><div class="char-def-text">${html}</div></div>`;
+    return `<div class="person-def"><div class="person-def-src">${escHtml(label)}</div><div class="person-def-text">${html}</div></div>`;
   }));
   return rows.join("");
 }
@@ -248,12 +248,12 @@ async function runBookGuideLookup() {
   let commHtml = "";
   if (commResult.status === "fulfilled") {
     const sources = commResult.value.data || [];
-    if (sources.length) commHtml = `<div class="char-section"><div class="char-section-label">Commentary Coverage (${sources.length})</div>${sources.map(s => `<span class="topic-chip">${escHtml(s.author_name || s.name)}</span>`).join("")}</div>`;
+    if (sources.length) commHtml = `<div class="person-section"><div class="person-section-label">Commentary Coverage (${sources.length})</div>${sources.map(s => `<span class="topic-chip">${escHtml(s.author_name || s.name)}</span>`).join("")}</div>`;
   }
   const body = `
     <div class="bg-head">${iconHtml}<div class="bg-title">${escHtml(info.name_en || current.bookName)}</div></div>
     ${metaCells ? `<div class="bg-meta-grid">${metaCells}</div>` : ""}
-    ${overviewHtml ? `<div class="char-section">${overviewHtml}</div>` : ""}
+    ${overviewHtml ? `<div class="person-section">${overviewHtml}</div>` : ""}
     ${structureHtml ? `<details class="bg-accordion" open><summary>Structure &amp; Key Content</summary><div class="bg-accordion-body">${structureHtml}</div></details>` : ""}
     ${contextHtml ? `<details class="bg-accordion"><summary>Historical &amp; Literary Context</summary><div class="bg-accordion-body">${contextHtml}</div></details>` : ""}
     ${theologyHtml ? `<details class="bg-accordion"><summary>Theological Themes</summary><div class="bg-accordion-body">${theologyHtml}</div></details>` : ""}
@@ -304,8 +304,8 @@ async function runVariantsLookup(preloaded) {
     return `<div class="prophecy-entry">
       <div class="place-name" style="margin-bottom:4px">${escHtml(v.title)}</div>
       <div class="place-meta" style="margin-bottom:8px">${escHtml(refLabel)} · ${escHtml(v.variant_type)}</div>
-      <div class="char-def"><div class="char-def-src">Traditional</div><div class="char-def-text">${escHtml(v.traditional_reading)}${v.witnesses_traditional ? ` <span class="rc-more">(${escHtml(v.witnesses_traditional)})</span>` : ""}</div></div>
-      <div class="char-def"><div class="char-def-src">Critical</div><div class="char-def-text">${escHtml(v.critical_reading)}${v.witnesses_critical ? ` <span class="rc-more">(${escHtml(v.witnesses_critical)})</span>` : ""}</div></div>
+      <div class="person-def"><div class="person-def-src">Traditional</div><div class="person-def-text">${escHtml(v.traditional_reading)}${v.witnesses_traditional ? ` <span class="rc-more">(${escHtml(v.witnesses_traditional)})</span>` : ""}</div></div>
+      <div class="person-def"><div class="person-def-src">Critical</div><div class="person-def-text">${escHtml(v.critical_reading)}${v.witnesses_critical ? ` <span class="rc-more">(${escHtml(v.witnesses_critical)})</span>` : ""}</div></div>
       ${v.explanation ? `<div class="prophecy-desc">${explanationHtml}</div>` : ""}
       <button class="prophecy-ref" onclick="closeStudy();jumpToVerse('${v.book}',${v.chapter_start},${v.verse_start})">Go to ${escHtml(refLabel)}</button>
     </div>`;

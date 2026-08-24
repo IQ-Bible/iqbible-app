@@ -123,7 +123,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
               <button class="bookinfo-btn" id="btnBookInfo" title="About this book" aria-label="About this book" onclick="openBookInfoModal(current.book)">&#9432;</button>
               <button class="titlepick" id="btnPickChapter" onclick="openChapterPicker()">1 <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
               <button class="verpick" id="btnPickVersion" onclick="openVersionPicker()">KJV <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
-              <!-- Below 1180px #rightRail's places/characters/prophecies/timeline
+              <!-- Below 1180px #rightRail's places/people/prophecies/timeline
                    cards have nowhere to live (the rail itself is hidden) — this
                    opens the same #cardStack content as a bottom sheet instead of
                    duplicating its markup/fetch logic. Hidden above 1180px since
@@ -622,7 +622,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
           </div>
           <div class="help-faq-item">
             <div class="help-faq-q">What are the cards next to the reading pane?</div>
-            <div class="help-faq-a">Per-chapter context, pulled live for whatever chapter you're reading — places (with maps), characters, prophecy fulfillments and a timeline.</div>
+            <div class="help-faq-a">Per-chapter context, pulled live for whatever chapter you're reading — places (with maps), people, prophecy fulfillments and a timeline.</div>
           </div>
           <div class="help-faq-item">
             <div class="help-faq-q">Can I use this on my phone?</div>
@@ -833,7 +833,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
   </div>
 
   <!-- API error modal — 429/5xx only (a routine 404, which this app relies
-       on constantly for "no illustrations/places/characters/etc. here",
+       on constantly for "no illustrations/places/people/etc. here",
        still just toasts — a mandatory-dismiss modal on every one of those
        would make normal browsing unusable). Has to be dismissed rather than
        auto-hiding like the toast, since the whole point is making sure a
@@ -903,24 +903,25 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
     </div>
   </div>
 
-  <!-- characters modal — opened from the right rail's Characters card. List
-       view shows the raw, unfiltered chapter character list (see reader.js's
-       loadCharactersCard / NOTES.md — no client-side filtering, per
+  <!-- people modal — opened from the right rail's People card. List
+       view shows the raw, unfiltered chapter people list (see reader.js's
+       loadPeopleCard / NOTES.md — no client-side filtering, per
        CLAUDE.md's GOLDEN RULE); detail view resolves one name via the
        exact-match GET /bible-characters/{name} lookup, a real endpoint this
-       app didn't use before. -->
-  <div class="modalscrim" id="charactersScrim">
+       app didn't use before (kept under its actual API path — see
+       reader.js's openPersonDetail). -->
+  <div class="modalscrim" id="peopleScrim">
     <div class="modal" style="width:560px">
       <div class="mhead">
         <div class="row">
           <div class="mhead-titlewrap">
-            <button class="ov-back" id="charactersBackBtn" style="display:none" onclick="renderCharactersList()" aria-label="Back">&lsaquo;</button>
-            <h2 id="charactersTitle">Characters</h2>
+            <button class="ov-back" id="peopleBackBtn" style="display:none" onclick="renderPeopleList()" aria-label="Back">&lsaquo;</button>
+            <h2 id="peopleTitle">People</h2>
           </div>
-          <button class="closebtn" onclick="closeModal('charactersScrim')">&times;</button>
+          <button class="closebtn" onclick="closeModal('peopleScrim')">&times;</button>
         </div>
       </div>
-      <div class="dictbody" id="charactersBody"></div>
+      <div class="dictbody" id="peopleBody"></div>
     </div>
   </div>
 

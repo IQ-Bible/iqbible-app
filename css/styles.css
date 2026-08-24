@@ -125,7 +125,7 @@ button{ font-family:inherit; cursor:pointer; }
 .navdivider{ border:none; border-top:1px solid var(--divider); margin:10px 12px; }
 .navfooter{ margin-top:auto; padding:16px 12px 0; font-size:.6rem; color:var(--muted); opacity:.7; }
 
-/* ── right rail cards — per-chapter context (places/characters/prophecies)
+/* ── right rail cards — per-chapter context (places/people/prophecies)
    plus an always-shown timeline card; only the ones with real API data for
    the current chapter render at all, see loadSidebarCards in reader.js. ── */
 .cardstack{ width:150px; flex-shrink:0; display:flex; flex-direction:column; gap:14px; padding-bottom:24px; }
@@ -193,7 +193,7 @@ button{ font-family:inherit; cursor:pointer; }
 .prophecy-ref:hover{ border-color:var(--brand); }
 
 /* ── shared "← Back" affordance for a modal/overlay that drills from a list
-   into a detail view (Characters, Explore's Harmony/Atlas/Genealogy tabs,
+   into a detail view (People, Explore's Harmony/Atlas/Genealogy tabs,
    Study's Book Guide) — same circular-button language as .closebtn, mirrored
    for the forward-nav (Devotionals' Next-day) use via .ov-back-fwd. ── */
 .mhead-titlewrap{ display:flex; align-items:center; gap:8px; min-width:0; }
@@ -204,20 +204,21 @@ button{ font-family:inherit; cursor:pointer; }
 .tool-back-row button{ font-family:'Josefin Sans',sans-serif; font-size:.62rem; letter-spacing:.08em; text-transform:uppercase; color:var(--brand); background:none; border:none; padding:0; }
 .tool-back-row button:hover{ text-decoration:underline; }
 
-/* ── characters modal ── */
-.char-row{ display:flex; align-items:center; justify-content:space-between; width:100%; text-align:left; padding:12px 12px; border-radius:8px; background:none; border:1px solid transparent; font-size:.95rem; color:var(--ink); }
-.char-row:hover{ background:var(--surface-2); border-color:var(--divider); }
-.char-row-arrow{ color:var(--muted); }
-.char-section{ margin-bottom:20px; }
-.char-section:last-child{ margin-bottom:0; }
-.char-section-label{ font-family:'Josefin Sans',sans-serif; font-size:.6rem; letter-spacing:.1em; text-transform:uppercase; color:var(--brand); margin-bottom:8px; }
-.char-def{ margin-bottom:12px; }
-.char-def:last-child{ margin-bottom:0; }
-.char-def-src{ font-family:'Josefin Sans',sans-serif; font-size:.58rem; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin-bottom:3px; }
-.char-def-text{ font-size:.92rem; line-height:1.6; color:var(--ink-soft); }
-.char-relative{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:8px 0; border-bottom:1px solid var(--divider); }
-.char-relative:last-child{ border-bottom:none; }
-.char-relative-rel{ font-family:'Josefin Sans',sans-serif; font-size:.58rem; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); min-width:50px; }
+/* ── people modal (also reused by Study Tools' Word Study/Book Guide/
+   Textual Variants and Explore's Atlas/Genealogy tabs) ── */
+.person-row{ display:flex; align-items:center; justify-content:space-between; width:100%; text-align:left; padding:12px 12px; border-radius:8px; background:none; border:1px solid transparent; font-size:.95rem; color:var(--ink); }
+.person-row:hover{ background:var(--surface-2); border-color:var(--divider); }
+.person-row-arrow{ color:var(--muted); }
+.person-section{ margin-bottom:20px; }
+.person-section:last-child{ margin-bottom:0; }
+.person-section-label{ font-family:'Josefin Sans',sans-serif; font-size:.6rem; letter-spacing:.1em; text-transform:uppercase; color:var(--brand); margin-bottom:8px; }
+.person-def{ margin-bottom:12px; }
+.person-def:last-child{ margin-bottom:0; }
+.person-def-src{ font-family:'Josefin Sans',sans-serif; font-size:.58rem; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin-bottom:3px; }
+.person-def-text{ font-size:.92rem; line-height:1.6; color:var(--ink-soft); }
+.person-relative{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:8px 0; border-bottom:1px solid var(--divider); }
+.person-relative:last-child{ border-bottom:none; }
+.person-relative-rel{ font-family:'Josefin Sans',sans-serif; font-size:.58rem; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); min-width:50px; }
 
 /* ── devotionals modal ── */
 /* Kept visually secondary (small, muted) — "Today's Devotional" below is
@@ -875,7 +876,7 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 /* ── Explore / Study Tools — both overlays render everything (per-tab
    controls, list view, detail view) into one JS-managed container
    (#exploreBody/#studyBody), so most of what they need is already covered by
-   .msearch/.filter-chip/.vrow/.result-card/.prophecy-entry/.char-relative*
+   .msearch/.filter-chip/.vrow/.result-card/.prophecy-entry/.person-relative*
    above. What follows is only the handful of shapes nothing existing
    covers. ── */
 #exploreBody,#studyBody{ max-width:900px; margin:0 auto; }
