@@ -23,6 +23,15 @@ function openVerseToolsForTour() {
     const span = document.querySelector(".verse-span");
     if (span) selectVerse(Number(span.dataset.verse), false);
   } else openVerseTools();
+  // The panel's first open of a tour run is otherwise mid-transition (still
+  // sliding/fading in, css/styles.css) at the exact moment renderTourStep
+  // measures it right after this returns — same "instant" bypass
+  // addShowInstant (main.js) uses for #moreMenuSheet/#rightRail, just applied
+  // post-hoc since selectVerse/openVerseTools already added the "show" class.
+  const panel = document.getElementById("verseToolsPanel");
+  panel.style.transition = "none";
+  void panel.offsetHeight;
+  panel.style.transition = "";
 }
 // Verse Tools is last, not right after Narration: it's the one step with a
 // natural follow-up (see ADVANCED_VERSE_TOOLS_STEPS/tourNext below — landing
@@ -32,7 +41,13 @@ const TOUR_STEPS = [
   { selector: "#readCol .chhead", title: "Reading", body: "Pick a version, book and chapter up here, then just start reading." },
   { selector: "#audioPlayer", title: "Audio Narration", body: "Versions with narration available show a player right here — tap play to hear the chapter read aloud." },
   { selector: "#btnPickNarration", title: "Choose a Voice", body: "Some versions have more than one narrator recorded — pick whichever you like." },
-  { selector: "#cardStack", title: "Chapter Context", body: "Places (with maps), people, prophecy fulfillments and a timeline for whatever chapter you're reading, right in the sidebar.", before: () => { switchMainView("read"); if (window.innerWidth <= 1180) openCardsSheet(true); } },
+  // #cardStack itself (desktop's always-visible sidebar) or #btnCardsSheet
+  // (its mobile trigger, css/styles.css) — never both at once, so this
+  // doesn't auto-open the sheet the way library/progress/plans/devotionals
+  // below open #moreMenuSheet: those reveal a nav item that's the same kind
+  // of thing either width, but auto-opening the cards sheet here would hide
+  // the one thing mobile users actually need to learn — the button.
+  { selector: "#cardStack, #btnCardsSheet", title: "Chapter Context", body: "Places (with maps), people, prophecy fulfillments and a timeline for whatever chapter you're reading.", before: () => switchMainView("read") },
   { selector: "#searchTrigger", title: "Search", body: "Tap here any time to search the whole Bible instantly." },
   // Bare [data-nav] (not .navitem) — below 1180px this is #mobileFooterNav's
   // .mfn-item instead of #navrail's (hidden) .navitem, a different class;
@@ -203,13 +218,21 @@ function renderTourStep(skipDepth) {
     // report a real box size.
     return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < window.innerHeight;
   });
-  const rect = el ? el.getBoundingClientRect() : null;
+  let rect = el ? el.getBoundingClientRect() : null;
   if (!rect || (rect.width === 0 && rect.height === 0)) {
     if ((skipDepth || 0) >= activeTourSteps.length || tourStepIndex >= activeTourSteps.length - 1) { endTour(); return; }
     tourStepIndex++;
     renderTourStep((skipDepth || 0) + 1);
     return;
   }
+  // The vertical check above only rules out scrolled-off-screen candidates —
+  // a target can still be horizontally scrolled out of view inside something
+  // like .lib-tabs (Explore/Study/My Library's tab strip, css/styles.css,
+  // overflow-x:auto below 1180px), which getBoundingClientRect alone doesn't
+  // catch. "instant" avoids measuring a rect that's still mid-flight from
+  // html's global scroll-behavior:smooth (css/styles.css).
+  el.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
+  rect = el.getBoundingClientRect();
   positionTourSpotlight(rect);
   document.getElementById("tourTooltipText").innerHTML = `<div class="tour-tooltip-title">${escHtml(step.title)}</div><p>${escHtml(step.body)}</p>`;
   document.getElementById("tourDots").innerHTML = activeTourSteps.map((_, i) => `<span class="tour-dot${i === tourStepIndex ? " active" : ""}"></span>`).join("");

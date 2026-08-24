@@ -95,9 +95,14 @@ function closeCardsSheet() {
   document.getElementById("rightRail").classList.remove("show");
   closeModal("cardsSheetScrim");
 }
+// #tourOverlay's own Next/Back/Skip buttons live outside #moreMenuSheet by
+// design (see js/tour.js's openMoreMenu(true) before() steps) — without this
+// exclusion, tapping Next to advance past a step that opened the sheet would
+// immediately close it again as an "outside" click, right after the tour
+// spotlighted something inside it.
 document.addEventListener("click", e => {
   const sheet = document.getElementById("moreMenuSheet");
-  if (sheet.classList.contains("show") && !sheet.contains(e.target) && !e.target.closest("#mfnMoreBtn")) closeMoreMenu();
+  if (sheet.classList.contains("show") && !sheet.contains(e.target) && !e.target.closest("#mfnMoreBtn") && !e.target.closest("#tourOverlay")) closeMoreMenu();
 });
 
 // Keeps --vvh (css/styles.css :root) in sync with the actual visible height

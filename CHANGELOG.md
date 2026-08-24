@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file. This CHANGE
 ## [Unreleased]
 - n/a
 
+## [1.2.3] - 2026-08-24
+- **fixed:** Several mobile-viewport bugs in Take a Tour. (1) The Basic Tour's My Library/My
+  Progress/Reading Plans/Devotionals steps open the mobile "More" dropup to spotlight each nav item
+  inside it, but a document-level "click outside closes the More menu" handler treated the tour's
+  own Next button (outside the dropup by design) as an outside click and closed the menu right after
+  it opened — leaving the spotlight stranded over the reading content behind it instead of the nav
+  item. The handler now ignores clicks inside the tour overlay. (2) The Chapter Context step
+  auto-opened the mobile "Chapter Info" bottom sheet before spotlighting its content, which meant
+  mobile users were never shown the button that actually opens it — it now spotlights that button
+  directly instead, matching how the tour points at other mobile-only triggers. (3) The Advanced
+  Tour's Highlight step measured the Verse Tools panel's position while it was still mid-transition
+  (its first open of a tour run), so the spotlight box landed straddling the highlight-color row and
+  the Original Language button below it — the panel now opens instantly for that measurement. (4)
+  Any Explore/Study Tools/My Library tab scrolled outside its tab strip's visible width (mobile's
+  horizontally-scrolling `.lib-tabs`) was spotlighted at its true, off-screen position instead of
+  being scrolled into view first, so several tabs (Extrabiblical, Genealogy, Harmony, Topics, and
+  the later tabs of Study Tools/My Library) appeared partially or entirely un-highlighted.
+
 ## [1.2.2] - 2026-08-24
 - **fixed:** The footer/About "vX.Y.Z" version display was a hardcoded constant
   (`APP_VERSION` in `js/config.js`) that had no way to catch itself drifting out
