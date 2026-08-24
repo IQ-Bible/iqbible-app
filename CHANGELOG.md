@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file. This CHANGE
 ## [Unreleased]
 - n/a
 
+## [1.1.0] - 2026-08-24
+- **fixed:** The Characters rail card and detail modal called `GET /bible-characters/chapter/{book}/
+  {chapter}`, an endpoint the API removed (2.0.0-beta-37) — every chapter's Characters card was
+  silently empty. Switched to `GET /bible-people/{book}/{chapter}`.
+- **changed:** Character profiles now read TIPNR data (API beta-37): Parents/Children rows no
+  longer cite a specific verse (TIPNR relationship edges carry none) and instead open that
+  relative's own profile; two new sections, Siblings and Partners, appear when TIPNR has that data.
+- **added:** Character profiles show a short TIPNR-sourced summary (`briefest`/`brief`/`short`
+  fallback chain) and tribe/nation, when available.
+- **changed:** Dictionary-term underlining now fetches a chapter's candidate words in one
+  `GET /dictionaries/easton/bulk` call (API beta-36) instead of one call per word.
+
 ## [1.0.0] - 2026-08-23
 - **fixed:** `404.html` (served by GitHub Pages for any deep-linked page load) had drifted out of
   sync with `index.html` again — missing the bottom nav bar, the Cards sheet trigger/sheet, the

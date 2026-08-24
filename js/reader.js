@@ -358,23 +358,15 @@ function goToAtlasPlace(id) {
   switchExploreTab("atlas");
   openAtlasPlace(id);
 }
-// The API's own chapter-characters lookup has no "is this actually a
-// person" flag to filter on — it infers one from a genealogy match or a
-// dictionary definition that merely *sounds* biographical (see that
-// endpoint's own doc comment, which names this exact failure mode: doctrinal
-// nave-torrey topics like "Key"/"Chain"/"Millennium" slipping through for
-// Revelation 20). "Fall of Man"/"Wrath of God"-shaped multi-word phrases are
-// the same false-positive class — real personal names essentially never
-// GET /bible-characters/chapter/{book}/{chapter} is shown exactly as the API
-// returns it — no client-side filtering of what it decides counts as a
-// character, even though that heuristic is known to admit non-person
-// Nave/Torrey topics (see NOTES.md). Per this project's GOLDEN RULE
-// (CLAUDE.md), an API-side shortcoming gets flagged, not patched around
-// client-side.
+// GET /bible-people/{book}/{chapter} lists every TIPNR-classified person
+// mentioned in this chapter, in first-appearance order — TIPNR is a real
+// per-person classification, not a heuristic, so (unlike the old
+// bible-characters/chapter endpoint this replaces) there's nothing left to
+// filter client-side.
 let currentChapterCharacters = [];
 async function loadCharactersCard() {
   try {
-    const d = await apiJSONCached(`/bible-characters/chapter/${current.book}/${current.chapter}`);
+    const d = await apiJSONCached(`/bible-people/${current.book}/${current.chapter}`);
     const people = d.data || [];
     currentChapterCharacters = people;
     if (!people.length) return null;
@@ -383,10 +375,11 @@ async function loadCharactersCard() {
   } catch (e) { currentChapterCharacters = []; return null; }
 }
 // Detail view resolves one name via the exact-match GET /bible-characters/{name}
-// lookup — a real endpoint this app didn't use before (the chapter-scoped list
-// above is a looser heuristic, so a name from it can occasionally 404 here;
-// shown as a plain empty state, not an error, since that's honest API behavior
-// rather than a bug).
+// lookup (name-keyed, not ustrong — TIPNR disambiguation between two
+// same-named individuals is out of scope for this endpoint). A name from the
+// chapter list can still occasionally 404 here in principle; shown as a
+// plain empty state, not an error, since that's honest API behavior rather
+// than a bug.
 let charDetailToken = 0;
 function openCharactersModal() {
   document.getElementById("charactersBackBtn").style.display = "none";
@@ -413,7 +406,7 @@ async function openCharacterDetail(name) {
   try { d = await apiJSON(`/bible-characters/${encodeURIComponent(name)}`); }
   catch (e) {
     if (token !== charDetailToken) return;
-    body.innerHTML = `<div class="dd-empty">No further details for "${escHtml(name)}" — the chapter list is a broader heuristic than this exact-name lookup.</div>`;
+    body.innerHTML = `<div class="dd-empty">No further details on file for "${escHtml(name)}".</div>`;
     return;
   }
   if (token !== charDetailToken) return;
@@ -421,13 +414,16 @@ async function openCharacterDetail(name) {
 }
 // d is the raw { status, data: BibleCharacter } envelope — data (and every
 // field on it) is entirely omitempty, so a real profile can legitimately
-// have anywhere from zero to all five sections below; nothing here is
-// filtered or reshaped, just laid out. Definitions' prose (and only that —
+// have anywhere from zero to all sections below; nothing here is filtered
+// or reshaped, just laid out. Definitions' prose (and only that —
 // scripture_refs/citations elsewhere are already-structured refs, not free
-// text) goes through linkifyCitations per CLAUDE.md's citation rule; every
-// already-known ref (key_events, parents/children, first/last appearance)
-// uses registerCiteId + one batched fetchVersePreviews call, same pattern
-// as the Prophecies modal.
+// text) goes through linkifyCitations per CLAUDE.md's citation rule;
+// key_events/first/last appearance use registerCiteId + one batched
+// fetchVersePreviews call, same pattern as the Prophecies modal.
+// parents/siblings/partners/children (TIPNR, bible_people_relationships)
+// carry no per-edge verse citation — the related person's own name is the
+// only thing to show, so those rows just drill into that name's own
+// profile via openCharacterDetail rather than jumping to a verse.
 async function renderCharacterProfile(d) {
   const c = d && d.data;
   if (!c) return `<div class="dd-empty">No further details on file for this name.</div>`;
@@ -435,13 +431,17 @@ async function renderCharacterProfile(d) {
 
   const refs = [];
   (c.key_events || []).forEach(e => { if (e.verses && e.verses[0]) refs.push(e.verses[0]); });
-  (c.parents || []).forEach(r => refs.push({ book: r.book, chapter: r.chapter, verse: r.verse_start }));
-  (c.children || []).forEach(r => refs.push({ book: r.book, chapter: r.chapter, verse: r.verse_start }));
   if (c.first_appearance) refs.push(c.first_appearance);
   if (c.last_appearance) refs.push(c.last_appearance);
   const previewByRef = await fetchVersePreviews(refs);
 
   const sections = [];
+
+  const summaryText = c.briefest || c.brief || c.short || "";
+  if (summaryText) {
+    const tribeHtml = c.tribe_nation ? `<div class="char-def-src">${escHtml(c.tribe_nation)}</div>` : "";
+    sections.push(`<div class="char-section">${tribeHtml}<div class="char-def-text">${escHtml(summaryText)}</div></div>`);
+  }
 
   if (c.definitions && c.definitions.length) {
     const defs = await Promise.all(c.definitions.map(async def => {
@@ -465,16 +465,13 @@ async function renderCharacterProfile(d) {
     sections.push(`<div class="char-section"><div class="char-section-label">Key Events</div>${html}</div>`);
   }
 
-  const relRow = r => {
-    const text = previewByRef[`${r.book}.${r.chapter}.${r.verse_start}`];
-    const refLabel = `${bookName(r.book)} ${r.chapter}:${r.verse_start}${r.verse_end ? "-" + r.verse_end : ""}`;
-    const citeAttr = text ? ` data-cite-id="${registerCiteId(refLabel, text)}"` : "";
-    return `<div class="char-relative">
+  const relRow = r => `<div class="char-relative">
       <span class="char-relative-rel">${escHtml(r.relationship)}</span>
-      <button class="prophecy-ref"${citeAttr} onclick="closeModal('charactersScrim');jumpToVerse('${r.book}',${r.chapter},${r.verse_start})">${escHtml(r.name)} · ${escHtml(refLabel)}</button>
+      <button class="prophecy-ref" onclick="openCharacterDetail('${r.name.replace(/'/g, "\\'")}')">${escHtml(r.name)}</button>
     </div>`;
-  };
   if (c.parents && c.parents.length) sections.push(`<div class="char-section"><div class="char-section-label">Parents</div>${c.parents.map(relRow).join("")}</div>`);
+  if (c.siblings && c.siblings.length) sections.push(`<div class="char-section"><div class="char-section-label">Siblings</div>${c.siblings.map(relRow).join("")}</div>`);
+  if (c.partners && c.partners.length) sections.push(`<div class="char-section"><div class="char-section-label">Partners</div>${c.partners.map(relRow).join("")}</div>`);
   if (c.children && c.children.length) sections.push(`<div class="char-section"><div class="char-section-label">Children</div>${c.children.map(relRow).join("")}</div>`);
 
   const appearanceRow = (label, v) => {
@@ -900,37 +897,33 @@ function seekAudio(e) {
 
 /* ═══════════════════════════════════════════════════════════════════════
    DICTIONARY TERMS — subtly underlines chapter words that have a real
-   Easton's entry. There's no bulk "which words in this text have a
-   definition" endpoint, only an exact-term-or-fulltext-search lookup per
-   word (GET /dictionaries/{id}?q=), so this checks capitalized words only
-   (proper nouns are the overwhelming majority of actual entries, and it
-   keeps the candidate count sane) against Easton's alone — the most
-   comprehensive of the five sources, not all five, to keep this to one
-   call per candidate word rather than five. Capped at 60 distinct
-   candidates per chapter as a safety valve against genealogy-heavy
+   Easton's entry. Checks capitalized words only (proper nouns are the
+   overwhelming majority of actual entries, and it keeps the candidate count
+   sane) against Easton's alone — the most comprehensive of the five
+   sources, not all five — via one GET /dictionaries/easton/bulk?terms=
+   call per chapter (below the endpoint's 100-term cap, since candidates are
+   already capped at 60) rather than one call per word. Capped at 60
+   distinct candidates per chapter as a safety valve against genealogy-heavy
    chapters; results are cached by term for the rest of the session, since
    common words (God, Lord, Israel...) recur across nearly every chapter. */
 const termDefCache = new Map();
 async function markDictionaryTerms() {
   const root = document.getElementById("readingText");
   if (!root) return;
-  // Chunked lookups mean this can still be in flight when the reader moves
-  // to a different chapter — book/chapter are snapshotted so a stale result
-  // never marks up whatever chapter happens to be on screen by the time it
-  // resolves.
+  // The lookup can still be in flight when the reader moves to a different
+  // chapter — book/chapter are snapshotted so a stale result never marks up
+  // whatever chapter happens to be on screen by the time it resolves.
   const requestBook = current.book, requestChapter = current.chapter;
   const words = Array.from(new Set((root.textContent || "").match(/\b[A-Z][a-zA-Z']{2,}\b/g) || []));
   const candidates = words.filter(w => !termDefCache.has(w.toLowerCase())).slice(0, 60);
-  const CHUNK = 8;
-  for (let i = 0; i < candidates.length; i += CHUNK) {
-    await Promise.all(candidates.slice(i, i + CHUNK).map(async w => {
-      try {
-        const d = await apiJSON(`/dictionaries/easton?q=${encodeURIComponent(w)}`);
-        const entry = (d.data || [])[0];
-        const exact = entry && entry.term && entry.term.toLowerCase() === w.toLowerCase();
-        termDefCache.set(w.toLowerCase(), exact ? entry.definition : null);
-      } catch (e) { termDefCache.set(w.toLowerCase(), null); }
-    }));
+  if (candidates.length) {
+    try {
+      const d = await apiJSON(`/dictionaries/easton/bulk?terms=${candidates.map(encodeURIComponent).join(",")}`);
+      const byTerm = new Map((d.data || []).map(e => [e.term.toLowerCase(), e.definition]));
+      candidates.forEach(w => termDefCache.set(w.toLowerCase(), byTerm.get(w.toLowerCase()) ?? null));
+    } catch (e) {
+      candidates.forEach(w => termDefCache.set(w.toLowerCase(), null));
+    }
   }
   if (current.book !== requestBook || current.chapter !== requestChapter) return;
   applyDictionaryMarks(words);
