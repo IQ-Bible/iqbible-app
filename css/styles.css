@@ -127,7 +127,7 @@ button{ font-family:inherit; cursor:pointer; }
 .navitem:hover{ background:var(--brand-soft); color:var(--brand); }
 .navitem.active{ color:var(--brand); border-left-color:var(--brand); background:var(--brand-soft); font-weight:600; }
 .navdivider{ border:none; border-top:1px solid var(--divider); margin:10px 12px; }
-.navfooter{ margin-top:auto; padding:16px 12px 0; font-size:.6rem; color:var(--muted); opacity:.7; }
+.navfooter{ margin-top:auto; padding:16px 12px 0; font-size:.8rem; color:var(--muted); opacity:.7; }
 
 /* ── right rail cards — per-chapter context (places/people/prophecies)
    plus an always-shown timeline card; only the ones with real API data for

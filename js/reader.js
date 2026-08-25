@@ -1068,6 +1068,54 @@ async function linkifyCitations(text) {
   html += escHtml(text.slice(last));
   return html;
 }
+// Commentary (GET /commentaries/...) and dictionary (GET /dictionaries/{id}
+// ?q=...) entries already carry a server-parsed `citations` array over their
+// own Text/Definition (same scanCitations engine /parse/citations uses, run
+// once at fetch time) — reusing it here means never re-sending that prose
+// through /parse/citations, which both avoids a redundant call and sidesteps
+// its ?text= length cap entirely (long-form commentary routinely exceeds
+// it). Unlike linkifyCitations, hydration isn't included server-side for
+// these, so verse text is fetched here via the same batched
+// fetchVersePreviews() every other "ref already known" call site uses.
+async function linkifyPreParsedCitations(text, citations) {
+  if (!text) return escHtml(text || "");
+  // Same "too wide to preview usefully" cutoff linkifyCitations applies,
+  // plus a bare chapter-only match (no m.verse) has nothing to preview.
+  const matches = (citations || []).filter(m => m.verse && (m.verse_end || m.verse) - m.verse + 1 <= 6);
+  if (!matches.length) return escHtml(text);
+
+  const refs = [];
+  const seen = new Set();
+  matches.forEach(m => {
+    const end = m.verse_end || m.verse;
+    for (let v = m.verse; v <= end; v++) {
+      const key = `${m.book}.${m.chapter}.${v}`;
+      if (!seen.has(key)) { seen.add(key); refs.push({ book: m.book, chapter: m.chapter, verse: v }); }
+    }
+  });
+  const previewByRef = await fetchVersePreviews(refs);
+
+  let html = "";
+  let last = 0;
+  matches.forEach(m => {
+    const start = m.start || 0;
+    if (start < last) return;
+    const end = m.verse_end || m.verse;
+    const verseTexts = [];
+    for (let v = m.verse; v <= end; v++) {
+      const t = previewByRef[`${m.book}.${m.chapter}.${v}`];
+      if (t) verseTexts.push(t);
+    }
+    if (!verseTexts.length) return;
+    html += escHtml(text.slice(last, start));
+    const ref = `${m.name_en} ${m.chapter}:${m.verse}${m.verse_end ? "-" + m.verse_end : ""}`;
+    const id = registerCiteId(ref, verseTexts.join(" ").trim());
+    html += `<span class="citelink" data-cite-id="${id}">${escHtml(m.raw)}</span>`;
+    last = m.end;
+  });
+  html += escHtml(text.slice(last));
+  return html;
+}
 // Batched preview-text fetch for a list of *already-known* {book,chapter,
 // verse} refs — one GET /bibles/{version}/verses?refs=... call regardless
 // of list size (the same BatchVerses endpoint/zip-against-not_found pattern
@@ -1134,7 +1182,7 @@ async function loadDictTab(id) {
     return;
   }
   const src = DICT_SOURCES.find(s => s.id === id);
-  const defHtml = await linkifyCitations(entry.definition || "");
+  const defHtml = await linkifyPreParsedCitations(entry.definition || "", entry.citations);
   if (token !== dictModalToken) return;
   body.innerHTML = `<div class="dd-meta">${escHtml(src ? src.name : id)}</div><div class="dd-def">${defHtml}</div>`;
 }
@@ -1606,7 +1654,7 @@ async function loadCommentaryText(name) {
     const d = await apiJSONCached(`/commentaries/${name}/${book}/${chapter}/${verse}`);
     const entries = d.entries || [];
     if (!entries.length) { el.innerHTML = `<div class="dd-empty">No entry from this source for this verse.</div>`; return; }
-    const paragraphs = await Promise.all(entries.map(e => linkifyCitations(e.text || "")));
+    const paragraphs = await Promise.all(entries.map(e => linkifyPreParsedCitations(e.text || "", e.citations)));
     el.innerHTML = paragraphs.map(p => `<div class="dd-def" style="margin-bottom:14px">${p}</div>`).join("");
   } catch (e) { el.innerHTML = `<div class="dd-empty">Could not load commentary.</div>`; }
 }

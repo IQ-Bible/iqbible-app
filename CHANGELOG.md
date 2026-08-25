@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file. This CHANGELOG follows SemVer, see https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
+- n/a
+
+## [1.2.7] - 2026-08-24
+- **fixed:** Commentary and dictionary entries could silently lose their verse-citation hover links on long-form text (e.g. Matthew Henry's characteristically long entries) because `linkifyCitations` re-sent the whole entry text through a citation-parsing call that has an input-length limit. Commentary and dictionary lookups already come back from the API with their citations pre-parsed, so those two call sites now consume that directly instead of re-parsing — fixes the long-entry case and drops a redundant API call on every dictionary/commentary render.
 
 ## [1.2.6] - 2026-08-24
 - **fixed:** Capped #shell (the flex row holding #navrail, #readMain, #rightRail) at max-width:1600px with margin:0 auto in css/styles.css:73. Previously it stretched full viewport width, so on wide screens #readMain (flex:1) filled all the leftover space and pushed the rails out to the raw viewport edges. Now the whole three-column group stays capped and centered as a unit, keeping the sidebars near the reading column regardless of screen width, while narrower screens (where the shell is already under 1600px) are unaffected.

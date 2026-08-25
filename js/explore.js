@@ -258,10 +258,10 @@ async function fetchAtlasPlaceDescription(name) {
   const hits = [];
   results.forEach((r, i) => {
     const entry = r.status === "fulfilled" && (r.value.data || [])[0];
-    if (entry && entry.definition) hits.push({ source: DICT_SOURCES[i].name, definition: entry.definition });
+    if (entry && entry.definition) hits.push({ source: DICT_SOURCES[i].name, definition: entry.definition, citations: entry.citations });
   });
   if (!hits.length) return "";
-  const rows = await Promise.all(hits.map(h => linkifyCitations(h.definition)));
+  const rows = await Promise.all(hits.map(h => linkifyPreParsedCitations(h.definition, h.citations)));
   const tabBtns = hits.length > 1
     ? `<div class="dict-tab-btns">${hits.map((h, i) => `<button type="button" class="filter-chip dict-tab-btn${i === 0 ? " active" : ""}" data-idx="${i}">${escHtml(h.source)}</button>`).join("")}</div>`
     : "";
