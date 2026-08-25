@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file. This CHANGE
 
 ## [Unreleased]
 
+## [1.2.6] - 2026-08-24
+- **fixed:** Capped #shell (the flex row holding #navrail, #readMain, #rightRail) at max-width:1600px with margin:0 auto in css/styles.css:73. Previously it stretched full viewport width, so on wide screens #readMain (flex:1) filled all the leftover space and pushed the rails out to the raw viewport edges. Now the whole three-column group stays capped and centered as a unit, keeping the sidebars near the reading column regardless of screen width, while narrower screens (where the shell is already under 1600px) are unaffected.
+
 ## [1.2.5] - 2026-08-24
 - **fixed:** Typo ('naviagating') in README.md for the word 'navigating.'
 

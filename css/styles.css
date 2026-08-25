@@ -70,7 +70,10 @@ button{ font-family:inherit; cursor:pointer; }
 .pp-actions button{ flex:1; font-family:'Josefin Sans',sans-serif; font-size:.55rem; letter-spacing:.04em; text-transform:uppercase; padding:9px 3px; border-radius:6px; border:1px solid var(--divider); background:var(--surface-2); color:var(--ink); white-space:nowrap; }
 .pp-actions button:hover{ border-color:var(--brand-line); color:var(--brand); }
 
-#shell{ flex:1; min-height:0; display:flex; }
+/* Capped + centered so the rails stay near the reading column on very wide
+   screens instead of pinning to the viewport edges while #readMain (flex:1)
+   stretches to fill the gap between them. */
+#shell{ flex:1; min-height:0; display:flex; width:100%; max-width:1600px; margin:0 auto; }
 /* Each rail is a 300px column with its content (.navmenu/.cardstack) fixed
    at half that width and horizontally centered — justify-content:center
    splits the freed 150px evenly as breathing room on both sides, rather
