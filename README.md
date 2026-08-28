@@ -4,37 +4,41 @@ A free, open-source Bible reader — and a worked example of building a real app
 
 Every feature here comes from a real API call. There's no server, no build step, and no framework — just `index.html`, `css/styles.css`, and a handful of plain `js/*.js` files loaded in order. If you're looking for a minimal, honest example of what it takes to build on the IQ Bible API, this is it.
 
-## Running it
+## Try it
+
+The hosted instance runs at **[app.iqbible.com](https://app.iqbible.com)** — nothing to set up, just start reading. (It's backed by a shared API key so anonymous visitors don't have to get their own; see ["Deploying for other people"](#if-youre-deploying-for-other-people-to-use-not-just-yourself) for how that works and why your own deployment shouldn't copy it blindly.)
+
+## Running it locally
 
 No build step, no dependencies. Any of these work:
 
 - Double-click `index.html` and open it directly in your browser.
 - Or serve it locally with any static file server, e.g. `npx serve .` or `python -m http.server`.
 
-Either way, you'll see a banner asking for an API key the first time you open it — see below.
+Run locally (or self-hosted anywhere that isn't `app.iqbible.com`) and you'll see a banner asking for an API key the first time you open it — see below.
 
 Deep links (`/gen/1`, `/gen/1/1`, etc.) are resolved client-side by `js/router.js`, so they only work on a fresh page load if the server falls back to `index.html` for unmatched paths — the same thing `404.html`/`_redirects` do in production (see "Deploying your own copy" below). Plain `npx serve .` and VS Code's Live Server extension don't do this, so loading a deep link directly (rather than navigating to it from within the app) 404s. Use `npx serve . -s` (the `-s`/`--single` flag enables that fallback) if you need to test deep links locally.
 
 ## Get an API key
 
-Every user of this app — including you, running it locally — needs their own IQ Bible API key. Get one free at [developer.iqbible.com](https://developer.iqbible.com), then paste it into the app's Settings (the profile icon in the top bar, or Settings in the left-hand menu). It's saved only in your browser's local storage; it's never written anywhere else and never leaves your browser except in requests to the API itself.
-
-## Demo
-
-You can experiment with the live version of this app (GitHub Pages) by navigating to [https://jody-pm.github.io/iqbible-app](https://jody-pm.github.io/iqbible-app) and entering your API Key. 
+The hosted instance at [app.iqbible.com](https://app.iqbible.com) doesn't need one. Everywhere else — running it locally, or self-hosting your own copy — needs its own IQ Bible API key. Get one free at [developer.iqbible.com](https://developer.iqbible.com), then paste it into the app's Settings (the profile icon in the top bar, or Settings in the left-hand menu). It's saved only in your browser's local storage; it's never written anywhere else and never leaves your browser except in requests to the API itself.
 
 ## Deploying your own copy
 
 This is a plain static site, so any static host works. Two are pre-configured:
 
-- **GitHub Pages**: enable Pages on your fork (Settings → Pages → deploy from a branch). `404.html` (a copy of `index.html`) makes deep links like `/gen/1/1` work on a fresh page load, which GitHub Pages doesn't otherwise support for a single-page app. The project-site subpath (`username.github.io/reponame/`) is auto-detected at runtime by the inline script at the top of `index.html`'s/`404.html`'s `<head>` — if you fork this to a different GitHub Pages project site, change the hostname check there (not `js/config.js`, which just reads what that script computes).
-- **Cloudflare Pages**: point it at this repo — `_redirects` already routes every path to `index.html`. No `BASE_PATH` needed on a custom domain.
+- **GitHub Pages**: enable Pages on your fork (Settings → Pages → deploy from a branch). `404.html` (a copy of `index.html`) makes deep links like `/gen/1/1` work on a fresh page load, which GitHub Pages doesn't otherwise support for a single-page app. The app expects to be served from the domain root — set a custom domain (Pages puts its name in the `CNAME` file and redirects the `username.github.io/reponame` path to it), or if you must serve it from a `/reponame` subpath, set `BASE_PATH` in `js/config.js` and add `<base href="/reponame/">` to `index.html`/`404.html`.
+- **Cloudflare Pages**: point it at this repo — `_redirects` already routes every path to `index.html`. Serve from the domain root.
+
+The hosted instance also runs a Cloudflare Worker (`cloudflare/`) in front of the API — see the next section.
 
 ### If you're deploying for other people to use, not just yourself
 
-**Do not put your own API key in this app's source code.** This app is entirely client-side — anything in its JavaScript is visible to anyone who opens their browser's dev tools or views the page source. If you deploy a public copy with your key baked in, every visitor can read it and use it as their own.
+**Do not put your own API key in this app's source code.** This app is entirely client-side — anything in its JavaScript is visible to anyone who opens their browser's dev tools or views the page source. A GitHub Actions secret written into the deployed files is no different: it's downloaded verbatim by every visitor. If you deploy a public copy with your key reachable from the browser, every visitor can read it and use it as their own.
 
-The default behavior — each visitor enters their own key via Settings — is the correct one for a public deployment, and it's why the app works this way out of the box. If you want to build a product for anonymous end users who shouldn't have to get their own API key (a consumer app rather than a developer tool), you need your own backend to hold a shared credential server-side and proxy requests through it. That's a real, separate piece of engineering — this app deliberately doesn't have one, so it stays a simple, honest example of what the API alone can do.
+The default behavior — each visitor enters their own key via Settings — is the correct one for most public deployments, and it's why the app works this way out of the box.
+
+If you want anonymous end users to skip that step (a consumer app rather than a developer tool), the key has to live somewhere the browser can't read it: a small server-side proxy that holds the credential and adds it to each request. The hosted instance at `app.iqbible.com` does exactly this with a Cloudflare Worker — see [`cloudflare/`](cloudflare/) for the whole thing (it's about 40 lines). That's a real, separate piece of infrastructure with its own trade-offs (you're now paying for everyone's usage, and a shared key behind a public proxy can still be abused), which is why the app itself still ships zero-backend and key-per-visitor by default.
 
 ## What it demonstrates
 

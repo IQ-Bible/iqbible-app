@@ -226,7 +226,7 @@ document.addEventListener("keydown", e => {
     setMenuHash(null);
     // Escape bypasses closeSettings() (goes straight to switchMainView above),
     // so re-apply its "still no key → re-block the app" check here too.
-    if (!getApiKey()) showKeyBanner();
+    if (!IS_HOSTED_INSTANCE && !getApiKey()) showKeyBanner();
   }
 });
 document.addEventListener("click", e => {
@@ -261,7 +261,8 @@ async function refreshAppVersionFromChangelog() {
   setFontSize(getFontSize());
   setUiFontSize(getUiFontSize());
   setIllustBW(getIllustBW());
-  if (!getApiKey()) { showKeyBanner(); openHashRoute(); return; }
+  // The hosted instance never gates on a key — its proxy supplies one.
+  if (!IS_HOSTED_INSTANCE && !getApiKey()) { showKeyBanner(); openHashRoute(); return; }
   await Promise.all([loadCatalog(), loadBookAbbreviations()]);
   applyStoredVersion();
   await loadBooks();

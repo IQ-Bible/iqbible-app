@@ -19,11 +19,15 @@ function openShareTool() {
 function shareToolRefString() {
   return `${shareToolRef.book}.${shareToolRef.chapter}.${shareToolRef.verse}`;
 }
+// API_PUBLIC_BASE, not API_BASE: these endpoints are unauthenticated and the
+// URLs get copied out / embedded on other sites, so they point straight at
+// the API even on the hosted instance (whose API_BASE is a same-origin proxy
+// path that only makes sense from within this app).
 function shareImageURL() {
-  return `${API_BASE}/image/verse?ref=${encodeURIComponent(shareToolRefString())}&version=${encodeURIComponent(current.version)}&style=${shareToolTheme}&format=png`;
+  return `${API_PUBLIC_BASE}/image/verse?ref=${encodeURIComponent(shareToolRefString())}&version=${encodeURIComponent(current.version)}&style=${shareToolTheme}&format=png`;
 }
 function shareEmbedSrc() {
-  return `${API_BASE}/embed/verse?ref=${encodeURIComponent(shareToolRefString())}&version=${encodeURIComponent(current.version)}&theme=${shareToolTheme}`;
+  return `${API_PUBLIC_BASE}/embed/verse?ref=${encodeURIComponent(shareToolRefString())}&version=${encodeURIComponent(current.version)}&theme=${shareToolTheme}`;
 }
 function renderShareTool() {
   const body = document.getElementById("shareToolBody");

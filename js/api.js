@@ -100,7 +100,10 @@ function showApiErrorModal(status, body, headers, path) {
   openModal("apiErrorScrim");
 }
 async function apiJSON(path) {
-  if (!getApiKey()) {
+  // The hosted instance's proxy injects a key server-side, so "no key set"
+  // isn't a blocking state there — apiFetch just sends no X-API-Key header
+  // and the Worker fills one in.
+  if (!IS_HOSTED_INSTANCE && !getApiKey()) {
     showKeyBanner();
     const err = new Error("no_api_key");
     err.status = 0;
@@ -168,6 +171,13 @@ function hideKeyBanner() { document.getElementById("keyBanner").classList.remove
 
 function openSettings() {
   document.getElementById("settingsKeyInput").value = getApiKey();
+  // On the hosted instance a key is optional (the proxy supplies a shared
+  // one) — say so, and note that entering a personal key switches that
+  // visitor off the shared pool and onto their own quota.
+  const keyHint = document.getElementById("settingsKeyHint");
+  if (keyHint) keyHint.innerHTML = IS_HOSTED_INSTANCE
+    ? `Optional here — app.iqbible.com includes a shared key, so you can read without one. Enter your own (free at <a href="https://developer.iqbible.com" target="_blank" rel="noopener">developer.iqbible.com</a>) to use your own quota instead of the shared pool. Stored only in this browser.`
+    : `Free at <a href="https://developer.iqbible.com" target="_blank" rel="noopener">developer.iqbible.com</a>. Stored only in this browser's local storage — never sent anywhere but the IQ Bible API.`;
   document.getElementById("settingsIllustSelect").value = getIllustPack();
   document.getElementById("settingsIllustBW").checked = getIllustBW();
   document.getElementById("settingsIconSelect").value = getIconStyle();
@@ -181,7 +191,8 @@ function closeSettings() {
   switchMainView("read");
   // Leaving Settings without a key re-blocks the app the same way arriving
   // with none did — covers both a direct close and saveSettings() below.
-  if (!getApiKey()) showKeyBanner();
+  // Not on the hosted instance, where a key is optional.
+  if (!IS_HOSTED_INSTANCE && !getApiKey()) showKeyBanner();
 }
 function saveSettings() {
   setApiKey(document.getElementById("settingsKeyInput").value);

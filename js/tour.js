@@ -1,6 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════
    TAKE A TOUR — a first-visit welcome dialog (maybeShowTourWelcome, called
-   once from main.js's init(), only once a key is set) plus a dynamic
+   once from main.js's init(), once the app is usable — a key is set, or
+   it's the hosted instance where none is needed) plus a dynamic
    step-by-step walkthrough that spotlights real topbar/nav-rail elements
    in place, rather than opening each panel it describes. Re-launchable any
    time from the Help page. No API calls, no persisted state beyond the
@@ -116,7 +117,7 @@ let tourRenderedIndex = -1;
 
 function markTourSeen() { localStorage.setItem(TOUR_SEEN_KEY, "1"); }
 function maybeShowTourWelcome() {
-  if (!getApiKey() || localStorage.getItem(TOUR_SEEN_KEY)) return;
+  if ((!IS_HOSTED_INSTANCE && !getApiKey()) || localStorage.getItem(TOUR_SEEN_KEY)) return;
   // Marked seen the moment it's shown, not on a specific dismiss button —
   // so a backdrop click or Escape (both close it generically, see main.js)
   // suppresses the nag next visit exactly the same as either real button.

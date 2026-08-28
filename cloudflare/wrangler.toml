@@ -1,0 +1,17 @@
+# Cloudflare Worker config for the API auth proxy — official hosted instance
+# only. See worker.js's header comment and ../README.md before deploying.
+
+name = "iqbible-app-proxy"
+main = "worker.js"
+compatibility_date = "2026-08-01"
+
+# Bound to just the API path on the hosted instance. Every other path on
+# app.iqbible.com is left alone and falls through to GitHub Pages (set up as
+# a proxied CNAME -> iq-bible.github.io in Cloudflare DNS).
+routes = [
+  { pattern = "app.iqbible.com/api/v2/*", zone_name = "iqbible.com" }
+]
+
+# The shared key is NOT stored here — it's a Worker secret:
+#   npx wrangler secret put IQBIBLE_API_KEY
+# (worker.js reads it as env.IQBIBLE_API_KEY).

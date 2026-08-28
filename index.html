@@ -5,17 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>IQ Bible</title>
 <meta name="description" content="A worked example of building a real app on the IQ Bible API — a free, open-source Bible reader with no backend of its own.">
-<script>
-// Single source of truth for this app's GitHub Pages project-site prefix —
-// computed here, once, instead of hand-maintained per branch (see
-// CHANGELOG's 1.1.0 hotfix for what happens when that manual step gets
-// missed on a main merge). Everything below this point (css/js/img refs in
-// this file, 404.html, and js/config.js's BASE_PATH) is relative to the
-// <base> this sets, so main and develop can stay byte-identical. Forking to
-// your own GitHub Pages project site: change the hostname/path below.
-window.BASE_PATH = location.hostname === "jody-pm.github.io" ? "/iqbible-app" : "";
-document.head.appendChild(Object.assign(document.createElement("base"), { href: (window.BASE_PATH || "") + "/" }));
-</script>
+<!-- The css/js/img refs below are written relative, so a deep-link page load
+     (e.g. /gen/1/1) must resolve them from the site root rather than the
+     current path. Every deployment of this app is served from its domain
+     root (see js/config.js's BASE_PATH note), so this is a plain "/". A fork
+     deploying under a subpath is the one case that needs to change it. -->
+<base href="/">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&family=Josefin+Sans:wght@300;400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/styles.css">
@@ -93,7 +88,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
         <button class="navitem" data-nav="help" onclick="navMenuClick('help')">Help</button>
         <button class="navitem" data-nav="about" onclick="navMenuClick('about')">About</button>
         <button class="navitem" data-nav="settings" onclick="navMenuClick('settings')">Settings</button>
-        <div class="navfooter">&copy;&nbsp;<span id="navYear"></span>&nbsp;IQ&nbsp;Bible<br/>&nbsp;v<span id="navVersion"></span> &middot; <a href="https://api.iqbible.com" target="_blank" rel="noopener">API</a></div>
+        <div class="navfooter">&copy;&nbsp;<span id="navYear"></span>&nbsp;IQ&nbsp;Bible<br>v<span id="navVersion"></span>&nbsp;&middot; <a href="https://api.iqbible.com" target="_blank" rel="noopener">API</a></div>
       </div>
     </nav>
 
@@ -397,7 +392,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
               <div class="setfield">
                 <label for="settingsKeyInput">API Key</label>
                 <input type="password" id="settingsKeyInput" placeholder="iqb_live_…" autocomplete="off">
-                <div class="hint">Free at <a href="https://developer.iqbible.com" target="_blank" rel="noopener">developer.iqbible.com</a>. Stored only in this browser's local storage — never sent anywhere but the IQ Bible API.</div>
+                <div class="hint" id="settingsKeyHint">Free at <a href="https://developer.iqbible.com" target="_blank" rel="noopener">developer.iqbible.com</a>. Stored only in this browser's local storage — never sent anywhere but the IQ Bible API.</div>
               </div>
               <button class="setsave" onclick="saveSettings()">Save</button>
             </form>
@@ -482,7 +477,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
             <span class="filter-chip">Reading plans</span>
           </div>
 
-          <p class="about-runs">It runs as a plain static site with zero backend of its own — no server, no build step, no framework, just HTML/CSS and a handful of vanilla JavaScript files. Every visitor brings their own free API key, stored only in this browser's local storage.</p>
+          <p class="about-runs">It runs as a plain static site with zero backend of its own — no server, no build step, no framework, just HTML/CSS and a handful of vanilla JavaScript files. On the hosted instance at app.iqbible.com you can start reading straight away; self-host a copy and each visitor supplies their own free API key, stored only in their browser.</p>
 
           <div class="about-callouts">
             <div class="about-callout">
@@ -491,14 +486,14 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
               </div>
               <div class="about-callout-title">Open Source</div>
               <div class="about-callout-body">MIT-licensed and open on GitHub. Fork it, self-host it, or use it as a reference for your own app on the API.</div>
-              <a class="about-callout-link" href="https://github.com/jody-pm/iqbible-app" target="_blank" rel="noopener">github.com/jody-pm/iqbible-app</a>
+              <a class="about-callout-link" href="https://github.com/IQ-Bible/iqbible-app" target="_blank" rel="noopener">github.com/IQ-Bible/iqbible-app</a>
             </div>
             <div class="about-callout">
               <div class="about-callout-icon">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-9.5 9.5"/><path d="M15 4l5 5-2 2-5-5z"/><circle cx="7" cy="17" r="4"/></svg>
               </div>
               <div class="about-callout-title">Get an API Key</div>
-              <div class="about-callout-body">Free, no card required — used only by this browser, stored only in this browser.</div>
+              <div class="about-callout-body">Free, no card required. You only need one to self-host — app.iqbible.com includes a shared key, so you can start reading right away.</div>
               <a class="about-callout-link about-callout-link-brand" href="https://developer.iqbible.com" target="_blank" rel="noopener">developer.iqbible.com</a>
             </div>
           </div>
@@ -538,18 +533,18 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
           <div class="help-grid">
             <div class="help-card">
               <div class="help-card-num">01</div>
-              <div class="help-card-title">Get a free API key</div>
-              <div class="help-card-body">Grab one at developer.iqbible.com — no card required.</div>
+              <div class="help-card-title">Pick a translation</div>
+              <div class="help-card-body">1,000+ translations across hundreds of languages, from the version picker in the top bar.</div>
             </div>
             <div class="help-card">
               <div class="help-card-num">02</div>
-              <div class="help-card-title">Add it in Settings</div>
-              <div class="help-card-body">Paste the key in; it stays only in this browser.</div>
+              <div class="help-card-title">Choose a book and chapter</div>
+              <div class="help-card-body">Navigate from the left rail, or deep-link straight to a verse like /gen/1/1.</div>
             </div>
             <div class="help-card">
               <div class="help-card-num">03</div>
-              <div class="help-card-title">Start reading</div>
-              <div class="help-card-body">Pick a version and book, or jump in with Take a Tour.</div>
+              <div class="help-card-title">Go deeper on any verse</div>
+              <div class="help-card-body">Tap a verse for cross-references, commentary, original languages, notes and more.</div>
             </div>
           </div>
 
@@ -603,14 +598,14 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
             <div class="help-card">
               <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 0 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 0 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.55V3a2 2 0 0 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.55 1H21a2 2 0 0 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1z"/></svg></div>
               <div class="help-card-title">Settings</div>
-              <div class="help-card-body">Your API key, font size, and reading preferences.</div>
+              <div class="help-card-body">Font size, illustrations, book icons and other reading preferences (plus your API key, if you self-host).</div>
             </div>
           </div>
 
           <div class="about-section-label" style="text-align:left">Frequently Asked</div>
           <div class="help-faq-item">
-            <div class="help-faq-q">Do I need an account?</div>
-            <div class="help-faq-a">No — just a free API key, stored only in your browser's local storage.</div>
+            <div class="help-faq-q">Do I need an account or an API key?</div>
+            <div class="help-faq-a">No. At app.iqbible.com there's nothing to set up — just start reading. If you self-host your own copy, you'll add a free API key in Settings, stored only in your browser.</div>
           </div>
           <div class="help-faq-item">
             <div class="help-faq-q">Why is a feature missing something I expected?</div>
@@ -635,6 +630,10 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
           <div class="help-faq-item">
             <div class="help-faq-q">Is this open source?</div>
             <div class="help-faq-a">Yes, MIT-licensed — see the About page for the repository link.</div>
+          </div>
+          <div class="help-faq-item">
+            <div class="help-faq-q">Can I run my own copy?</div>
+            <div class="help-faq-a">Yes — it's a static site with no backend. Fork it on GitHub, add a free API key, and host it anywhere. The README has the details.</div>
           </div>
 
         </div>

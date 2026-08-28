@@ -3,7 +3,21 @@
 All notable changes to this project will be documented in this file. This CHANGELOG follows SemVer, see https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
-- n/a
+- **added:** Official hosted instance at `app.iqbible.com` — the app now runs there with no API
+  key required. A small Cloudflare Worker (`cloudflare/`) sits in front of the authenticated API
+  endpoints and injects a shared key server-side; the key never reaches the browser. A visitor who
+  still enters their own key in Settings is passed straight through to their own quota. Forks and
+  self-hosted copies are unchanged — they call the API directly with each visitor's own key, which
+  is still the only correct model for a deployment you don't control the API billing for.
+- **changed:** The app is now served from the domain root on every deployment, so the per-branch
+  `/iqbible-app` GitHub Pages project-site prefix is gone. `BASE_PATH` is always `""`; `index.html`/
+  `404.html` use a plain `<base href="/">` instead of the old runtime hostname check; `main` and
+  `develop` no longer diverge on those lines.
+- **changed:** Share Tools (`GET /image/verse`, `/embed/verse` — both public/unauthenticated) now
+  always point straight at `api.iqbible.com` via the new `API_PUBLIC_BASE`, so copied image links
+  and embed codes don't depend on the hosted instance's proxy path.
+- **changed:** About and Help copy updated for the hosted instance (an API key is only needed when
+  self-hosting); repository moved to `github.com/IQ-Bible/iqbible-app`.
 
 ## [1.2.7] - 2026-08-24
 - **fixed:** Commentary and dictionary entries could silently lose their verse-citation hover links on long-form text (e.g. Matthew Henry's characteristically long entries) because `linkifyCitations` re-sent the whole entry text through a citation-parsing call that has an input-length limit. Commentary and dictionary lookups already come back from the API with their citations pre-parsed, so those two call sites now consume that directly instead of re-parsing — fixes the long-entry case and drops a redundant API call on every dictionary/commentary render.

@@ -2,6 +2,7 @@
 Thumbs.db
 .vscode/
 node_modules/
+.wrangler/
 CLAUDE.md
 NOTES.md
 TODO.md
