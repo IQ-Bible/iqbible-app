@@ -242,9 +242,35 @@ button{ font-family:inherit; cursor:pointer; }
 .person-def:last-child{ margin-bottom:0; }
 .person-def-src{ font-family:var(--font-ui); font-size:.58rem; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin-bottom:3px; }
 .person-def-text{ font-size:.92rem; line-height:1.6; color:var(--ink-soft); }
+/* Long dictionary entries clamp to a few lines until "Read more" — the class
+   lives on the wrapper, not .person-def-text, so it survives the innerHTML
+   swap ensurePersonDefLinkified() does when the tab is first shown. */
+.person-def-clamp{ position:relative; }
+.person-def-clamp.clamp:not(.open) .person-def-text{ display:-webkit-box; -webkit-line-clamp:6; -webkit-box-orient:vertical; overflow:hidden; }
+.person-def-clamp.clamp:not(.open)::after{ content:""; position:absolute; left:0; right:0; bottom:1.5em; height:2.2em; background:linear-gradient(transparent, var(--surface)); pointer-events:none; }
+.person-def-more{ margin-top:5px; background:none; border:none; padding:0; font-family:var(--font-ui); font-size:.72rem; font-weight:600; color:var(--brand); cursor:pointer; }
+.person-def-clamp.open .person-def-more{ display:none; }
 .person-relative{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:8px 0; border-bottom:1px solid var(--divider); }
 .person-relative:last-child{ border-bottom:none; }
 .person-relative-rel{ font-family:var(--font-ui); font-size:.58rem; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); min-width:50px; }
+/* ── person profile: identity block + family chips + key-events accordion (js/reader.js) ── */
+.person-id{ margin-bottom:16px; }
+.person-id-eyebrow{ font-family:var(--font-ui); font-size:.6rem; letter-spacing:.1em; text-transform:uppercase; color:var(--brand); margin-bottom:4px; }
+.person-id-summary{ font-size:1rem; line-height:1.55; color:var(--ink); }
+.person-appear{ margin-top:8px; font-size:.78rem; line-height:1.5; color:var(--muted); }
+.person-appear-label{ font-family:var(--font-ui); font-size:.56rem; letter-spacing:.06em; text-transform:uppercase; }
+.person-appear-ref{ background:none; border:none; padding:0; font-size:.78rem; font-weight:600; color:var(--brand); cursor:pointer; }
+.person-appear-ref:hover{ text-decoration:underline; }
+.person-appear-sep{ opacity:.6; }
+.person-rel-groups{ display:grid; grid-template-columns:1fr 1fr; gap:12px 18px; align-items:start; margin-bottom:18px; }
+.person-rel-group{ min-width:0; }
+.person-rel-group .person-section-label{ margin-bottom:5px; }
+.person-rel-names{ display:flex; flex-wrap:wrap; gap:6px 10px; }
+@media (max-width:560px){ .person-rel-groups{ grid-template-columns:1fr; } }
+.person-rel-item{ display:inline-flex; align-items:baseline; gap:4px; }
+.person-rel-tag{ font-family:var(--font-ui); font-size:.54rem; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); }
+.person-section > .bg-accordion{ margin-bottom:0; }
+.person-acc-count{ display:inline-block; min-width:16px; padding:1px 5px; border-radius:var(--r-pill); background:var(--surface-2); color:var(--muted); font-size:.6rem; text-align:center; }
 
 /* ── devotionals modal ── */
 /* Kept visually secondary (small, muted) — "Today's Devotional" below is

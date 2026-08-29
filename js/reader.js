@@ -420,15 +420,22 @@ async function openPersonDetail(name) {
   }
   if (token !== personDetailToken) return;
   body.innerHTML = await renderPersonProfile(d);
+  ensurePersonDefLinkified(0);
 }
 // d is the raw { status, data: BibleCharacter } envelope — data (and every
 // field on it) is entirely omitempty, so a real profile can legitimately
 // have anywhere from zero to all sections below; nothing here is filtered
-// or reshaped, just laid out. Definitions' prose (and only that —
-// scripture_refs/citations elsewhere are already-structured refs, not free
-// text) goes through linkifyCitations per CLAUDE.md's citation rule;
-// key_events/first/last appearance use registerCiteId + one batched
-// fetchVersePreviews call, same pattern as the Prophecies modal.
+// or reshaped, just laid out. Layout runs identity block (epithet, summary,
+// a small first/last appearance line) → family (inline name chips per
+// relationship) → Key Events (collapsed accordion, the one big/messy block)
+// → tabbed definitions: the structured
+// data stays compact so the dictionary prose (the bulk of the content) sits
+// near the top instead of below a long scroll.
+// Definitions' prose (and only that — scripture_refs/citations elsewhere are
+// already-structured refs, not free text) goes through linkifyCitations per
+// CLAUDE.md's citation rule, one tab at a time; key_events/first/last
+// appearance use registerCiteId + one batched fetchVersePreviews call, same
+// pattern as the Prophecies modal.
 // parents/siblings/partners/children (TIPNR, bible_people_relationships)
 // carry no per-edge verse citation — the related person's own name is the
 // only thing to show, so those rows just drill into that name's own
@@ -444,57 +451,107 @@ async function renderPersonProfile(d) {
   if (c.last_appearance) refs.push(c.last_appearance);
   const previewByRef = await fetchVersePreviews(refs);
 
-  const sections = [];
+  const out = [];
 
-  const summaryText = c.briefest || c.brief || c.short || "";
-  if (summaryText) {
-    const tribeHtml = c.tribe_nation ? `<div class="person-def-src">${escHtml(c.tribe_nation)}</div>` : "";
-    sections.push(`<div class="person-section">${tribeHtml}<div class="person-def-text">${escHtml(summaryText)}</div></div>`);
+  // Identity block — epithet, one-sentence summary, and a small first/last
+  // appearance line. NB the appearance refs come from the API's name-matched
+  // Nave/Torrey citation range, not a true narrative first/last mention (see
+  // NOTES.md) — rendered as-is, not second-guessed here.
+  const eyebrow = c.tribe_nation || (c.gender ? c.gender[0].toUpperCase() + c.gender.slice(1) : "");
+  const summaryText = c.brief || c.summary || c.briefest || c.short || c.description || "";
+  const appearItem = (label, v) => {
+    if (!v) return "";
+    const refLabel = `${bookName(v.book)} ${v.chapter}:${v.verse}`;
+    const text = previewByRef[`${v.book}.${v.chapter}.${v.verse}`];
+    const citeAttr = text ? ` data-cite-id="${registerCiteId(refLabel, text)}"` : "";
+    return `<span class="person-appear-item"><span class="person-appear-label">${escHtml(label)}</span> <button class="person-appear-ref"${citeAttr} onclick="closeModal('peopleScrim');jumpToVerse('${v.book}',${v.chapter},${v.verse})">${escHtml(refLabel)}</button></span>`;
+  };
+  const appearParts = [appearItem("First appearance", c.first_appearance), appearItem("Last appearance", c.last_appearance)].filter(Boolean);
+  if (eyebrow || summaryText || appearParts.length) {
+    out.push(`<div class="person-id">${eyebrow ? `<div class="person-id-eyebrow">${escHtml(eyebrow)}</div>` : ""}${summaryText ? `<div class="person-id-summary">${escHtml(summaryText)}</div>` : ""}${appearParts.length ? `<div class="person-appear">${appearParts.join(`<span class="person-appear-sep"> · </span>`)}</div>` : ""}</div>`);
   }
 
-  if (c.definitions && c.definitions.length) {
-    const defs = await Promise.all(c.definitions.map(async def => {
-      const src = DICT_SOURCES.find(s => s.id === def.source);
-      const defHtml = await linkifyCitations(def.definition || "");
-      const refsHtml = (def.scripture_refs && def.scripture_refs.length)
-        ? `<div class="rc-more">${escHtml(def.scripture_refs.join(", "))}</div>` : "";
-      return `<div class="person-def"><div class="person-def-src">${escHtml(src ? src.name : def.source)}</div><div class="person-def-text">${defHtml}</div>${refsHtml}</div>`;
-    }));
-    sections.push(`<div class="person-section"><div class="person-section-label">Definitions</div>${defs.join("")}</div>`);
-  }
+  // Family — one group per relationship in a 2-up grid, the names as inline
+  // chips that wrap (handles a figure with many children). The per-chip
+  // relationship label is dropped when it's just the singular of the group
+  // heading ("Siblings" → "sibling") but kept when it adds something
+  // ("Parents" → "father" / "mother").
+  const relChip = (r, groupSingular) => {
+    const showRel = r.relationship && r.relationship.toLowerCase() !== groupSingular;
+    return `<span class="person-rel-item">${showRel ? `<span class="person-rel-tag">${escHtml(r.relationship)}</span>` : ""}<button class="prophecy-ref" onclick="openPersonDetail('${r.name.replace(/'/g, "\\'")}')">${escHtml(r.name)}</button></span>`;
+  };
+  const relGroups = [["Parents", "parent", c.parents], ["Siblings", "sibling", c.siblings], ["Partners", "partner", c.partners], ["Children", "child", c.children]]
+    .filter(([, , list]) => list && list.length)
+    .map(([label, singular, list]) => `<div class="person-rel-group"><div class="person-section-label">${label}</div><div class="person-rel-names">${list.map(r => relChip(r, singular)).join("")}</div></div>`);
+  if (relGroups.length) out.push(`<div class="person-rel-groups">${relGroups.join("")}</div>`);
 
+  // Key Events — often 20+ rows of API topical citations, some mislabelled or
+  // cross-entity (see NOTES.md), so it stays folded away and sits last before
+  // the definitions rather than pushing everything down.
   if (c.key_events && c.key_events.length) {
-    const html = c.key_events.map(e => {
+    const pills = c.key_events.map(e => {
       const v = e.verses && e.verses[0];
       const text = v && previewByRef[`${v.book}.${v.chapter}.${v.verse}`];
       const citeAttr = text ? ` data-cite-id="${registerCiteId(e.citation, text)}"` : "";
       const jump = v ? ` onclick="closeModal('peopleScrim');jumpToVerse('${v.book}',${v.chapter},${v.verse})"` : "";
       return `<button class="prophecy-ref" style="margin:0 6px 8px 0"${citeAttr}${jump}>${e.label ? escHtml(e.label) + ": " : ""}${escHtml(e.citation)}</button>`;
     }).join("");
-    sections.push(`<div class="person-section"><div class="person-section-label">Key Events</div>${html}</div>`);
+    out.push(`<div class="person-section">${personAccordion("Key Events", c.key_events.length, pills)}</div>`);
   }
 
-  const relRow = r => `<div class="person-relative">
-      <span class="person-relative-rel">${escHtml(r.relationship)}</span>
-      <button class="prophecy-ref" onclick="openPersonDetail('${r.name.replace(/'/g, "\\'")}')">${escHtml(r.name)}</button>
-    </div>`;
-  if (c.parents && c.parents.length) sections.push(`<div class="person-section"><div class="person-section-label">Parents</div>${c.parents.map(relRow).join("")}</div>`);
-  if (c.siblings && c.siblings.length) sections.push(`<div class="person-section"><div class="person-section-label">Siblings</div>${c.siblings.map(relRow).join("")}</div>`);
-  if (c.partners && c.partners.length) sections.push(`<div class="person-section"><div class="person-section-label">Partners</div>${c.partners.map(relRow).join("")}</div>`);
-  if (c.children && c.children.length) sections.push(`<div class="person-section"><div class="person-section-label">Children</div>${c.children.map(relRow).join("")}</div>`);
+  // Definitions last but visible without a long scroll — tabbed by source
+  // rather than stacked. openPersonDetail linkifies the first tab; the rest
+  // go through ensurePersonDefLinkified() on tab-click.
+  if (c.definitions && c.definitions.length) out.push(personDefsSection(c.definitions));
 
-  const appearanceRow = (label, v) => {
-    if (!v) return "";
-    const text = previewByRef[`${v.book}.${v.chapter}.${v.verse}`];
-    const refLabel = `${bookName(v.book)} ${v.chapter}:${v.verse}`;
-    const citeAttr = text ? ` data-cite-id="${registerCiteId(refLabel, text)}"` : "";
-    return `<div class="rc-entry" style="margin-bottom:8px">${escHtml(label)}: <button class="prophecy-ref"${citeAttr} onclick="closeModal('peopleScrim');jumpToVerse('${v.book}',${v.chapter},${v.verse})">${escHtml(refLabel)}</button></div>`;
-  };
-  const appearances = appearanceRow("First appearance", c.first_appearance) + appearanceRow("Last appearance", c.last_appearance);
-  if (appearances) sections.push(`<div class="person-section"><div class="person-section-label">Appearances</div>${appearances}</div>`);
-
-  return sections.length ? sections.join("") : `<div class="dd-empty">No further details on file for "${escHtml(c.name)}".</div>`;
+  return out.length ? out.join("") : `<div class="dd-empty">No further details on file for "${escHtml(c.name)}".</div>`;
 }
+function personAccordion(label, count, bodyHtml) {
+  return `<details class="bg-accordion person-acc"><summary><span>${escHtml(label)} <span class="person-acc-count">${count}</span></span></summary><div class="bg-accordion-body">${bodyHtml}</div></details>`;
+}
+// Ordered by DICT_SOURCES (Easton's, Smith's, …) with any unknown source
+// appended; a person with one entry skips the tab row. Panels render with
+// plain escaped text — ensurePersonDefLinkified() swaps in the citation-linked
+// HTML for a tab the first time it's shown. A long entry clamps to 6 lines
+// with a "Read more".
+let personDefs = [];
+let personDefLinkified = {};
+function personDefsSection(defs) {
+  personDefLinkified = {};
+  const ordered = [];
+  DICT_SOURCES.forEach(s => { const d = defs.find(x => x.source === s.id); if (d) ordered.push({ name: s.name, def: d }); });
+  defs.forEach(d => { if (!ordered.some(o => o.def === d)) ordered.push({ name: d.source, def: d }); });
+  personDefs = ordered.map(o => ({ name: o.name, definition: o.def.definition || "" }));
+  const multi = personDefs.length > 1;
+  const btns = multi
+    ? `<div class="dict-tab-btns">${personDefs.map((d, i) => `<button type="button" class="filter-chip dict-tab-btn${i === 0 ? " active" : ""}" data-idx="${i}">${escHtml(d.name)}</button>`).join("")}</div>`
+    : "";
+  const panels = personDefs.map((d, i) => {
+    const long = d.definition.length > 480;
+    return `<div class="dict-tab-panel${i === 0 ? " active" : ""}" data-idx="${i}">
+      ${multi ? "" : `<div class="person-def-src">${escHtml(d.name)}</div>`}
+      <div class="person-def-clamp${long ? " clamp" : ""}">
+        <div class="person-def-text" id="personDefBody${i}">${escHtml(d.definition)}</div>
+        ${long ? `<button type="button" class="person-def-more" onclick="this.closest('.person-def-clamp').classList.add('open')">Read more</button>` : ""}
+      </div></div>`;
+  }).join("");
+  return `<div class="person-section dict-tabs"><div class="person-section-label">Definitions</div>${btns}${panels}</div>`;
+}
+async function ensurePersonDefLinkified(idx) {
+  if (personDefLinkified[idx] || !personDefs[idx]) return;
+  personDefLinkified[idx] = true;
+  const token = personDetailToken;
+  const html = await linkifyCitations(personDefs[idx].definition);
+  if (token !== personDetailToken) return;
+  const el = document.getElementById("personDefBody" + idx);
+  if (el) el.innerHTML = html;
+}
+// The generic .dict-tabs switcher (js/main.js) has already toggled .active by
+// the time this fires — this only adds the lazy citation-linking.
+document.addEventListener("click", e => {
+  const btn = e.target.closest("#peopleBody .dict-tab-btn");
+  if (btn) ensurePersonDefLinkified(+btn.dataset.idx);
+});
 function propheciesForChapter(all, book, chapter) {
   return all.filter(p =>
     (p.origin.book === book && p.origin.chapter === chapter) ||

@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file. This CHANGELOG follows SemVer, see https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
+## [1.5.0] - 2026-08-29
+- **changed:** The People card's person detail view was reworked. It opens with a compact identity
+  block — epithet, a one-sentence summary, and a small first/last appearance line — then the family
+  relationships as one line each with the related names as inline chips, and the long Key Events
+  list folded into a collapsed accordion just above the definitions. The dictionary definitions now
+  sit near the top of the panel instead of below a long scroll, and are shown one source at a time
+  via a tab row (Easton's, Smith's, Hastings', …) rather than stacked, with long entries clamped
+  behind a "Read more". Only the visible definition tab is scanned for verse citations — the rest
+  when you switch to them — instead of all of them up front.
+
+## [1.4.0] - 2026-08-29
 - **added:** Each menu page now carries a one-line description of what it's for. The tabbed pages
   (Explore, Study Tools, My Library) show a blurb that changes with the active tab; Reading Plans,
   Devotionals and My Progress each have their own under the title.
@@ -11,8 +22,6 @@ All notable changes to this project will be documented in this file. This CHANGE
 - **fixed:** The short version label in the reading header (e.g. "KJV") no longer picks up a stray
   "(" from a translation whose title ends in a parenthetical like "(wordproject.org)" — the
   parenthetical is dropped before the acronym is built, and only letter/digit-initial words feed it.
-
-## [1.4.0] - 2026-08-28
 - **added:** Deep links can now point at a verse range, not just a single verse — `/gal/5/14-16`
   scrolls to verse 14 and rings the whole span (14 through 16), the same treatment a single-verse
   link already got. Verse Tools' "Copy Link" emits a range URL when the selection is contiguous
