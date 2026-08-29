@@ -3,7 +3,11 @@
 All notable changes to this project will be documented in this file. This CHANGELOG follows SemVer, see https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
-- n/a
+- **added:** Each menu page now carries a one-line description of what it's for. The tabbed pages
+  (Explore, Study Tools, My Library) show a blurb that changes with the active tab; Reading Plans,
+  Devotionals and My Progress each have their own under the title.
+- **changed:** The copyright/version line in the left nav footer is a little larger and less faded,
+  and `404.html`'s copy of it now matches `index.html` (they had drifted).
 
 ## [1.4.0] - 2026-08-28
 - **added:** Deep links can now point at a verse range, not just a single verse — `/gal/5/14-16`

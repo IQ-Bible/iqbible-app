@@ -149,7 +149,7 @@ button{ font-family:inherit; cursor:pointer; }
 .navitem:hover{ background:var(--brand-soft); color:var(--brand); }
 .navitem.active{ color:var(--brand); border-left-color:var(--brand); background:var(--brand-soft); font-weight:600; }
 .navdivider{ border:none; border-top:1px solid var(--divider); margin:10px 12px; }
-.navfooter{ margin-top:auto; padding:16px 12px 0; font-size:.8rem; color:var(--muted); opacity:.7; }
+.navfooter{ margin-top:auto; padding:16px 12px 0; font-size:.92rem; line-height:1.5; color:var(--muted); opacity:.85; }
 
 /* ── right rail cards — per-chapter context (places/people/prophecies)
    plus an always-shown timeline card; only the ones with real API data for
@@ -864,6 +864,13 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 .tour-next-btn{ font-family:var(--font-ui); font-weight:700; font-size:.8rem; letter-spacing:0; color:var(--on-brand); background:var(--brand); border:none; border-radius:var(--r-sm); padding:8px 16px; }
 .tour-next-btn:hover{ background:var(--brand-2); }
 .overlay-search-area{ padding:40px 32px 24px; flex-shrink:0; }
+/* One-line orientation blurb shown under a menu page's title (or its tab
+   row, updated per tab by the switch* handlers). Static markup for the
+   single-view pages, JS-set for the tabbed ones. */
+.view-desc{ font-family:var(--font-ui); font-size:.92rem; line-height:1.5; color:var(--muted); max-width:640px; }
+.overlay-topbar + .view-desc{ padding:14px 32px 0; }
+.mainview-narrow .overlay-topbar + .view-desc{ padding:14px 0 0; }
+.lib-tabs + .view-desc{ max-width:640px; margin:-6px auto 14px; text-align:center; }
 .overlay-input-wrap{ display:flex; align-items:center; border-bottom:2px solid var(--divider); max-width:780px; margin:0 auto; }
 .overlay-input-wrap:focus-within{ border-color:var(--brand); }
 .overlay-search-icon{ color:var(--muted); font-size:1.4rem; padding-right:14px; line-height:1; }

@@ -26,10 +26,17 @@ function closeLibrary() {
   switchMainView("read");
   closeNoteComposer();
 }
+const LIBRARY_TAB_DESC = {
+  notes: "Your own notes — tied to a verse or free-standing, searchable and taggable. Stored on this device; export to back them up.",
+  bookmarks: "Verses you've bookmarked, sorted in Bible order or by when you added them.",
+  highlights: "Every verse you've highlighted, filterable by color.",
+  history: "Chapters you've opened recently, most recent first.",
+};
 function switchLibraryTab(tab) {
   libraryActiveTab = tab;
   localStorage.setItem("iqb_library_tab", tab);
   document.querySelectorAll(".lib-tab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  document.getElementById("libraryDesc").textContent = LIBRARY_TAB_DESC[tab] || "";
   document.getElementById("notesTagChips").style.display = tab === "notes" ? "" : "none";
   document.getElementById("notesToolbar").style.display = tab === "notes" ? "" : "none";
   if (tab !== "notes") closeNoteComposer();

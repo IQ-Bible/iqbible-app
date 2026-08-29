@@ -11,9 +11,15 @@ function openStudy() {
 function closeStudy() {
   switchMainView("read");
 }
+const STUDY_TAB_DESC = {
+  word: "Look up a Strong's number for its lexicon entry and every place that word occurs in Scripture.",
+  book: "Background on a book of the Bible — who wrote it, when, and its main themes and structure.",
+  variants: "Places where the manuscript tradition differs, and how the major textual editions read there.",
+};
 function switchStudyTab(tab) {
   studyActiveTab = tab;
   document.querySelectorAll("#studyTabs .lib-tab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  document.getElementById("studyDesc").textContent = STUDY_TAB_DESC[tab] || "";
   if (tab === "word") renderStudyWord();
   else if (tab === "book") renderStudyBook();
   else if (tab === "variants") renderStudyVariants();

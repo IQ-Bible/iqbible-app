@@ -14,9 +14,18 @@ function openExplore() {
 function closeExplore() {
   switchMainView("read");
 }
+const EXPLORE_TAB_DESC = {
+  atlas: "Search the Bible atlas for a place, see where it sits on the map, and read what the dictionaries record about it.",
+  collections: "Curated sets — parables, miracles, prayers, names of God, titles of Jesus, weights and measures, and named stories.",
+  extrabiblical: "Books that Scripture names or quotes but that aren't in the canon, with what's known about each.",
+  genealogy: "Trace a family line through Scripture — ancestors, descendants, and the verses that record each link.",
+  harmony: "The events of Jesus' life laid out in parallel across Matthew, Mark, Luke and John.",
+  topics: "Browse a classic topical index and jump to every verse it lists for a subject.",
+};
 function switchExploreTab(tab) {
   exploreActiveTab = tab;
   document.querySelectorAll("#exploreTabs .lib-tab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  document.getElementById("exploreDesc").textContent = EXPLORE_TAB_DESC[tab] || "";
   if (tab === "harmony") renderExploreHarmonyList();
   else if (tab === "topics") renderExploreTopicsList();
   else if (tab === "atlas") renderExploreAtlas();
