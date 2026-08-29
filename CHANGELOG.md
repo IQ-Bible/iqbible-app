@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file. This CHANGE
 ## [Unreleased]
 - n/a
 
+## [1.4.0] - 2026-08-28
+- **added:** Deep links can now point at a verse range, not just a single verse — `/gal/5/14-16`
+  scrolls to verse 14 and rings the whole span (14 through 16), the same treatment a single-verse
+  link already got. Verse Tools' "Copy Link" emits a range URL when the selection is contiguous
+  (a disjoint selection still falls back to its first verse, since a path can't express a gap).
+- **changed:** New-visitor defaults now match the app's intended out-of-the-box look: black &
+  white illustrations, black & white book icons, reading font size 20 and interface font size 17.
+  Schnorr illustrations and day mode were already the defaults. Anyone who has already set these
+  preferences keeps their own choices — only a browser that never touched them is affected.
+- **added:** The reading-plan builder now has a Version field. It starts on whatever translation
+  you're reading, but you can pick another — the plan is then generated and saved against that
+  version, and the "Specific Books" list only offers books in that version's canon (so a
+  Catholic/Orthodox translation exposes Tobit, Maccabees and the rest; a Protestant one doesn't).
+  The Specific Books input was also restyled to match the rest of the form.
+
 ## [1.3.0] - 2026-08-28
 - **changed:** The app chrome now follows the IQ Bible brand guide. The wordmark uses the shared
   construction (sentence-case "IQ Bible", weight 900, tight tracking, "IQ" in brand purple and

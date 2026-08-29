@@ -73,16 +73,18 @@ function shortVersionLabel(title) {
   return t.length <= 8 ? t : t.slice(0, 6);
 }
 
-// "navigate" (default) picks a version to actually read; "compare-default"/
-// "compare-session" reuse this same search/filter picker to instead add a
-// version to a Compare list (Settings' persisted default set, or a one-off
-// addition inside Verse Tools > Compare) — see pickVersionRow() below. Every
-// other picker mechanic (search, language chips, audio filter) is unchanged
-// regardless of mode.
+// "navigate" (default) picks a version to actually read; "plan" picks the
+// version/canon a new reading plan is built for (js/plans.js), without
+// touching what's on screen; "compare-default"/"compare-session" reuse this
+// same search/filter picker to instead add a version to a Compare list
+// (Settings' persisted default set, or a one-off addition inside Verse Tools >
+// Compare) — see pickVersionRow() below. Every other picker mechanic (search,
+// language chips, audio filter) is unchanged regardless of mode.
 let versionPickerMode = "navigate";
 async function openVersionPicker(mode) {
   versionPickerMode = mode || "navigate";
-  document.getElementById("versionPickerTitle").textContent = versionPickerMode === "navigate" ? "Choose a translation" : "Add a Compare version";
+  document.getElementById("versionPickerTitle").textContent =
+    (versionPickerMode === "navigate" || versionPickerMode === "plan") ? "Choose a translation" : "Add a Compare version";
   openModal("versionPickerScrim");
   document.getElementById("versionSearchInput").value = "";
   await loadCatalog();
@@ -100,6 +102,7 @@ async function openVersionPicker(mode) {
 }
 function pickVersionRow(id) {
   if (versionPickerMode === "navigate") { selectVersion(id); return; }
+  if (versionPickerMode === "plan") { setPlanBuilderVersion(id); return; }
   addCompareVersion(id, versionPickerMode);
   closeModal("versionPickerScrim");
 }
@@ -147,6 +150,8 @@ function renderVersionList(q) {
     }
     const on = versionPickerMode === "navigate"
       ? v.version_id === current.version
+      : versionPickerMode === "plan"
+      ? v.version_id === planTargetVersion().id
       : compareTargetList(versionPickerMode).includes(v.version_id);
     const audioBit = v.audio_count > 0
       ? `<span class="audiobadge" title="${v.audio_count > 1 ? v.audio_count + ' narrations available' : 'Audio narration available'}">${AUDIO_ICON}${v.audio_count > 1 ? ` ×${v.audio_count}` : ""}</span>`

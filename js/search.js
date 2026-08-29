@@ -100,10 +100,10 @@ function highlightWords(html, words) {
   });
   return html;
 }
-async function jumpToVerse(bookUsfm, chapter, verse) {
+async function jumpToVerse(bookUsfm, chapter, verse, verseEnd) {
   const b = bookList.find(x => x.usfm === bookUsfm);
   current.book = bookUsfm;
   current.bookName = b ? b.name : bookUsfm;
   chapterMeta = [];
-  await loadChapter(chapter, true, verse);
+  await loadChapter(chapter, true, verse, verseEnd);
 }

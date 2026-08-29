@@ -271,7 +271,7 @@ async function refreshAppVersionFromChangelog() {
     const b = bookList.find(x => x.usfm === route.book);
     if (b) { current.book = b.usfm; current.bookName = b.name; }
   }
-  await loadChapter(route ? route.chapter : current.chapter, true, route ? route.verse : null);
+  await loadChapter(route ? route.chapter : current.chapter, true, route ? route.verse : null, route ? route.verseEnd : null);
   openHashRoute();
   maybeShowPeriodicBackupReminder();
   maybeShowTourWelcome();

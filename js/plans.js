@@ -19,6 +19,15 @@
    fetch across every book's meta, and this app doesn't fabricate precision
    it can't back up (see NOTES.md). */
 let planBuilderMode = "general";
+// The version a new plan is being built for. null = "whatever's being read"
+// (current.version); set non-null once the reader picks a different one in the
+// builder. Drives both the version the plan is generated + stored against and
+// the canon the "Specific Books" list offers — a Catholic version exposes
+// Tobit/Maccabees/etc., a Protestant one doesn't. planBuilderBookList caches
+// that chosen version's GET /bibles/{id}/books so the datalist can refresh
+// without a full builder re-render (which would drop half-entered fields).
+let planBuilderVersion = null;   // { id, title } | null
+let planBuilderBookList = null;  // that version's books | null → use bookList
 let plansViewState = "list"; // "list" | "builder" | "calendar"
 let plansOpenPlanId = null;
 let calendarCursor = null; // {year, month(0-indexed)} for the open plan's calendar
@@ -120,7 +129,41 @@ function backToPlansList() {
   dayDrawerDay = null; planExportMenuOpen = false;
   renderPlansView();
 }
-function startNewPlan() { plansViewState = "builder"; renderPlansView(); }
+function startNewPlan() {
+  planBuilderVersion = null; planBuilderBookList = null;
+  plansViewState = "builder"; renderPlansView();
+}
+// The version/canon a new plan targets — the reader's current translation
+// unless they've picked another in the builder.
+function planTargetVersion() { return planBuilderVersion || { id: current.version, title: current.versionTitle }; }
+function planBuilderBooks() { return (planBuilderVersion && planBuilderBookList) ? planBuilderBookList : bookList; }
+function planBookOptionsHtml() {
+  return planBuilderBooks().map(b => `<option value="${escAttr(b.usfm)}">${escHtml(b.name)}</option>`).join("");
+}
+// Called from the shared version picker in its "plan" mode (js/catalog.js).
+// Updates the builder in place rather than re-rendering it, so a partly
+// filled-in form survives a version change.
+async function setPlanBuilderVersion(id) {
+  closeModal("versionPickerScrim");
+  const v = (catalog || []).find(x => x.version_id === id);
+  if (!v) return;
+  planBuilderVersion = { id, title: v.title || id };
+  planBuilderBookList = null;
+  const btn = document.getElementById("planVersionBtn");
+  if (btn) btn.textContent = planBuilderVersion.title;
+  try {
+    const d = await apiJSONCached(`/bibles/${id}/books`);
+    planBuilderBookList = d.data || [];
+  } catch (e) { if (e.message !== "no_api_key") toast("Could not load that version's books"); }
+  const dl = document.getElementById("planBookList");
+  if (dl) dl.innerHTML = planBookOptionsHtml();
+  // Drop any typed book code that isn't in the new canon.
+  const inp = document.getElementById("planBooksInput");
+  if (inp && inp.value.trim()) {
+    const valid = new Set(planBuilderBooks().map(b => b.usfm.toUpperCase()));
+    inp.value = inp.value.split(",").map(s => s.trim()).filter(s => s && valid.has(s.toUpperCase())).join(",");
+  }
+}
 
 /* ── "My Plans" home — a grid of every saved plan ── */
 function pctComplete(plan) {
@@ -227,7 +270,8 @@ function selectedDow(containerId) {
   return [...document.querySelectorAll(`#${containerId} .plan-dow-chip.active`)].map(b => b.dataset.dow).join(",");
 }
 function renderPlanBuilderHtml() {
-  const bookOptions = bookList.map(b => `<option value="${escAttr(b.usfm)}">${escHtml(b.name)}</option>`).join("");
+  const bookOptions = planBookOptionsHtml();
+  const tv = planTargetVersion();
   return `
     <div class="setfield">
       <label>Build a Reading Plan</label>
@@ -236,6 +280,11 @@ function renderPlanBuilderHtml() {
         <button class="filter-chip plan-mode-chip" data-mode="topic" onclick="selectPlanMode('topic')">Topic</button>
         <button class="filter-chip plan-mode-chip" data-mode="mcheyne" onclick="selectPlanMode('mcheyne')">M'Cheyne</button>
       </div>
+    </div>
+    <div class="setfield">
+      <label for="planVersionBtn">Version</label>
+      <button type="button" class="setfield-picker" id="planVersionBtn" onclick="openVersionPicker('plan')">${escHtml(tv.title || tv.id)}</button>
+      <div class="hint">The plan is built for this translation, and “Specific Books” follows its canon. Defaults to what you’re reading now.</div>
     </div>
     <div id="planFieldsGeneral">
       <div class="setfield"><label for="planDays">Days</label><input type="number" id="planDays" min="1" max="730" value="365"></div>
@@ -247,11 +296,14 @@ function renderPlanBuilderHtml() {
           <label><input type="radio" name="planScope" value="testament" onchange="updatePlanScopeFields()"> Testament</label>
           <label><input type="radio" name="planScope" value="books" onchange="updatePlanScopeFields()"> Specific Books</label>
         </div>
-        <select id="planTestamentSelect" style="display:none;margin-top:8px">
+        <select id="planTestamentSelect" class="plan-scope-sub" style="display:none">
           <option value="ot">Old Testament</option>
           <option value="nt">New Testament</option>
         </select>
-        <input type="text" id="planBooksInput" list="planBookList" placeholder="e.g. GEN,EXO,MAT" style="display:none;margin-top:8px">
+        <div id="planBooksField" class="plan-scope-sub" style="display:none">
+          <input type="text" id="planBooksInput" list="planBookList" placeholder="Start typing a book name…">
+          <div class="hint">Pick from the list or type book codes separated by commas (e.g. GEN, EXO, MAT). Only books in the selected version’s canon are offered.</div>
+        </div>
         <datalist id="planBookList">${bookOptions}</datalist>
       </div>
       <div class="setfield"><label>Days of Week <span class="hint" style="display:inline">— leave blank for every day</span></label><div class="overlay-filters" id="planDowGeneral">${dowChipsHtml()}</div></div>
@@ -284,7 +336,7 @@ function selectPlanMode(mode) {
 function updatePlanScopeFields() {
   const scope = document.querySelector('input[name="planScope"]:checked').value;
   document.getElementById("planTestamentSelect").style.display = scope === "testament" ? "" : "none";
-  document.getElementById("planBooksInput").style.display = scope === "books" ? "" : "none";
+  document.getElementById("planBooksField").style.display = scope === "books" ? "" : "none";
 }
 function buildPlanParams(mode) {
   if (mode === "general") {
@@ -318,14 +370,15 @@ async function createPlan() {
   const mode = planBuilderMode;
   if (mode === "topic" && !document.getElementById("planTopicInput").value.trim()) { toast("Enter a topic name"); return; }
   const params = buildPlanParams(mode);
+  const tv = planTargetVersion();
   try {
-    const d = await apiJSON(`/bibles/${current.version}/reading-plan?${planQueryString(params)}`);
+    const d = await apiJSON(`/bibles/${tv.id}/reading-plan?${planQueryString(params)}`);
     const plans = getPlans();
     plans.forEach(p => { p.active = false; });
     const plan = {
       id: "plan_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       name: defaultPlanName(mode, params, d.plan_info),
-      mode, versionCode: current.version, versionTitle: current.versionTitle,
+      mode, versionCode: tv.id, versionTitle: tv.title || tv.id,
       params, planInfo: d.plan_info, days: d.days,
       completedDays: [], active: true, createdAt: Date.now(),
     };

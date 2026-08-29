@@ -6,7 +6,7 @@
    illustration pack (Schnorr, see getIllustPack below) is Old Testament-
    only, so a New Testament default would never show any imagery out of
    the box. */
-let current = { version: "eng_kjv", versionTitle: "King James Version", book: "GEN", bookName: "Genesis", chapter: 1, verse: null, audioId: null, textDirection: "ltr" };
+let current = { version: "eng_kjv", versionTitle: "King James Version", book: "GEN", bookName: "Genesis", chapter: 1, verse: null, verseEnd: null, audioId: null, textDirection: "ltr" };
 let catalog = null;
 let bookList = [];
 let chapterMeta = [];
@@ -223,16 +223,18 @@ function toggleTheme() { setTheme(getTheme() === "dark" ? "light" : "dark"); }
 function getIllustPack() { return localStorage.getItem("iqb_illust_pack") || "schnorr"; }
 function setIllustPack(v) { localStorage.setItem("iqb_illust_pack", v); refreshInlineIllustrations(); }
 // Pure CSS (grayscale filter, see .illust-bw in css/styles.css) — no
-// different image variant to fetch, so this just toggles a class.
-function getIllustBW() { return localStorage.getItem("iqb_illust_bw") === "1"; }
+// different image variant to fetch, so this just toggles a class. Default-on:
+// absence of the key means "never explicitly turned off", matching the
+// print-Bible look the app ships with.
+function getIllustBW() { return localStorage.getItem("iqb_illust_bw") !== "0"; }
 function setIllustBW(v) { localStorage.setItem("iqb_illust_bw", v ? "1" : "0"); document.documentElement.classList.toggle("illust-bw", v); }
 // Default-on (see js/reader.js's DATA BACKUP AWARENESS section) — absence of
 // the key means "never explicitly turned off", not "off".
 function getExportReminderEnabled() { return localStorage.getItem("iqb_export_reminder_enabled") !== "0"; }
 function setExportReminderEnabled(v) { localStorage.setItem("iqb_export_reminder_enabled", v ? "1" : "0"); }
-function getIconStyle() { return localStorage.getItem("iqb_icon_style") || "color"; }
+function getIconStyle() { return localStorage.getItem("iqb_icon_style") || "bw"; }
 function setIconStyle(v) { localStorage.setItem("iqb_icon_style", v); loadTopBookIcon(); }
-function getFontSize() { return parseInt(localStorage.getItem("iqb_font_size"), 10) || 18; }
+function getFontSize() { return parseInt(localStorage.getItem("iqb_font_size"), 10) || 20; }
 function setFontSize(px) {
   localStorage.setItem("iqb_font_size", px);
   document.documentElement.style.setProperty("--reading-font-size", px + "px");
@@ -242,7 +244,7 @@ function setFontSize(px) {
 // rem, so scaling the root font-size scales all of it at once — everything
 // except the reading text itself, which is pinned to --reading-font-size in
 // px above rather than rem specifically so this setting can't touch it.
-function getUiFontSize() { return parseInt(localStorage.getItem("iqb_ui_font_size"), 10) || 16; }
+function getUiFontSize() { return parseInt(localStorage.getItem("iqb_ui_font_size"), 10) || 17; }
 function setUiFontSize(px) {
   localStorage.setItem("iqb_ui_font_size", px);
   document.documentElement.style.setProperty("--ui-font-size", px + "px");

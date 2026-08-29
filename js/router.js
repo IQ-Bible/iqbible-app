@@ -1,10 +1,11 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   URL — /{book}/{chapter}[/{verse}] deep links, e.g. /gen/1/1. BASE_PATH
-   (config.js) is stripped/re-added so the same code works at the root of a
-   custom domain or under a GitHub Pages project subpath. The version isn't
-   encoded — a deep link always resolves against the default translation;
-   picking a different translation from an already-loaded chapter doesn't
-   need to round-trip through the URL. */
+   URL — /{book}/{chapter}[/{verse}] deep links, e.g. /gen/1/1. A verse
+   segment can also be a range, /gal/5/14-16, which lands on the first verse
+   and rings the whole span. BASE_PATH (config.js) is stripped/re-added so
+   the same code works at the root of a custom domain or under a GitHub Pages
+   project subpath. The version isn't encoded — a deep link always resolves
+   against the default translation; picking a different translation from an
+   already-loaded chapter doesn't need to round-trip through the URL. */
 function parsePathRoute() {
   let path = location.pathname;
   if (BASE_PATH && path.startsWith(BASE_PATH)) path = path.slice(BASE_PATH.length);
@@ -12,12 +13,20 @@ function parsePathRoute() {
   if (!parts.length) return null;
   const book = parts[0].toUpperCase();
   const chapter = parts[1] ? parseInt(parts[1], 10) : 1;
-  const verse = parts[2] ? parseInt(parts[2], 10) : null;
-  return { book, chapter: isNaN(chapter) ? 1 : chapter, verse: (verse && !isNaN(verse)) ? verse : null };
+  const [rawStart, rawEnd] = (parts[2] || "").split("-");
+  const verse = parseInt(rawStart, 10);
+  const verseEnd = parseInt(rawEnd, 10);
+  return {
+    book,
+    chapter: isNaN(chapter) ? 1 : chapter,
+    verse: isNaN(verse) ? null : verse,
+    verseEnd: (!isNaN(verse) && !isNaN(verseEnd) && verseEnd > verse) ? verseEnd : null,
+  };
 }
 function currentPath() {
   const base = `${BASE_PATH}/${(current.book || "").toLowerCase()}/${current.chapter}`;
-  return current.verse ? `${base}/${current.verse}` : base;
+  if (!current.verse) return base;
+  return current.verseEnd ? `${base}/${current.verse}-${current.verseEnd}` : `${base}/${current.verse}`;
 }
 // pushState for every real navigation so Back/Forward walks chapter by
 // chapter; the very first sync (whatever chapter the page happened to load)
@@ -37,7 +46,7 @@ window.addEventListener("popstate", async () => {
   const b = bookList.find(x => x.usfm === route.book);
   if (b) { current.book = b.usfm; current.bookName = b.name; }
   chapterMeta = [];
-  await loadChapter(route.chapter, true, route.verse);
+  await loadChapter(route.chapter, true, route.verse, route.verseEnd);
 });
 
 /* ── menu-page hash — /{book}/{chapter}#explore, #share-tools, etc. ──

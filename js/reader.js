@@ -1,8 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════════════
    READ — chapter render */
-async function loadChapter(chapter, refreshMeta, verse) {
+async function loadChapter(chapter, refreshMeta, verse, verseEnd) {
   current.chapter = chapter;
   current.verse = verse || null;
+  current.verseEnd = (verse && verseEnd && verseEnd > verse) ? verseEnd : null;
   logHistoryVisit();
   clearVerseSelection();
   document.getElementById("btnPickChapter").firstChild.textContent = chapter + " ";
@@ -40,19 +41,23 @@ async function loadChapter(chapter, refreshMeta, verse) {
   // measuring a display:none tree and collapsing the rails to the topbar.
   alignChapterNavButtons(); alignRails();
   syncURL();
-  if (current.verse) scrollHighlightVerse(current.verse);
+  if (current.verse) scrollHighlightVerse(current.verse, current.verseEnd);
 }
-// Flashes the jump-target verse a few times (.jump-target, css/styles.css)
-// then leaves it persistently ringed — a scroll-position jump with no
+// Flashes the jump-target verse(s) a few times (.jump-target, css/styles.css)
+// then leaves them persistently ringed — a scroll-position jump with no
 // lasting marker is easy to lose track of, unlike a timed fade. Cleared on
 // the reader's next click anywhere, or the next verse jump, not a timer.
-function scrollHighlightVerse(verse) {
+// verseEnd (optional) rings a whole span, /gal/5/14-16.
+function scrollHighlightVerse(verse, verseEnd) {
   setTimeout(() => {
     clearJumpTarget();
     const el = document.querySelector(`.verse-span[data-verse="${verse}"]`);
     if (!el) return;
     el.scrollIntoView({ behavior: "smooth", block: "center" });
-    el.classList.add("jump-target");
+    const last = (verseEnd && verseEnd > verse) ? verseEnd : verse;
+    for (let v = verse; v <= last; v++) {
+      document.querySelector(`.verse-span[data-verse="${v}"]`)?.classList.add("jump-target");
+    }
   }, 300);
 }
 function clearJumpTarget() {
@@ -1508,15 +1513,24 @@ function selectionText() {
     return clone.textContent.trim();
   }).join(" ");
 }
-function verseDeepLink(verse) {
-  return location.origin + BASE_PATH + "/" + current.book.toLowerCase() + "/" + current.chapter + "/" + verse;
+function verseDeepLink(verse, verseEnd) {
+  const span = (verseEnd && verseEnd > verse) ? `${verse}-${verseEnd}` : `${verse}`;
+  return location.origin + BASE_PATH + "/" + current.book.toLowerCase() + "/" + current.chapter + "/" + span;
+}
+// A contiguous multi-verse selection links as a range (/gal/5/14-16); a
+// disjoint one (14, 17) can't be expressed in the path, so it falls back to
+// the first verse.
+function selectionDeepLink() {
+  const lo = selectedVerses[0], hi = selectedVerses[selectedVerses.length - 1];
+  const contiguous = selectedVerses.length === hi - lo + 1;
+  return verseDeepLink(lo, contiguous ? hi : null);
 }
 function copySelection() {
   const text = `"${selectionText()}" — ${selectionRefLabel()}`;
   navigator.clipboard.writeText(text).then(() => toast("Copied to clipboard"), () => toast("Could not copy"));
 }
 function copyVerseLink() {
-  navigator.clipboard.writeText(verseDeepLink(selectedVerses[0])).then(() => toast("Link copied to clipboard"), () => toast("Could not copy"));
+  navigator.clipboard.writeText(selectionDeepLink()).then(() => toast("Link copied to clipboard"), () => toast("Could not copy"));
 }
 // Verse Tools' own Share panel — the image/embed capability from Share
 // Tools (js/share.js), scoped to the current selection instead of a
@@ -1535,7 +1549,7 @@ async function showShareTool() {
 function renderVtShareTool() {
   const body = document.getElementById("vtShareBody");
   const ref = selectionRefLabel();
-  const url = verseDeepLink(selectedVerses[0]);
+  const url = selectionDeepLink();
   const shareText = `"${selectionText()}" — ${ref}`;
   body.innerHTML = `
     <div class="share-fields" style="margin-bottom:10px">

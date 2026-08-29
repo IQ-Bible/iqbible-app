@@ -46,7 +46,7 @@
   --overlay-scrim:rgba(15,10,26,.92);
 }
 *,*::before,*::after{ box-sizing:border-box; margin:0; padding:0; }
-html{ scroll-behavior:smooth; font-size:var(--ui-font-size,16px); }
+html{ scroll-behavior:smooth; font-size:var(--ui-font-size,17px); }
 body{ font-family:var(--font-ui); background:var(--bg); color:var(--ink); overflow-x:hidden; transition:background-color .2s ease,color .2s ease; }
 a{ color:var(--brand); }
 button{ font-family:inherit; cursor:pointer; }
@@ -406,7 +406,7 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 #scrubFill{ position:absolute; left:0; top:0; bottom:0; width:0%; border-radius:var(--r-pill); background:var(--brand); pointer-events:none; }
 
 /* ── reading text ── */
-#readingText{ font-family:var(--font-reading); font-size:var(--reading-font-size,18px); line-height:1.85; color:var(--ink-soft); font-weight:300; }
+#readingText{ font-family:var(--font-reading); font-size:var(--reading-font-size,20px); line-height:1.85; color:var(--ink-soft); font-weight:300; }
 #readingText p{ margin:0 0 22px; }
 #readingText::after{ content:""; display:block; clear:both; }
 .vnum{ font-size:.65rem; font-weight:600; color:var(--brand); vertical-align:super; margin-right:3px; font-family:var(--font-ui); user-select:none; cursor:pointer; }
@@ -640,6 +640,12 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 .setfield select{ width:100%; background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-control); padding:10px 13px; font-family:var(--font-ui); font-size:.95rem; color:var(--ink); outline:none; appearance:none; -webkit-appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b6480' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 12px center; background-size:11px; }
 .setfield select:focus{ border-color:var(--brand); }
 .setfield input[type=range]{ width:100%; accent-color:var(--brand); background:none; padding:0; height:20px; }
+/* Button that opens a search picker but reads like a <select> — used for the
+   reading-plan builder's Version field. */
+.setfield-picker{ width:100%; text-align:left; background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-control); padding:10px 34px 10px 13px; font-family:var(--font-ui); font-size:.95rem; color:var(--ink); cursor:pointer; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b6480' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 12px center; background-size:11px; }
+.setfield-picker:hover{ border-color:var(--brand); }
+:root[data-theme="dark"] .setfield-picker{ background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a79cc4' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); }
+.plan-scope-sub{ margin-top:8px; }
 .setfield-check{ display:flex; align-items:center; gap:10px; margin-bottom:18px; }
 .setfield-check input[type=checkbox]{ width:auto; accent-color:var(--brand); }
 .setfield-check label{ margin-bottom:0; }
