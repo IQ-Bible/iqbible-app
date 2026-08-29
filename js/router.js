@@ -3,9 +3,10 @@
    segment can also be a range, /gal/5/14-16, which lands on the first verse
    and rings the whole span. BASE_PATH (config.js) is stripped/re-added so
    the same code works at the root of a custom domain or under a GitHub Pages
-   project subpath. The version isn't encoded — a deep link always resolves
-   against the default translation; picking a different translation from an
-   already-loaded chapter doesn't need to round-trip through the URL. */
+   project subpath. The translation rides along as a `?v=` query param
+   (/gen/1/1?v=eng_kjv) so a copied URL always reopens in the same version;
+   it's kept on every navigation URL, not just non-default ones, so a shared
+   link is unambiguous regardless of the recipient's own stored version. */
 function parsePathRoute() {
   let path = location.pathname;
   if (BASE_PATH && path.startsWith(BASE_PATH)) path = path.slice(BASE_PATH.length);
@@ -21,12 +22,14 @@ function parsePathRoute() {
     chapter: isNaN(chapter) ? 1 : chapter,
     verse: isNaN(verse) ? null : verse,
     verseEnd: (!isNaN(verse) && !isNaN(verseEnd) && verseEnd > verse) ? verseEnd : null,
+    version: new URLSearchParams(location.search).get("v") || null,
   };
 }
 function currentPath() {
-  const base = `${BASE_PATH}/${(current.book || "").toLowerCase()}/${current.chapter}`;
-  if (!current.verse) return base;
-  return current.verseEnd ? `${base}/${current.verse}-${current.verseEnd}` : `${base}/${current.verse}`;
+  let p = `${BASE_PATH}/${(current.book || "").toLowerCase()}/${current.chapter}`;
+  if (current.verse) p += current.verseEnd ? `/${current.verse}-${current.verseEnd}` : `/${current.verse}`;
+  if (current.version) p += `?v=${encodeURIComponent(current.version)}`;
+  return p;
 }
 // pushState for every real navigation so Back/Forward walks chapter by
 // chapter; the very first sync (whatever chapter the page happened to load)
@@ -36,13 +39,25 @@ function currentPath() {
 let urlSynced = false;
 function syncURL() {
   const path = currentPath();
-  if (location.pathname === path) { urlSynced = true; return; }
-  if (!urlSynced) { history.replaceState(null, "", path); urlSynced = true; }
-  else history.pushState(null, "", path);
+  if (location.pathname + location.search === path) { urlSynced = true; return; }
+  // Keep any menu-view hash (/gen/38/26#explore) across the rewrite — a bare
+  // deep link with no `?v=` still lands here to have the param filled in, and
+  // dropping its hash would break a shared #explore/#settings/etc. link.
+  const withHash = path + location.hash;
+  if (!urlSynced) { history.replaceState(null, "", withHash); urlSynced = true; }
+  else history.pushState(null, "", withHash);
 }
 window.addEventListener("popstate", async () => {
   const route = parsePathRoute();
   if (!route) return;
+  // A version can differ between two history entries (the reader switched
+  // translation mid-session), so a different version's book list has to be
+  // reloaded before resolving the book segment against it.
+  if (route.version && route.version !== current.version && applyVersionById(route.version)) {
+    setLastVersion(route.version);
+    bookList = [];
+    await loadBooks();
+  }
   const b = bookList.find(x => x.usfm === route.book);
   if (b) { current.book = b.usfm; current.bookName = b.name; }
   chapterMeta = [];
@@ -63,7 +78,7 @@ function parseHashRoute() {
 function setMenuHash(key) {
   const slug = HASH_SLUGS[key] || "";
   const url = currentPath() + (slug ? `#${slug}` : "");
-  if (location.pathname + location.hash === url) return;
+  if (location.pathname + location.search + location.hash === url) return;
   history.replaceState(null, "", url);
 }
 function openHashRoute() {

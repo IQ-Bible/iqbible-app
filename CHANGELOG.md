@@ -3,6 +3,101 @@
 All notable changes to this project will be documented in this file. This CHANGELOG follows SemVer, see https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
+- n/a
+
+## [1.8.0] - 2026-08-29
+- **added:** Notes now take a light Markdown subset — `**bold**`, `*italic*`, `` `code` ``,
+  `#` headings, `-` / `1.` lists, `>` quotes, `---` rules and `[text](url)` links — rendered on the
+  read view (in the drawer and on My Library's note cards) alongside the usual verse
+  hover-previews. The drawer's edit mode gains a small formatting toolbar and Ctrl/Cmd+B / +I.
+  Notes are still stored as plain text.
+- **changed:** On desktop the Notes drawer is now a floating panel aligned to the reading column
+  rather than a full-width dock spanning both nav rails — it sits just off the bottom edge with
+  rounded corners, so it reads as a panel over the page instead of browser chrome.
+- **changed:** The app version in the left-nav footer is now a small tracked-caps line under the
+  copyright credit instead of a same-size second line.
+- **fixed:** The app version (and copyright credit) now also show on mobile, in the footer of the
+  "More" menu sheet — the left nav that carried them is hidden on narrow screens, so they had been
+  invisible there.
+- **fixed:** Clicking into a Notes-drawer note to edit it no longer occasionally jumps the text to
+  the top — the textarea now inherits the read view's scroll position, and a click that lands in
+  the top padding no longer drops the cursor at the very start.
+
+## [1.7.1] - 2026-08-29
+- **fixed:** On narrow screens, opening the Notes drawer's "All notes" list no longer left it
+  crammed into a short strip above the current note — the list now takes over the whole sheet (and
+  the sheet pops to full height) so the other notes are actually visible to pick from. Selecting a
+  note brings the editor back.
+
+## [1.7.0] - 2026-08-29
+- **changed:** On narrow screens the Notes drawer's bottom sheet no longer blocks the page behind
+  it — there's no scrim, so the passage still scrolls and verses can still be selected for **Add to
+  Note** while the sheet is open. Dismiss it with the header's collapse chevron or by dragging the
+  grip down and off.
+- **added:** The Notes drawer's bottom sheet is now resizable — drag the grip to snap it between a
+  peek and a full height; the choice is remembered. (The docked desktop panel was already
+  drag-resizable.)
+
+## [1.6.0] - 2026-08-29
+- **added:** A Notes drawer — a dockable notes surface that opens from any screen with the `N` key
+  or the Notes button at the bottom-right. It edits free-standing notes (the same ones "+ New Note"
+  in My Library makes), autosaves as you type, and keeps one note "active" at a time. Verse Tools
+  has a new **Add to Note** action that appends the selected verse — reference and text — to the
+  active note, so a passage can be gathered into one note without leaving the page. The drawer has
+  an inline note switcher (search + recent notes), resizes by dragging its top edge, and drops to a
+  bottom sheet on narrow screens. It has two modes: a **read view** (the default — opening the
+  drawer or picking a note shows the note rendered, with every Scripture reference in it
+  hover-previewable) and an **edit** text box, toggled by the header's Edit / Done button, by
+  Esc, or by clicking into the text. Pressing `N` opens straight into editing for a quick
+  capture. Verse-tied notes are unchanged (still Verse Tools ▸ Note); My Library stays the place
+  to browse, tag and export everything.
+- **changed:** The per-chapter context cards in the right rail (People, Prophecies, Timeline) now
+  size to their content instead of all being fixed squares — denser, less scrolling, and a Timeline
+  or Prophecies card with two long entries is no longer clipped. The Places card keeps its square
+  since it's filled by a map/photo thumbnail. The rail also scrolls properly now when its cards are
+  taller than the window, and its last card stays clear of the Notes launcher / open drawer.
+- **added:** The reading URL now carries the translation as a `?v=` query param (e.g.
+  `/gen/1/1?v=eng_kjv`), so a copied or shared link reopens in the same version instead of the
+  recipient's own default. It's kept on every navigation URL, added the moment you switch
+  translation, and Back/Forward restores the version each history entry was viewed in. "Copy verse
+  link" (Verse Tools) includes it too.
+- **added:** Once a chapter is marked read, a compact line below the chapter header shows when —
+  a light-green check plus "Read on Mon. 09/01/2026 at 6:42 pm"; clicking the check undoes it. It
+  replaces the "Marked as read" confirmation that used to sit at the foot of the chapter, so the
+  end-of-chapter prompt now only appears while a chapter is still unread. A new Settings toggle
+  ("Show when I read a chapter, under the title") turns the line off, which restores the old
+  end-of-chapter confirmation and its Undo.
+- **fixed:** A reading-plan day is now auto-completed only once *every* chapter it schedules has
+  been marked read. Marking a single chapter of a multi-chapter day (M'Cheyne days especially, but
+  any General day covering more than one chapter) no longer checks the whole day off — the
+  chapter-end prompt reports how many chapters are left to finish the day instead. Verse-only
+  (Topic) plans are unaffected.
+- **changed:** Reading Plans > ticking "Mark day complete" in the day drawer now also records that
+  day's chapters as read in your Progress (General and M'Cheyne plans). Previously only reading each
+  chapter through the reader's own prompt counted, so a plan tracked mainly from the calendar left
+  the Bible-wide "chapters marked read" count and the reader's chapter-end prompt out of step with
+  the calendar. Unchecking a day leaves those chapter marks in place — clear an individual chapter
+  from the reader if you need to. Verse-only (Topic) plans are unaffected.
+- **added:** Reading Plans > the plan overflow menu has a Share Plan option. It hands off the
+  plan's JSON export as a file (the recipient re-creates it with Import Plan) plus a short text
+  summary via the system share sheet where available, and copies the summary to the clipboard on
+  browsers without the Web Share API.
+- **added:** Study Tools > Word Study now covers every lexicon, not just Strong's. A tab row sits
+  above the entry: Strong's first, then BDB (Hebrew) or LSJ and Abbott-Smith (Greek) for any that
+  have an entry, plus a Crosswalk tab showing the raw Strong's-number → native-key mapping. The
+  other sources are resolved through the API's lexicon crosswalk rather than a guessed key, so BDB
+  (which has no Strong's-shaped key) now resolves too.
+- **changed:** Study Tools tabs are reordered — Book Guide is now first, then Word Study, then
+  Textual Variants. Study Tools opens on Book Guide by default.
+- **added:** Study Tools > Book Guide now shows book-level commentary. Below the book overview,
+  accordions and meta strip, a dropdown lists every commentary source that covers the book (Matthew
+  Henry and Gill first, then the historic sources); picking one loads that source's book
+  introduction (the API's "chapter 0" entry) with its Scripture citations made hover-previewable.
+  A source with no book-level introduction just says so. This replaces the old passive "Commentary
+  Coverage" chip list, which only named the sources.
+- **changed:** Study Tools > Book Guide now always opens on the book you're currently reading. It
+  previously kept whatever book you last looked at, even after you'd moved on in the reader.
+
 ## [1.5.0] - 2026-08-29
 - **changed:** The People card's person detail view was reworked. It opens with a compact identity
   block — epithet, a one-sentence summary, and a small first/last appearance line — then the family

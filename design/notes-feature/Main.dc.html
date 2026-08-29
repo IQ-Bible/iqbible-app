@@ -1,0 +1,215 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,400&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{ box-sizing:border-box; margin:0; padding:0; }
+    a{ color:var(--brand); text-decoration:none; } a:hover{ color:var(--brand-2); }
+    .app{
+      --brand:#6d28d9; --brand-2:#9333ea; --brand-soft:rgba(109,40,217,.08); --brand-line:rgba(109,40,217,.4);
+      --on-brand:#fff;
+      --bg:#f7f6fc; --surface:#fff; --surface-2:#f2effa;
+      --ink:#1a1330; --ink-soft:#2b2145; --muted:#6b6480; --muted2:#a09bb3;
+      --divider:rgba(109,40,217,.16);
+      --shadow:rgba(45,27,88,.12); --shadow-lg:rgba(45,27,88,.18);
+      --r-pill:999px; --r-card:16px; --r-control:12px; --r-sm:8px;
+      --font-ui:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+      --font-reading:'Crimson Pro',Georgia,'Times New Roman',serif;
+      position:relative; width:1400px; height:900px; overflow:hidden;
+      background:var(--bg); color:var(--ink); font-family:var(--font-ui);
+    }
+    .app.dark{
+      --brand:#9d6bf0; --brand-2:#b586f5; --brand-soft:rgba(157,107,240,.14); --brand-line:rgba(157,107,240,.45);
+      --on-brand:#140b26;
+      --bg:#120c1f; --surface:#1c1430; --surface-2:#241a3a;
+      --ink:#f1ecfb; --ink-soft:#d9d0ef; --muted:#a79cc4; --muted2:#736a90;
+      --divider:rgba(157,107,240,.24);
+      --shadow:rgba(0,0,0,.4); --shadow-lg:rgba(0,0,0,.55);
+    }
+
+    /* ── topbar ── */
+    .topbar{ position:absolute; top:0; left:0; right:0; height:64px; display:flex; align-items:center; gap:16px;
+      padding:0 24px; background:var(--surface); border-bottom:1px solid var(--divider); z-index:5; }
+    .wordmark{ display:flex; align-items:center; gap:9px; font-weight:900; font-size:1.3rem; letter-spacing:-.02em; }
+    .wordmark .logo{ width:26px; height:26px; border-radius:var(--r-sm); background:linear-gradient(135deg,var(--brand),var(--brand-2)); flex-shrink:0; }
+    .wordmark .wm{ color:var(--brand); } .wordmark .wm span{ color:var(--ink); }
+    .topactions{ margin-left:auto; display:flex; align-items:center; gap:10px; }
+    .ticon{ width:34px; height:34px; display:flex; align-items:center; justify-content:center; border:1px solid var(--divider);
+      border-radius:var(--r-sm); color:var(--muted); background:none; }
+    .ticon svg{ width:16px; height:16px; }
+
+    /* ── shell ── */
+    .shell{ position:absolute; top:64px; left:0; right:0; bottom:0; display:flex; }
+    .navrail{ width:230px; flex-shrink:0; border-right:1px solid var(--divider); padding:28px 0 0 40px; }
+    .navitem{ display:block; width:150px; text-align:left; border-left:2px solid transparent; font-weight:600;
+      font-size:.82rem; letter-spacing:-.005em; color:var(--muted); line-height:1.4; padding:10px 12px;
+      border-radius:0 var(--r-sm) var(--r-sm) 0; }
+    .navitem.active{ color:var(--brand); border-left-color:var(--brand); background:var(--brand-soft); }
+    .navdivider{ width:126px; border:none; border-top:1px solid var(--divider); margin:10px 12px; }
+
+    /* ── reading column ── */
+    .readmain{ flex:1; min-width:0; overflow:hidden; display:flex; justify-content:center; padding:0 32px; }
+    .readcol{ width:100%; max-width:700px; padding-top:40px; }
+    .chhead{ display:flex; align-items:center; gap:16px; margin-bottom:20px; }
+    .bookicon{ width:52px; height:52px; border-radius:var(--r-card); flex-shrink:0;
+      background:linear-gradient(150deg,var(--brand),var(--brand-2)); display:flex; align-items:center; justify-content:center; }
+    .bookicon svg{ width:24px; height:24px; color:#fff; }
+    .chtitle{ display:flex; align-items:baseline; flex-wrap:wrap; gap:2px 10px; }
+    .chtitle .bk{ font-weight:800; font-size:1.7rem; letter-spacing:-.02em; color:var(--ink); }
+    .chtitle .ch{ font-weight:800; font-size:1.7rem; letter-spacing:-.02em; color:var(--ink); }
+    .chtitle .ver{ flex:0 0 100%; font-size:.7rem; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin-top:4px; }
+    .readtext{ font-family:var(--font-reading); font-size:20px; line-height:1.85; color:var(--ink-soft); font-weight:300; }
+    .vnum{ font-family:var(--font-ui); font-size:.62em; font-weight:600; color:var(--muted2); vertical-align:super; margin-right:3px; }
+    .vsel{ background:var(--brand-soft); border-radius:4px; box-shadow:0 0 0 2px var(--brand-line); }
+    .cite{ color:var(--brand); border-bottom:1px solid var(--brand-line); cursor:help; }
+    .vbadge{ display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:var(--r-pill);
+      background:var(--brand); color:#fff; vertical-align:middle; margin:0 4px; }
+    .vbadge svg{ width:9px; height:9px; }
+
+    /* ── Notes drawer (docked) ── */
+    .drawer{ position:absolute; left:0; right:0; bottom:0; height:344px; background:var(--surface);
+      border-top:1px solid var(--divider); box-shadow:0 -14px 40px var(--shadow-lg); z-index:40;
+      display:flex; flex-direction:column; }
+    .drawer-grip{ position:absolute; top:6px; left:50%; transform:translateX(-50%); width:44px; height:4px;
+      border-radius:var(--r-pill); background:var(--divider); }
+    .drawer-head{ display:flex; align-items:center; gap:12px; padding:18px 20px 12px; border-bottom:1px solid var(--divider); }
+    .dh-note-ic{ width:30px; height:30px; border-radius:var(--r-sm); background:var(--brand-soft); color:var(--brand);
+      display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .dh-note-ic svg{ width:16px; height:16px; }
+    .dh-title{ font-weight:700; font-size:1rem; letter-spacing:-.01em; color:var(--ink); }
+    .dh-chevron{ width:22px; height:22px; border-radius:var(--r-sm); border:1px solid var(--divider); background:var(--surface-2);
+      color:var(--muted); display:flex; align-items:center; justify-content:center; }
+    .dh-chevron svg{ width:12px; height:12px; }
+    .dh-chip{ font-size:.62rem; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--brand);
+      background:var(--brand-soft); border-radius:var(--r-pill); padding:4px 9px; }
+    .dh-saved{ display:flex; align-items:center; gap:5px; font-size:.72rem; color:var(--muted); margin-left:6px; }
+    .dh-saved svg{ width:13px; height:13px; color:#16a34a; }
+    .dh-actions{ margin-left:auto; display:flex; align-items:center; gap:6px; }
+    .dh-btn{ width:30px; height:30px; border-radius:var(--r-sm); border:1px solid var(--divider); background:var(--surface-2);
+      color:var(--muted); display:flex; align-items:center; justify-content:center; }
+    .dh-btn svg{ width:15px; height:15px; }
+    .dh-btn.primary{ background:var(--brand); border-color:var(--brand); color:var(--on-brand); }
+
+    .drawer-body{ flex:1; min-height:0; display:flex; gap:0; }
+    .editor-wrap{ flex:1; min-width:0; padding:16px 20px; display:flex; flex-direction:column; }
+    .editor{ flex:1; background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-control);
+      padding:14px 16px; font-size:.95rem; line-height:1.7; color:var(--ink); overflow:hidden; }
+    .editor .blockq{ display:block; border-left:3px solid var(--brand-line); padding-left:12px; margin:10px 0;
+      color:var(--muted); font-style:italic; }
+    .editor .caret{ display:inline-block; width:2px; height:1.1em; background:var(--brand); vertical-align:text-bottom;
+      margin-left:1px; }
+    .drawer-foot{ display:flex; align-items:center; gap:8px; padding:12px 20px; border-top:1px solid var(--divider); }
+    .tag{ font-size:.68rem; font-weight:600; color:var(--ink-soft); background:var(--surface-2); border:1px solid var(--divider);
+      border-radius:var(--r-pill); padding:5px 11px; }
+    .tag-add{ font-size:.68rem; font-weight:600; color:var(--muted); border:1px dashed var(--divider); border-radius:var(--r-pill);
+      padding:5px 11px; }
+    .foot-right{ margin-left:auto; display:flex; align-items:center; gap:10px; }
+    .foot-btn{ font-size:.7rem; font-weight:600; color:var(--brand); background:var(--brand-soft); border:1px solid transparent;
+      border-radius:var(--r-control); padding:7px 13px; }
+    .foot-link{ font-size:.7rem; font-weight:600; color:var(--muted); }
+  </style>
+</helmet>
+
+<div class="app {{theme}}">
+
+  <div class="topbar">
+    <div class="wordmark"><span class="logo"></span><span class="wm">IQ <span>Bible</span></span></div>
+    <div class="topactions">
+      <button class="ticon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></button>
+      <button class="ticon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 18l3.2-9 3.2 9M4.1 15h4.2M14 20L19.5 3.5 25 20M16.1 14.5h6.8"/></svg></button>
+      <button class="ticon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4l1.4-1.4M18 6l1.4-1.4"/></svg></button>
+      <button class="ticon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c1.4-3.6 4.4-5.5 7.5-5.5s6.1 1.9 7.5 5.5"/></svg></button>
+    </div>
+  </div>
+
+  <div class="shell">
+    <nav class="navrail">
+      <div class="navitem active">Read</div>
+      <div class="navitem">Search</div>
+      <div class="navitem">Explore</div>
+      <div class="navitem">Study Tools</div>
+      <div class="navitem">Share Tools</div>
+      <hr class="navdivider">
+      <div class="navitem">My Library</div>
+      <div class="navitem">My Progress</div>
+      <div class="navitem">Reading Plans</div>
+      <div class="navitem">Devotionals</div>
+      <hr class="navdivider">
+      <div class="navitem">Help</div>
+      <div class="navitem">Settings</div>
+    </nav>
+
+    <div class="readmain">
+      <div class="readcol">
+        <div class="chhead">
+          <div class="bookicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20v3H6.5A2.5 2.5 0 0 1 4 20.5z"/></svg></div>
+          <div class="chtitle">
+            <span class="bk">2&nbsp;Corinthians</span><span class="ch">4</span>
+            <span class="ver">King James Version</span>
+          </div>
+        </div>
+        <div class="readtext">
+          <p><span class="vnum">16</span>For which cause we faint not; but though our outward man perish, yet the inward man is renewed day by day. <span class="vnum">17</span>For our light affliction, which is but for a moment, worketh for us a far more exceeding and eternal weight of glory;</p>
+          <p><span class="vsel"><span class="vnum">18</span>While we look not at the things which are seen, but at the things which are not seen: for the things which are seen are temporal; but the things which are not seen are eternal.</span><span class="vbadge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5V4Z"/><path d="M9 10h6M9 14h6"/></svg></span></p>
+          <p><span class="vnum">1</span>For we know that if our earthly house of this tabernacle were dissolved, we have a building of God, an house not made with hands, eternal in the heavens.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Notes drawer, docked ── -->
+  <div class="drawer">
+    <div class="drawer-grip"></div>
+    <div class="drawer-head">
+      <div class="dh-note-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5V4Z"/><path d="M9 10h6M9 14h6"/></svg></div>
+      <span class="dh-title">2 Corinthians study</span>
+      <button class="dh-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+      <span class="dh-chip">7 refs</span>
+      <span class="dh-saved"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Saved</span>
+      <div class="dh-actions">
+        <button class="dh-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></button>
+        <button class="dh-btn primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button>
+        <button class="dh-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M10 14 21 3M21 14v7H3V3h7"/></svg></button>
+        <button class="dh-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg></button>
+      </div>
+    </div>
+
+    <div class="drawer-body">
+      <div class="editor-wrap">
+        <div class="editor">
+          Paul's whole argument turns on a contrast: the <em>seen</em> against the <em>unseen</em>. The renewal is inward and daily even while the outward man wastes &mdash; affliction is real but re-scaled by glory.
+          <span class="blockq">&ldquo;While we look not at the things which are seen&hellip;&rdquo; &mdash; <span class="cite">2 Cor 4:18</span></span>
+          Tie this back to <span class="cite">Rom 8:18</span> for the study group.<span class="caret"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="drawer-foot">
+      <span class="tag">renewal</span>
+      <span class="tag">affliction</span>
+      <span class="tag">sermon prep</span>
+      <span class="tag-add">+ tag</span>
+      <div class="foot-right">
+        <button class="foot-btn">+ Attach 2 Cor 4:18</button>
+        <a class="foot-link" href="#">Open in My Library &#8599;</a>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Theme"}}'>
+class Component extends DCLogic {
+  renderVals() { return { theme: this.props.theme ?? "light" }; }
+}
+</script>
+</body>
+</html>

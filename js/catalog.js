@@ -181,17 +181,22 @@ async function selectVersion(id) {
   await loadBooks();
   await loadChapter(1, true);
 }
-// Applied once at init from the stored iqb_last_version (js/main.js) — same
-// field-setting as selectVersion() above, minus the navigation side effects
-// (no chapter reload; init() is about to load the first chapter anyway).
-function applyStoredVersion() {
-  const id = getLastVersion();
-  if (!id) return;
+// Sets current.version/versionTitle/textDirection from a version id without
+// any navigation side effects (no chapter reload) — used at init and by the
+// router (a `?v=` deep link, or a popstate to an entry in another version).
+// Returns false if the id isn't in the catalog, so callers can fall back.
+function applyVersionById(id) {
   const v = (catalog || []).find(x => x.version_id === id);
-  if (!v) return;
+  if (!v) return false;
   current.version = id;
   current.versionTitle = v.title || id;
   current.textDirection = v.text_direction === "rtl" ? "rtl" : "ltr";
+  return true;
+}
+// Applied once at init from the stored iqb_last_version (js/main.js).
+function applyStoredVersion() {
+  const id = getLastVersion();
+  if (id) applyVersionById(id);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════

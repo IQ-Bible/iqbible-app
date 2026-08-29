@@ -240,22 +240,25 @@ document.addEventListener("click", e => {
 // CHANGELOG entry). Runs unawaited from init() below — the constant is shown
 // first so there's no blank flash, and this only overwrites it on success.
 // Fails silently offline/on a fetch error, leaving the constant in place.
+// One version string shows in three places (left-nav footer, the mobile More
+// sheet's footer, the About page), so fan it out by attribute rather than id.
+function setAppVersionText(v) {
+  document.querySelectorAll("[data-app-version]").forEach(el => el.textContent = v);
+}
 async function refreshAppVersionFromChangelog() {
   try {
     const text = await (await fetch("CHANGELOG.md")).text();
     const version = text.match(/^## \[(\d+\.\d+\.\d+)\]/m)?.[1];
     if (!version) return;
-    document.getElementById("navVersion").textContent = version;
-    document.getElementById("aboutVersion").textContent = version;
+    setAppVersionText(version);
   } catch { /* offline or CHANGELOG.md unreachable — keep APP_VERSION shown */ }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
    INIT */
 (async function init() {
-  document.getElementById("navYear").textContent = new Date().getFullYear();
-  document.getElementById("navVersion").textContent = APP_VERSION;
-  document.getElementById("aboutVersion").textContent = APP_VERSION;
+  document.querySelectorAll("[data-app-year]").forEach(el => el.textContent = new Date().getFullYear());
+  setAppVersionText(APP_VERSION);
   refreshAppVersionFromChangelog();
   setTheme(getTheme());
   setFontSize(getFontSize());
@@ -265,8 +268,11 @@ async function refreshAppVersionFromChangelog() {
   if (!IS_HOSTED_INSTANCE && !getApiKey()) { showKeyBanner(); openHashRoute(); return; }
   await Promise.all([loadCatalog(), loadBookAbbreviations()]);
   applyStoredVersion();
-  await loadBooks();
   const route = parsePathRoute();
+  // A `?v=` on the deep link wins over the stored version — resolved before
+  // loadBooks() so the book list matches the version the link asked for.
+  if (route && route.version && route.version !== current.version && applyVersionById(route.version)) setLastVersion(route.version);
+  await loadBooks();
   if (route) {
     const b = bookList.find(x => x.usfm === route.book);
     if (b) { current.book = b.usfm; current.bookName = b.name; }

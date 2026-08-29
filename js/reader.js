@@ -13,6 +13,7 @@ async function loadChapter(chapter, refreshMeta, verse, verseEnd) {
   // Otherwise the previous chapter's prompt (or its "done" state) stays
   // visible behind the spinner until renderChapterReadPrompt() below re-runs.
   document.getElementById("chapterReadPrompt").className = "";
+  document.getElementById("chapterReadStamp").className = "";
 
   if (refreshMeta) await loadChapterMeta();
 
@@ -302,7 +303,9 @@ async function loadPlacesCard() {
     } else if (typeof first.lat === "number" && typeof first.lon === "number") {
       media = `<img class="rc-thumb" src="${staticMapTileURL(first.lon, first.lat, 7)}" alt="Map of ${escHtml(first.name)}" onerror="this.remove()">`;
     }
-    return `<div class="railcard clickable" onclick="openPlacesModal()"><div class="rc-label">Places</div>${media ? `<div class="rc-media">${media}</div>` : ""}<div class="rc-body">${moreText}</div></div>`;
+    // Only the media variant keeps the 1:1 square (see .railcard--media, CSS) —
+    // a Places card with just names, no thumbnail/coords, sizes to content.
+    return `<div class="railcard clickable${media ? " railcard--media" : ""}" onclick="openPlacesModal()"><div class="rc-label">Places</div>${media ? `<div class="rc-media">${media}</div>` : ""}<div class="rc-body">${moreText}</div></div>`;
   } catch (e) { return null; }
 }
 // Opens with a real embedded map per place — a plain OpenStreetMap iframe
@@ -1130,6 +1133,81 @@ async function linkifyCitations(text) {
   html += escHtml(text.slice(last));
   return html;
 }
+
+/* ── notes: a small Markdown subset ─────────────────────────────────────────
+   Notes (the drawer and My Library) are written in plain text and stored that
+   way — only the read view renders them. Citations are wrapped first
+   (linkifyCitations — the one shared path, never a local parser), then this
+   pass runs over that HTML with each .citelink span pulled out as an opaque
+   token so a stray * or _ beside a verse label can't be read as formatting.
+   Deliberately tiny: **bold**, *italic*, `code`, #-headings, - / 1. lists,
+   > quotes, --- rules, [text](url). No dependency, no [[wikilinks]] yet. */
+function ndMdInline(s) {
+  const code = [];
+  s = s.replace(/`([^`\n]+?)`/g, (m, c) => { code.push(c); return `\u0001${code.length - 1}\u0001`; });
+  s = s.replace(/\[([^\]\n]+?)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)/g,
+    (m, t, u) => `<a href="${u}" target="_blank" rel="noopener nofollow">${t}</a>`);
+  s = s.replace(/\*\*([^\n]+?)\*\*/g, "<strong>$1</strong>");
+  s = s.replace(/(^|[^*])\*([^*\n]+?)\*(?!\*)/g, "$1<em>$2</em>");
+  s = s.replace(/\u0001(\d+)\u0001/g, (m, i) => `<code>${code[+i]}</code>`);
+  return s;
+}
+function ndMarkdownToHtml(escaped, rawText) {
+  // escaping and citation-wrapping never touch newlines, so the raw note's
+  // lines line up index-for-index with `src` — walk them in parallel to keep
+  // data-sl an offset into the *stored* text, not the escaped HTML.
+  const rawLines = (rawText != null ? rawText : escaped).split("\n");
+  const tok = [];
+  const src = escaped.replace(/<span class="citelink"[^>]*>[\s\S]*?<\/span>/g, m => {
+    tok.push(m); return `\u0000${tok.length - 1}\u0000`;
+  });
+  const out = [];
+  // para/quote/fence hold {at, lines:[]}; list holds {tag, items:[{at,t}]}.
+  // `at` is the source offset the block's first line starts at (data-sl).
+  let para = null, list = null, quote = null, fence = null;
+  const flushPara = () => { if (para) { out.push(`<p data-sl="${para.at}">${ndMdInline(para.lines.join("<br>"))}</p>`); para = null; } };
+  const flushList = () => { if (list) { out.push(`<${list.tag}>${list.items.map(it => `<li data-sl="${it.at}">${ndMdInline(it.t)}</li>`).join("")}</${list.tag}>`); list = null; } };
+  const flushQuote = () => { if (quote) { out.push(`<blockquote data-sl="${quote.at}">${ndMdInline(quote.lines.join("<br>"))}</blockquote>`); quote = null; } };
+  const flushAll = () => { flushPara(); flushList(); flushQuote(); };
+
+  let at = 0;
+  src.split("\n").forEach((raw, i) => {
+    const start = at;
+    at += (rawLines[i] != null ? rawLines[i].length : raw.length) + 1;
+    const line = raw.replace(/\s+$/, "");
+    if (fence !== null) {
+      if (/^```/.test(line)) { out.push(`<pre data-sl="${fence.at}"><code>${fence.lines.join("\n")}</code></pre>`); fence = null; }
+      else fence.lines.push(raw);
+      return;
+    }
+    if (/^```/.test(line)) { flushAll(); fence = { at: start, lines: [] }; return; }
+    if (!line.trim()) { flushAll(); return; }
+    const h = line.match(/^(#{1,4})\s+(.*)$/);
+    if (h) { flushAll(); const n = h[1].length + 1; out.push(`<h${n} data-sl="${start}">${ndMdInline(h[2])}</h${n}>`); return; }
+    if (/^([-*_])(\s*\1){2,}\s*$/.test(line)) { flushAll(); out.push("<hr>"); return; }
+    const q = line.match(/^&gt;\s?(.*)$/); // '>' is already escaped by linkifyCitations
+    if (q) { flushPara(); flushList(); (quote = quote || { at: start, lines: [] }).lines.push(q[1]); return; }
+    const ul = line.match(/^\s*[-*+]\s+(.*)$/);
+    const ol = line.match(/^\s*\d+[.)]\s+(.*)$/);
+    if (ul || ol) {
+      flushPara(); flushQuote();
+      const tag = ul ? "ul" : "ol";
+      if (!list || list.tag !== tag) { flushList(); list = { tag, items: [] }; }
+      list.items.push({ at: start, t: ul ? ul[1] : ol[1] });
+      return;
+    }
+    flushList(); flushQuote();
+    (para = para || { at: start, lines: [] }).lines.push(line);
+  });
+  if (fence !== null) out.push(`<pre data-sl="${fence.at}"><code>${fence.lines.join("\n")}</code></pre>`);
+  flushAll();
+  return out.join("").replace(/\u0000(\d+)\u0000/g, (m, i) => tok[+i] || "");
+}
+async function renderNoteMarkdown(text) {
+  if (!text || !text.trim()) return "";
+  return ndMarkdownToHtml(await linkifyCitations(text), text);
+}
+
 // Commentary (GET /commentaries/...) and dictionary (GET /dictionaries/{id}
 // ?q=...) entries already carry a server-parsed `citations` array over their
 // own Text/Definition (same scanCitations engine /parse/citations uses, run
@@ -1321,6 +1399,9 @@ function renderVerseSelectionUI() {
   document.querySelectorAll(".verse-span").forEach(el => {
     el.classList.toggle("vsel", selectedVerses.includes(Number(el.dataset.verse)));
   });
+  // Keeps the Notes drawer's "Attach <ref>" footer button in sync with the
+  // current selection (both selectVerse and clearVerseSelection route here).
+  if (typeof ndUpdateAttachButton === "function") ndUpdateAttachButton();
 }
 // Clicking anywhere in a verse opens Verse Tools for it, not just the small
 // superscript number — except a dict-term/citation click, which already has
@@ -1572,7 +1653,8 @@ function selectionText() {
 }
 function verseDeepLink(verse, verseEnd) {
   const span = (verseEnd && verseEnd > verse) ? `${verse}-${verseEnd}` : `${verse}`;
-  return location.origin + BASE_PATH + "/" + current.book.toLowerCase() + "/" + current.chapter + "/" + span;
+  return location.origin + BASE_PATH + "/" + current.book.toLowerCase() + "/" + current.chapter + "/" + span
+    + (current.version ? `?v=${encodeURIComponent(current.version)}` : "");
 }
 // A contiguous multi-verse selection links as a range (/gal/5/14-16); a
 // disjoint one (14, 17) can't be expressed in the path, so it falls back to

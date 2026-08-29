@@ -1,0 +1,19 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1400, "h": 900, "title": "1 · Drawer open — Read view" },
+    { "file": "Collapsed.dc.html", "x": 1520, "y": 0, "w": 1400, "h": 900, "title": "2 · Collapsed launcher" },
+    { "file": "Switcher.dc.html", "x": 0, "y": 1060, "w": 1400, "h": 640, "title": "4 · Note switcher panel" },
+    { "file": "QuickCapture.dc.html", "x": 1520, "y": 1060, "w": 1200, "h": 880, "title": "3 · Quick capture from Verse Tools" },
+    { "file": "Mobile.dc.html", "x": 2820, "y": 1060, "w": 390, "h": 844, "title": "5 · Mobile bottom sheet" }
+  ],
+  "annotations": [
+    { "id": "intro", "x": 0, "y": -170, "w": 620, "text": "Notes — Phase 1: docked bottom drawer + \"active note\" + quick-capture from anywhere. Chrome matched to the app: #6d28d9 purple, Inter, 16/12/8px radii, token-for-token light + dark (flip the Theme tweak on any artboard). Reading column stays Crimson Pro serif per the brand's \"text is Scripture, not chrome\" rule." },
+    { "id": "n-main", "x": 0, "y": 920, "w": 1400, "text": "1 · Drawer docked. Header: active-note title + chevron to the switcher, a refs chip, a quiet Saved state, then list / new / pop-out-to-floating-window / collapse. Body is the plain-text editor (Inter, like today's Verse Tools note field). Footer: tag chips + a context-aware \"Attach <current verse>\" and a link out to My Library, which stays the archive/search/export surface." },
+    { "id": "n-collapsed", "x": 1520, "y": 920, "w": 1400, "text": "2 · Collapsed = a pill on the bottom-right showing the active note; one click re-opens the drawer. Global \"N\" shortcut opens it from any view. The verse keeps its existing note badge in the text." },
+    { "id": "n-quick", "x": 1520, "y": 1960, "w": 1200, "text": "3 · New \"Add to note\" cell in Verse Tools appends \"> 2 Cor 4:18 — <verse text>\" to the active note (a running study thread) — distinct from today's \"Note\", which is still the one-note-per-selection verse annotation. Toast confirms; the launcher shows +1." },
+    { "id": "n-switch", "x": 0, "y": 1720, "w": 1400, "text": "4 · Chevron opens the switcher in-place: search, + New note, and a list showing title, snippet, a refs count and last-updated. Picking one makes it the active note. Snippets render citations with the shared linkify hover, per the standing \"every reference is previewable\" rule." },
+    { "id": "n-mobile", "x": 2820, "y": 1920, "w": 620, "text": "5 · On mobile the floating-window option is dropped — drawer becomes a bottom sheet over a scrim, drag handle to resize, swipe down to dismiss. 44px hit targets. No fake status bar / keyboard. Sits below the shared tooltip + toast (z 600) per CLAUDE.md." },
+    { "id": "later", "x": 0, "y": 2000, "w": 620, "text": "Not shown (later phases): Phase 2 — pop-out floating draggable/resizable window, position persisted, snap-to-dock. Phase 3 — unified refs model, [[note links]] + backlinks, Write/Preview markdown toggle." }
+  ],
+  "launch": { "view": "canvas" }
+}

@@ -65,6 +65,9 @@ const TOUR_STEPS = [
   { selector: '.navitem[data-nav="plans"]', title: "Reading Plans", body: "Build or import a reading plan, then track it day by day on a calendar.", before: () => openMoreMenu(true) },
   { selector: '.navitem[data-nav="devotionals"]', title: "Devotionals", body: "A new reading each morning and evening, with its own progress tracking.", before: () => openMoreMenu(true) },
   { selector: "#profileTrigger", title: "Your Reading", body: "Streaks and quick stats live here too, with a shortcut back to Settings." },
+  // #notesLauncher is display:none while the drawer itself is open — close it
+  // first so the step has something to spotlight.
+  { selector: "#notesLauncher", title: "Notes", body: "Jot a thought from anywhere — press N or tap here to open the Notes drawer. It autosaves as you type, takes light Markdown (bold, lists, quotes), and “Add to Note” in Verse Tools sends a verse straight into it.", before: () => { switchMainView("read"); if (typeof closeNotesDrawer === "function") closeNotesDrawer(); } },
   // .show (not just #verseToolsPanel) matters: the panel is always in the
   // layout (opacity:0 when closed, css/styles.css), so a bare id selector
   // would report a nonzero rect and get spotlighted even while closed.
@@ -82,6 +85,7 @@ const ADVANCED_VERSE_TOOLS_STEPS = [
   { selector: "#verseToolsPanel.show .vtcolors", title: "Highlight", body: "Tap a color — yellow, green, blue or pink — to highlight the verse right in the reading text.", before: openVerseToolsForTour },
   { selector: '.vtcell[onclick^="toggleBookmarkSelection"]', title: "Bookmark", body: "Save this verse to My Library so it's easy to find again later.", before: openVerseToolsForTour },
   { selector: '.vtcell[onclick^="openNoteTool"]', title: "Note", body: "Write a note attached to this verse (or a whole selected range) — citations inside it get the same hover-preview as the reading text.", before: openVerseToolsForTour },
+  { selector: '.vtcell[onclick^="addSelectionToActiveNote"]', title: "Add to Note", body: "Drop this verse — reference and text — into your active note in the Notes drawer, without leaving the page. Keep going to gather a whole passage into one note.", before: openVerseToolsForTour },
   { selector: '.vtcell[onclick^="copySelection"]', title: "Copy", body: "Copy the verse text, with its reference, straight to your clipboard.", before: openVerseToolsForTour },
   { selector: '.vtcell[onclick^="showShareTool"]', title: "Share", body: "Turn the verse into a shareable image, link or embeddable card.", before: openVerseToolsForTour },
   { selector: '.vtcell[onclick^="showOriginalLanguageTool"]', title: "Original Language", body: "See the underlying Hebrew or Greek for each word, with Strong's numbers you can jump into for a full word study.", before: openVerseToolsForTour },
@@ -97,8 +101,8 @@ const ADVANCED_EXPLORE_STUDY_LIBRARY_STEPS = [
   { selector: '#exploreTabs .lib-tab[data-tab="genealogy"]', title: "Explore: Genealogy", body: "Trace family lines through scripture with an interactive genealogy explorer.", before: () => { openExplore(); switchExploreTab("genealogy"); } },
   { selector: '#exploreTabs .lib-tab[data-tab="harmony"]', title: "Explore: Harmony", body: "The four Gospels laid out side-by-side, matched up event by event.", before: () => { openExplore(); switchExploreTab("harmony"); } },
   { selector: '#exploreTabs .lib-tab[data-tab="topics"]', title: "Explore: Topics", body: "Browse the Bible by topic instead of by book and chapter.", before: () => { openExplore(); switchExploreTab("topics"); } },
-  { selector: '#studyTabs .lib-tab[data-tab="word"]', title: "Study: Word Study", body: "A Strong's-numbered word study — meaning, root, and every other place a word appears.", before: () => { openStudy(); switchStudyTab("word"); } },
-  { selector: '#studyTabs .lib-tab[data-tab="book"]', title: "Study: Book Guide", body: "A per-book overview — author, setting, structure and themes.", before: () => { openStudy(); switchStudyTab("book"); } },
+  { selector: '#studyTabs .lib-tab[data-tab="book"]', title: "Study: Book Guide", body: "A per-book overview — author, setting, structure and themes — plus book-level commentary from the historic sources.", before: () => { openStudy(); switchStudyTab("book"); } },
+  { selector: '#studyTabs .lib-tab[data-tab="word"]', title: "Study: Word Study", body: "A Strong's-numbered word study across several lexicons — Strong's, BDB, LSJ, Abbott-Smith — plus every other place a word appears.", before: () => { openStudy(); switchStudyTab("word"); } },
   { selector: '#studyTabs .lib-tab[data-tab="variants"]', title: "Study: Textual Variants", body: "Where New Testament manuscripts differ, verse by verse.", before: () => { openStudy(); switchStudyTab("variants"); } },
   { selector: '#libraryOverlay .lib-tab[data-tab="notes"]', title: "My Library: Notes", body: "Every note you've written, searchable and taggable, across the whole Bible.", before: () => { openLibrary(); switchLibraryTab("notes"); } },
   { selector: '#libraryOverlay .lib-tab[data-tab="bookmarks"]', title: "My Library: Bookmarks", body: "Every verse you've bookmarked, in one list.", before: () => { openLibrary(); switchLibraryTab("bookmarks"); } },

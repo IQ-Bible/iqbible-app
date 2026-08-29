@@ -1,0 +1,122 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,400&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{ box-sizing:border-box; margin:0; padding:0; }
+    .app{
+      --brand:#6d28d9; --brand-2:#9333ea; --brand-soft:rgba(109,40,217,.08); --brand-line:rgba(109,40,217,.4);
+      --on-brand:#fff;
+      --bg:#f7f6fc; --surface:#fff; --surface-2:#f2effa;
+      --ink:#1a1330; --ink-soft:#2b2145; --muted:#6b6480; --muted2:#a09bb3;
+      --divider:rgba(109,40,217,.16);
+      --shadow:rgba(45,27,88,.12); --shadow-lg:rgba(45,27,88,.18);
+      --r-pill:999px; --r-card:16px; --r-control:12px; --r-sm:8px;
+      --font-ui:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+      --font-reading:'Crimson Pro',Georgia,'Times New Roman',serif;
+      position:relative; width:390px; height:844px; overflow:hidden;
+      background:var(--bg); color:var(--ink); font-family:var(--font-ui);
+    }
+    .app.dark{
+      --brand:#9d6bf0; --brand-2:#b586f5; --brand-soft:rgba(157,107,240,.14); --brand-line:rgba(157,107,240,.45);
+      --on-brand:#140b26;
+      --bg:#120c1f; --surface:#1c1430; --surface-2:#241a3a;
+      --ink:#f1ecfb; --ink-soft:#d9d0ef; --muted:#a79cc4; --muted2:#736a90;
+      --divider:rgba(157,107,240,.24);
+      --shadow:rgba(0,0,0,.4); --shadow-lg:rgba(0,0,0,.55);
+    }
+    .tb{ height:56px; display:flex; align-items:center; gap:8px; padding:0 16px; border-bottom:1px solid var(--divider); background:var(--surface); }
+    .tb .logo{ width:22px; height:22px; border-radius:6px; background:linear-gradient(135deg,var(--brand),var(--brand-2)); }
+    .tb .wm{ font-weight:900; font-size:1.05rem; letter-spacing:-.02em; color:var(--brand); }
+    .tb .wm span{ color:var(--ink); }
+    .read{ padding:18px 20px; }
+    .read .kick{ font-size:.62rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin-bottom:12px; }
+    .read .rt{ font-family:var(--font-reading); font-size:18px; line-height:1.8; color:var(--ink-soft); font-weight:300; }
+    .read .vnum{ font-family:var(--font-ui); font-size:.6em; font-weight:600; color:var(--muted2); vertical-align:super; }
+
+    .scrim{ position:absolute; inset:0; background:rgba(26,19,48,.28); z-index:10; }
+
+    .sheet{ position:absolute; left:0; right:0; bottom:0; height:588px; background:var(--surface);
+      border-radius:20px 20px 0 0; box-shadow:0 -18px 50px var(--shadow-lg); z-index:20; display:flex; flex-direction:column; }
+    .sgrip{ width:40px; height:4px; border-radius:var(--r-pill); background:var(--divider); margin:9px auto 0; }
+    .shead{ display:flex; align-items:center; gap:10px; padding:12px 16px 12px; border-bottom:1px solid var(--divider); }
+    .snoteic{ width:28px; height:28px; border-radius:var(--r-sm); background:var(--brand-soft); color:var(--brand);
+      display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .snoteic svg{ width:15px; height:15px; }
+    .stitle{ font-weight:700; font-size:.92rem; color:var(--ink); }
+    .schev{ width:20px; height:20px; border-radius:6px; border:1px solid var(--divider); background:var(--surface-2);
+      color:var(--muted); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .schev svg{ width:11px; height:11px; }
+    .sx{ margin-left:auto; width:30px; height:30px; border-radius:var(--r-pill); background:var(--surface-2); border:none;
+      color:var(--muted); font-size:1.15rem; flex-shrink:0; }
+
+    .sbody{ flex:1; min-height:0; padding:14px 16px; display:flex; flex-direction:column; }
+    .schip{ align-self:flex-start; font-size:.6rem; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--brand);
+      background:var(--brand-soft); border-radius:var(--r-pill); padding:4px 9px; margin-bottom:10px; }
+    .seditor{ flex:1; background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-control);
+      padding:13px 14px; font-size:.92rem; line-height:1.7; color:var(--ink); }
+    .seditor .bq{ display:block; border-left:3px solid var(--brand-line); padding-left:10px; margin:9px 0; color:var(--muted); font-style:italic; }
+    .cite{ color:var(--brand); border-bottom:1px solid var(--brand-line); }
+    .stags{ display:flex; gap:6px; margin-top:12px; flex-wrap:wrap; }
+    .stag{ font-size:.66rem; font-weight:600; color:var(--ink-soft); background:var(--surface-2); border:1px solid var(--divider);
+      border-radius:var(--r-pill); padding:5px 10px; }
+    .stag.add{ color:var(--muted); border-style:dashed; }
+
+    .sfoot{ display:flex; align-items:center; gap:8px; padding:12px 16px calc(12px + 8px); border-top:1px solid var(--divider); }
+    .sfbtn{ flex:1; display:flex; align-items:center; justify-content:center; gap:6px; height:44px; border-radius:var(--r-control);
+      background:var(--brand); color:var(--on-brand); border:none; font-size:.76rem; font-weight:700; }
+    .sfbtn.ghost{ flex:0 0 44px; background:var(--surface-2); color:var(--muted); border:1px solid var(--divider); }
+    .sfbtn svg{ width:15px; height:15px; }
+  </style>
+</helmet>
+
+<div class="app {{theme}}">
+  <div class="tb"><span class="logo"></span><span class="wm">IQ <span>Bible</span></span></div>
+  <div class="read">
+    <div class="kick">2 Corinthians 4 &middot; KJV</div>
+    <div class="rt"><span class="vnum">17</span>For our light affliction, which is but for a moment, worketh for us a far more exceeding and eternal weight of glory; <span class="vnum">18</span>While we look not at the things which are seen&hellip;</div>
+  </div>
+
+  <div class="scrim"></div>
+
+  <div class="sheet">
+    <div class="sgrip"></div>
+    <div class="shead">
+      <span class="snoteic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5V4Z"/><path d="M9 10h6M9 14h6"/></svg></span>
+      <span class="stitle">2 Corinthians study</span>
+      <button class="schev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+      <button class="sx">&times;</button>
+    </div>
+    <div class="sbody">
+      <span class="schip">7 refs &middot; saved</span>
+      <div class="seditor">
+        Renewal is inward and daily even while the outward man wastes &mdash; affliction is real but re-scaled by glory.
+        <span class="bq">&ldquo;&hellip;the things which are not seen are eternal.&rdquo; &mdash; <span class="cite">2 Cor 4:18</span></span>
+        Cross-check <span class="cite">Rom 8:18</span>.
+      </div>
+      <div class="stags">
+        <span class="stag">renewal</span><span class="stag">affliction</span><span class="stag add">+ tag</span>
+      </div>
+    </div>
+    <div class="sfoot">
+      <button class="sfbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Attach 2 Cor 4:18</button>
+      <button class="sfbtn ghost"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></button>
+    </div>
+  </div>
+</div>
+
+<script data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Theme"}}'>
+class Component extends DCLogic {
+  renderVals() { return { theme: this.props.theme ?? "light" }; }
+}
+</script>
+</body>
+</html>

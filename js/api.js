@@ -184,6 +184,7 @@ function openSettings() {
   document.getElementById("settingsFontSlider").value = getFontSize();
   document.getElementById("settingsUiFontSlider").value = getUiFontSize();
   document.getElementById("settingsExportReminder").checked = getExportReminderEnabled();
+  document.getElementById("settingsReadStamp").checked = getReadStampEnabled();
   renderSettingsCompareChips();
   switchMainView("settings");
 }
@@ -232,6 +233,10 @@ function setIllustBW(v) { localStorage.setItem("iqb_illust_bw", v ? "1" : "0"); 
 // the key means "never explicitly turned off", not "off".
 function getExportReminderEnabled() { return localStorage.getItem("iqb_export_reminder_enabled") !== "0"; }
 function setExportReminderEnabled(v) { localStorage.setItem("iqb_export_reminder_enabled", v ? "1" : "0"); }
+// The "Read on …" line under the chapter title. Default-on (absence = never
+// turned off). Off falls back to the end-of-chapter "Marked as read" box.
+function getReadStampEnabled() { return localStorage.getItem("iqb_read_stamp_enabled") !== "0"; }
+function setReadStampEnabled(v) { localStorage.setItem("iqb_read_stamp_enabled", v ? "1" : "0"); renderChapterReadPrompt(); }
 function getIconStyle() { return localStorage.getItem("iqb_icon_style") || "bw"; }
 function setIconStyle(v) { localStorage.setItem("iqb_icon_style", v); loadTopBookIcon(); }
 function getFontSize() { return parseInt(localStorage.getItem("iqb_font_size"), 10) || 20; }

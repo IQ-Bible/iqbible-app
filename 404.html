@@ -89,7 +89,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
         <button class="navitem" data-nav="help" onclick="navMenuClick('help')">Help</button>
         <button class="navitem" data-nav="about" onclick="navMenuClick('about')">About</button>
         <button class="navitem" data-nav="settings" onclick="navMenuClick('settings')">Settings</button>
-        <div class="navfooter">&copy;&nbsp;<span id="navYear"></span>&nbsp;IQ&nbsp;Bible<br>v<span id="navVersion"></span>&nbsp;&middot; <a href="https://api.iqbible.com" target="_blank" rel="noopener">API</a></div>
+        <div class="navfooter">&copy;&nbsp;<span id="navYear" data-app-year></span>&nbsp;IQ&nbsp;Bible<span class="navfoot-ver">v<span id="navVersion" data-app-version></span> &middot; <a href="https://api.iqbible.com" target="_blank" rel="noopener">API</a></span></div>
       </div>
     </nav>
 
@@ -139,6 +139,11 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
               </div>
             </div>
           </div>
+
+          <!-- Compact "Read on …" line — its own row below .chhead (not inside
+               it) so it never changes the header's height or nudges the audio
+               player. js/plans.js renderChapterReadStamp(); toggle in Settings. -->
+          <div id="chapterReadStamp"></div>
 
           <div id="readingText"><div class="spin"></div></div>
           <!-- "Did you read this chapter?" — js/plans.js's
@@ -295,8 +300,8 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
         </div>
       </div>
 
-      <!-- study tools view — Word Study (Strong's lexicon + every-occurrence
-           lookup), Book Guide, and Textual Variants. Same shell as
+      <!-- study tools view — Book Guide, Word Study (multi-lexicon +
+           every-occurrence lookup), and Textual Variants. Same shell as
            #exploreOverlay. -->
       <div id="studyOverlay" class="mainview" role="region" aria-label="Study Tools">
         <div class="overlay-inner">
@@ -306,8 +311,8 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
           </div>
           <div class="overlay-search-area">
             <div class="lib-tabs" id="studyTabs">
-              <button class="lib-tab" data-tab="word" onclick="switchStudyTab('word')">Word Study</button>
               <button class="lib-tab" data-tab="book" onclick="switchStudyTab('book')">Book Guide</button>
+              <button class="lib-tab" data-tab="word" onclick="switchStudyTab('word')">Word Study</button>
               <button class="lib-tab" data-tab="variants" onclick="switchStudyTab('variants')">Textual Variants</button>
             </div>
             <p class="view-desc" id="studyDesc"></p>
@@ -444,6 +449,10 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
                 <input type="checkbox" id="settingsExportReminder" onchange="setExportReminderEnabled(this.checked)">
                 <label for="settingsExportReminder">Remind me to back up my data</label>
               </div>
+              <div class="setfield-check">
+                <input type="checkbox" id="settingsReadStamp" onchange="setReadStampEnabled(this.checked)">
+                <label for="settingsReadStamp">Show when I read a chapter, under the title</label>
+              </div>
               <div class="setfield">
                 <label>Compare Versions <span class="hint" style="display:inline">— used in Verse Tools &gt; Compare</span></label>
                 <div class="compare-chip-row" id="settingsCompareChips"></div>
@@ -504,7 +513,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
             </div>
           </div>
 
-          <p class="hint about-version">IQ Bible App v<span id="aboutVersion"></span></p>
+          <p class="hint about-version">IQ Bible App v<span id="aboutVersion" data-app-version></span></p>
         </div>
       </div>
 
@@ -545,7 +554,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
             <div class="help-card">
               <div class="help-card-num">02</div>
               <div class="help-card-title">Choose a book and chapter</div>
-              <div class="help-card-body">Navigate from the left rail, or deep-link straight to a verse like /gen/1/1 — or a range, /gal/5/14-16.</div>
+              <div class="help-card-body">Navigate from the left rail, or deep-link straight to a verse like /gen/1/1 — or a range, /gal/5/14-16. The address bar keeps your translation (?v=…), so a copied link reopens in the same version.</div>
             </div>
             <div class="help-card">
               <div class="help-card-num">03</div>
@@ -574,7 +583,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
             <div class="help-card">
               <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h6M10 2v6.5L4.5 18a2 2 0 0 0 1.7 3h11.6a2 2 0 0 0 1.7-3L14 8.5V2"/></svg></div>
               <div class="help-card-title">Study Tools</div>
-              <div class="help-card-body">A Strong's word study, a cross-reference graph, per-book guides and NT textual variants.</div>
+              <div class="help-card-body">A word study across the Hebrew &amp; Greek lexicons, per-book guides with book-level commentary, and NT textual variants.</div>
             </div>
             <div class="help-card">
               <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.5 15.4 6.5M8.6 13.5l6.8 4"/></svg></div>
@@ -587,6 +596,11 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
               <div class="help-card-body">Notes, bookmarks, highlights and history, all in one place.</div>
             </div>
             <div class="help-card">
+              <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5V4Z"/><path d="M9 10h6M9 14h6"/></svg></div>
+              <div class="help-card-title">Notes drawer</div>
+              <div class="help-card-body">A dockable notes panel you can open from anywhere with the N key. It opens on a read view where every reference in the note is hover-previewable and a light Markdown subset (bold, italic, headings, lists, quotes) is rendered; hit Edit (or click the text) to change it, with a small formatting toolbar and Ctrl/Cmd+B / +I. "Add to Note" in Verse Tools drops the selected verse straight in. On a phone it's a bottom sheet you can drag by its grip to resize — and the passage stays readable behind it.</div>
+            </div>
+            <div class="help-card">
               <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg></div>
               <div class="help-card-title">My Progress</div>
               <div class="help-card-body">A streak calendar, read counts and your active plan's progress, all in one place.</div>
@@ -594,7 +608,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
             <div class="help-card">
               <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div>
               <div class="help-card-title">Reading Plans</div>
-              <div class="help-card-body">Build or import a plan and track it day by day on a calendar.</div>
+              <div class="help-card-body">Build, import or share a plan and track it day by day on a calendar.</div>
             </div>
             <div class="help-card">
               <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2c-1 4-5 5-5 10a5 5 0 0 0 10 0c0-2-1-3-2-4 .5 2-1 3-2 2-1.5-1-1-3-1-3s-1 1-1 3c0-3 2-4 1-8z"/></svg></div>
@@ -620,6 +634,10 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
           <div class="help-faq-item">
             <div class="help-faq-q">Does this include audio narration?</div>
             <div class="help-faq-a">Versions with narration available show an inline player above the reading text — a caret next to it lets you pick a different narrator when a version has more than one recorded.</div>
+          </div>
+          <div class="help-faq-item">
+            <div class="help-faq-q">How do I take notes?</div>
+            <div class="help-faq-a">Two kinds. A note tied to a verse: select the verse, then Verse Tools ▸ Note. A free-standing note: open the Notes drawer (press N anywhere, or the Notes button at the bottom-right) — it autosaves as you type, keeps one note "active", and takes a light Markdown subset (bold, italic, headings, lists, quotes) that renders on the read view. Verse Tools ▸ Add to Note drops the selected verse's reference and text into that active note. Everything is searchable, taggable and exportable from My Library.</div>
           </div>
           <div class="help-faq-item">
             <div class="help-faq-q">What are the cards next to the reading pane?</div>
@@ -679,6 +697,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
         </div>
         <button class="vtcell vtbtn" onclick="toggleBookmarkSelection()">Bookmark</button>
         <button class="vtcell vtbtn" onclick="openNoteTool()">Note</button>
+        <button class="vtcell vtbtn" onclick="addSelectionToActiveNote()">Add to Note</button>
         <button class="vtcell vtbtn" onclick="copySelection()">Copy</button>
         <button class="vtcell vtbtn" onclick="showShareTool()">Share</button>
         <button class="vtcell vtbtn" onclick="showOriginalLanguageTool()">Orig. Language</button>
@@ -746,6 +765,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
     <button class="navitem" data-nav="help" onclick="navMenuClick('help');closeMoreMenu()">Help</button>
     <button class="navitem" data-nav="about" onclick="navMenuClick('about');closeMoreMenu()">About</button>
     <button class="navitem" data-nav="settings" onclick="navMenuClick('settings');closeMoreMenu()">Settings</button>
+    <div class="navfooter navfooter-sheet">&copy;&nbsp;<span data-app-year></span>&nbsp;IQ&nbsp;Bible<span class="navfoot-ver">v<span data-app-version></span> &middot; <a href="https://api.iqbible.com" target="_blank" rel="noopener">API</a></span></div>
   </div>
 
   <!-- API key gate — shown whenever no key is set (first load, or after
@@ -1011,6 +1031,68 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
     </div>
   </div>
 
+  <!-- Notes drawer — a persistent capture surface reachable from every view
+       (js/notesdrawer.js). The launcher is always present once the app is
+       usable; the drawer docks to the bottom edge (a scrimmed bottom sheet
+       below 1180px). Kept below .dict-tooltip/#toast (600) and, on desktop,
+       #verseToolsPanel (120) so a citation hover and Verse Tools both stay
+       usable while it's open. -->
+  <button id="notesLauncher" onclick="openNotesDrawer()" hidden aria-label="Open notes">
+    <span class="ndl-ic">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5V4Z"/><path d="M9 10h6M9 14h6"/></svg>
+      <span class="ndl-count" id="notesLauncherCount"></span>
+    </span>
+    <span class="ndl-wrap"><span class="ndl-k">Notes</span><span class="ndl-t" id="notesLauncherTitle">New note</span></span>
+    <span class="ndl-up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg></span>
+  </button>
+  <section id="notesDrawer" hidden aria-label="Notes">
+    <div class="nd-grip" id="ndGrip" title="Drag to resize"></div>
+    <header class="nd-head">
+      <span class="nd-note-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5V4Z"/><path d="M9 10h6M9 14h6"/></svg></span>
+      <input id="ndTitle" class="nd-title-input" placeholder="Untitled note" aria-label="Note title" maxlength="120">
+      <button id="ndSwitcherToggle" class="nd-chevron" onclick="ndToggleSwitcher()" title="All notes" aria-label="All notes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+      <span class="nd-chip" id="ndRefChip" hidden></span>
+      <span class="nd-saved" id="ndSaved" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span>Saved</span></span>
+      <div class="nd-actions">
+        <button id="ndModeBtn" class="nd-btn nd-mode-btn" onclick="ndModeToggle()" title="Edit note (N)" aria-label="Edit note">
+          <svg class="nd-mi nd-mi-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          <svg class="nd-mi nd-mi-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          <span class="nd-mode-label">Edit</span>
+        </button>
+        <button class="nd-btn primary" onclick="ndNewNote()" title="New note" aria-label="New note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button>
+        <button class="nd-btn" onclick="closeNotesDrawer()" title="Collapse" aria-label="Collapse notes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+      </div>
+    </header>
+    <div class="nd-body">
+      <div class="nd-switcher" id="ndSwitcher" hidden>
+        <label class="nd-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input id="ndSearch" type="text" placeholder="Search notes" aria-label="Search notes"></label>
+        <button class="nd-newnote" onclick="ndNewNote()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New note</button>
+        <div class="nd-list" id="ndList"></div>
+      </div>
+      <div class="nd-editor-wrap">
+        <div class="nd-toolbar" id="ndToolbar" hidden role="toolbar" aria-label="Formatting">
+          <button type="button" class="nd-tb" data-fmt="bold" title="Bold (Ctrl+B)" aria-label="Bold"><b>B</b></button>
+          <button type="button" class="nd-tb" data-fmt="italic" title="Italic (Ctrl+I)" aria-label="Italic"><i>I</i></button>
+          <button type="button" class="nd-tb" data-fmt="head" title="Heading" aria-label="Heading">H</button>
+          <button type="button" class="nd-tb" data-fmt="quote" title="Quote" aria-label="Quote">&ldquo;</button>
+          <button type="button" class="nd-tb" data-fmt="ul" title="Bulleted list" aria-label="Bulleted list">&bull;</button>
+          <button type="button" class="nd-tb" data-fmt="link" title="Link" aria-label="Link">&#128279;</button>
+        </div>
+        <textarea id="ndEditor" class="nd-editor" placeholder="Start typing… Markdown (**bold**, - lists, &gt; quotes) and references like John 3:16 render on the read view."></textarea>
+        <div id="ndPreview" class="nd-preview note-md" hidden tabindex="0" role="textbox" aria-readonly="true" aria-label="Note preview — click to edit" title="Click to edit"></div>
+      </div>
+    </div>
+    <footer class="nd-foot">
+      <div class="nd-tags" id="ndTags">
+        <input id="ndTagInput" class="nd-tag-input" placeholder="+ tag" aria-label="Add tag">
+      </div>
+      <div class="nd-foot-right">
+        <button class="nd-foot-btn" id="ndAttachBtn" onclick="addSelectionToActiveNote()" hidden></button>
+        <button class="nd-foot-link" onclick="closeNotesDrawer();openLibrary()">Open in My Library &#8599;</button>
+      </div>
+    </footer>
+  </section>
+
   <div id="toast"></div>
   <div id="dictTooltip" class="dict-tooltip"></div>
 </div>
@@ -1025,6 +1107,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
 <script src="js/reader.js"></script>
 <script src="js/search.js"></script>
 <script src="js/notes.js"></script>
+<script src="js/notesdrawer.js"></script>
 <script src="js/devotionals.js"></script>
 <script src="js/profile.js"></script>
 <script src="js/share.js"></script>

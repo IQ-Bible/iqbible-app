@@ -4,6 +4,8 @@
      that shouldn't be as loud as a solid --brand border. */
   --brand:#6d28d9; --brand-2:#9333ea; --brand-soft:rgba(109,40,217,.08); --brand-line:rgba(109,40,217,.4);
   --on-brand:#fff;
+  --read-check:#16a34a; /* green "chapter read" checkmark below the header — deepened
+                           from the dark-theme #4ade80 for contrast on the light bg */
 
   /* Type system. --font-ui (Inter) is the shared IQ Bible brand face and
      carries all app chrome — nav, labels, buttons, headings, modal titles.
@@ -38,6 +40,7 @@
 :root[data-theme="dark"]{
   --brand:#9d6bf0; --brand-2:#b586f5; --brand-soft:rgba(157,107,240,.14); --brand-line:rgba(157,107,240,.45);
   --on-brand:#140b26;
+  --read-check:#4ade80;
 
   --bg:#120c1f; --surface:#1c1430; --surface-2:#241a3a;
   --ink:#f1ecfb; --ink-soft:#d9d0ef; --muted:#a79cc4; --muted2:#736a90;
@@ -102,7 +105,14 @@ button{ font-family:inherit; cursor:pointer; }
    than the content hugging one edge. Content's top padding is set at
    runtime (alignRails, in reader.js) so it lines up with the first line of
    the chapter text rather than the top of the rail. */
-#navrail,#rightRail{ width:300px; flex-shrink:0; overflow-y:auto; display:flex; justify-content:center; }
+/* align-items:flex-start (not the default stretch) so the inner column sizes
+   to its content and the rail actually scrolls when that content is taller
+   than the window — stretch pins the inner column to the rail height, so it
+   silently clips instead of scrolling (e.g. a tall card stack, or the last
+   nav items once the open Notes drawer eats the bottom of the viewport).
+   .navmenu keeps min-height:100% so its margin-top:auto footer still sits at
+   the bottom when there's room. */
+#navrail,#rightRail{ width:300px; flex-shrink:0; overflow-y:auto; display:flex; justify-content:center; align-items:flex-start; }
 #navrail{ border-right:1px solid var(--divider); }
 #rightRail{ border-left:1px solid var(--divider); }
 @media (max-width:1180px){ #navrail,#rightRail{ display:none; } }
@@ -131,11 +141,17 @@ button{ font-family:inherit; cursor:pointer; }
   #moreMenuSheet{ display:block; position:fixed; left:0; right:0; bottom:var(--mfn-h); background:var(--surface); border-top:1px solid var(--divider); padding:6px; max-height:60vh; overflow-y:auto; box-shadow:0 -8px 24px var(--shadow-lg); z-index:420; transform:translateY(100%); opacity:0; pointer-events:none; transition:transform .18s ease,opacity .18s ease; }
   #moreMenuSheet.show{ transform:translateY(0); opacity:1; pointer-events:auto; }
   #moreMenuSheet .navitem{ padding:13px 14px; }
+  /* The left-nav footer's credit/version line, mirrored here — it's the only
+     place the version shows on mobile (the desktop nav rail is display:none). */
+  #moreMenuSheet .navfooter-sheet{ margin-top:4px; padding:14px 14px calc(10px + env(safe-area-inset-bottom,0)); border-top:1px solid var(--divider); }
 
   /* #rightRail becomes a slide-up sheet with the same #cardStack content/
      fetch logic as the desktop rail — see the HTML comment above it. Scrim
      dims everything including the footer bar (z-index between the two). */
-  #rightRail{ display:flex; flex-direction:column; justify-content:flex-start; position:fixed; left:0; right:0; bottom:0; width:auto; max-height:75vh; border-left:none; border-top:1px solid var(--divider); background:var(--bg); box-shadow:0 -8px 24px var(--shadow-lg); z-index:425; transform:translateY(100%); transition:transform .22s ease; }
+  /* align-items back to stretch here — the desktop rule sets flex-start (so a
+     tall card column scrolls); the mobile sheet's header/cardstack need to
+     span the full width. */
+  #rightRail{ display:flex; flex-direction:column; justify-content:flex-start; align-items:stretch; position:fixed; left:0; right:0; bottom:0; width:auto; max-height:75vh; border-left:none; border-top:1px solid var(--divider); background:var(--bg); box-shadow:0 -8px 24px var(--shadow-lg); z-index:425; transform:translateY(100%); transition:transform .22s ease; }
   #rightRail.show{ transform:translateY(0); }
   .rightrail-sheethead{ display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--divider); flex-shrink:0; }
   #cardsSheetScrim{ z-index:415; }
@@ -144,18 +160,29 @@ button{ font-family:inherit; cursor:pointer; }
 }
 
 /* ── left nav menu ── */
-.navmenu{ width:150px; flex-shrink:0; display:flex; flex-direction:column; padding-bottom:24px; }
+.navmenu{ width:150px; flex-shrink:0; display:flex; flex-direction:column; padding-bottom:24px; min-height:100%; }
 .navitem{ display:block; width:100%; text-align:left; background:none; border:none; border-left:2px solid transparent; font-family:var(--font-ui); font-weight:600; font-size:.82rem; letter-spacing:-.005em; color:var(--muted); line-height:1.4; padding:10px 12px; border-radius:0 var(--r-sm) var(--r-sm) 0; transition:background .15s,color .15s,border-color .15s; }
 .navitem:hover{ background:var(--brand-soft); color:var(--brand); }
 .navitem.active{ color:var(--brand); border-left-color:var(--brand); background:var(--brand-soft); font-weight:600; }
 .navdivider{ border:none; border-top:1px solid var(--divider); margin:10px 12px; }
 .navfooter{ margin-top:auto; padding:16px 12px 0; font-size:.92rem; line-height:1.5; color:var(--muted); opacity:.85; }
+/* Version line as a small tracked-caps kicker (à la .ndl-k) — sits under the
+   credit line, static, not a control. */
+.navfoot-ver{ display:block; margin-top:5px; font-family:var(--font-ui); font-size:.56rem; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); }
+.navfoot-ver a{ color:inherit; }
 
 /* ── right rail cards — per-chapter context (places/people/prophecies)
    plus an always-shown timeline card; only the ones with real API data for
    the current chapter render at all, see loadSidebarCards in reader.js. ── */
 .cardstack{ width:150px; flex-shrink:0; display:flex; flex-direction:column; gap:14px; padding-bottom:24px; }
-.railcard{ aspect-ratio:1/1; border:1px solid var(--divider); border-radius:var(--r-control); background:var(--surface); box-shadow:0 2px 10px var(--shadow); padding:14px; display:flex; flex-direction:column; gap:8px; overflow:hidden; }
+/* Text-only cards (People/Prophecies/Timeline) size to their content — the
+   old 1:1 square both wasted space on a one-line card and clipped a card with
+   two long Timeline/Prophecy entries (overflow:hidden). Only the Places card,
+   which fills its box with a map/photo thumbnail, keeps the square. */
+/* flex-shrink:0 so an overflowing stack scrolls #rightRail rather than
+   squashing the cards to label-only (the old 1:1 square masked this). */
+.railcard{ flex-shrink:0; border:1px solid var(--divider); border-radius:var(--r-control); background:var(--surface); box-shadow:0 2px 10px var(--shadow); padding:14px; display:flex; flex-direction:column; gap:8px; overflow:hidden; }
+.railcard--media{ aspect-ratio:1/1; }
 .railcard.clickable{ cursor:pointer; transition:border-color .15s,box-shadow .15s; }
 .railcard.clickable:hover{ border-color:var(--brand-line); box-shadow:0 4px 16px var(--shadow-lg); }
 .railcard .rc-label{ font-family:var(--font-ui); font-size:.6rem; letter-spacing:.12em; text-transform:uppercase; color:var(--brand); }
@@ -371,6 +398,18 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 .titlepick{ display:flex; align-items:center; gap:5px; padding:2px 8px; margin:0 -8px; border-radius:var(--r-sm); background:none; border:none; font-family:var(--font-ui); font-size:1.7rem; font-weight:800; letter-spacing:-.02em; color:var(--ink); transition:background .15s; }
 .titlepick:hover{ background:var(--brand-soft); }
 .titlepick svg{ width:13px; height:13px; stroke:var(--muted); flex-shrink:0; }
+/* Read-status line under the chapter title — flex:0 0 100% drops it onto its
+   own row within .chtitlewrap's wrap. Only shown once the chapter's read. */
+/* Its own row under .chhead (a sibling, never a child) so it can't change
+   the header height or shift the inline audio player. Positive top margin —
+   .chhead is a sticky, opaque, z-index:6 box, so any overlap paints over
+   this line's top edge. */
+#chapterReadStamp{ display:none; align-items:center; gap:6px; margin:6px 0 16px; font-family:var(--font-ui); font-size:.74rem; color:var(--muted); }
+#chapterReadStamp.show{ display:flex; }
+#chapterReadStamp .read-check{ display:flex; align-items:center; justify-content:center; width:15px; height:15px; flex-shrink:0; background:none; border:none; padding:0; cursor:pointer; color:var(--read-check); border-radius:var(--r-sm); transition:background .15s; }
+#chapterReadStamp .read-check:hover{ background:var(--brand-soft); }
+#chapterReadStamp .read-check svg{ width:15px; height:15px; }
+#chapterReadStamp .read-label{ letter-spacing:.01em; }
 .verpick{ display:flex; align-items:center; gap:4px; padding:4px 8px; border-radius:var(--r-sm); background:none; border:none; font-family:var(--font-ui); font-size:.7rem; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); transition:background .15s,color .15s; }
 .verpick:hover{ background:var(--brand-soft); color:var(--brand); }
 .verpick svg{ width:9px; height:9px; stroke:var(--muted); flex-shrink:0; }
@@ -978,6 +1017,20 @@ details.bg-accordion{ border:1px solid var(--divider); border-radius:var(--r-con
 .bg-accordion summary::after{ content:"+"; font-size:1rem; color:var(--muted); }
 .bg-accordion[open] summary::after{ content:"–"; }
 .bg-accordion .bg-accordion-body{ padding:14px 16px; }
+/* Book Guide commentary picker — a custom dropdown (not a native <select>)
+   so the option list can be a 2-col grid; the covering-source list runs long
+   for major books. */
+.bg-comm{ position:relative; }
+.bg-comm-trigger{ display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%; font-family:var(--font-ui); font-weight:600; font-size:.8rem; color:var(--ink); background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-control); padding:10px 14px; cursor:pointer; }
+.bg-comm-trigger svg{ width:15px; height:15px; flex-shrink:0; fill:none; stroke:var(--muted); stroke-width:3; stroke-linecap:round; stroke-linejoin:round; transition:transform .15s; }
+.bg-comm-trigger[aria-expanded="true"] svg{ transform:rotate(180deg); }
+.bg-comm-menu{ display:none; grid-template-columns:1fr 1fr; gap:3px; margin-top:6px; padding:8px; max-height:280px; overflow-y:auto; border:1px solid var(--divider); border-radius:var(--r-control); background:var(--surface); }
+.bg-comm-menu.open{ display:grid; }
+@media (max-width:400px){ .bg-comm-menu{ grid-template-columns:1fr; } }
+.bg-comm-opt{ text-align:left; font-family:var(--font-ui); font-size:.72rem; line-height:1.3; color:var(--ink-soft); background:none; border:none; border-radius:var(--r-sm); padding:7px 9px; cursor:pointer; }
+.bg-comm-opt:hover{ background:var(--brand-soft); color:var(--brand); }
+.bg-comm-opt.active{ background:var(--brand-soft); color:var(--brand); font-weight:600; }
+#bgCommBody{ margin-top:14px; }
 
 /* ── Word Study lexicon entries (js/study.js) ── */
 .lw-card .lw-headline{ display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:6px; }
@@ -1070,4 +1123,185 @@ details.bg-accordion{ border:1px solid var(--divider); border-radius:var(--r-con
      which half of the screen it gets. */
   #versionPickerScrim,#bookPickerScrim{ align-items:flex-start; padding-top:max(16px,env(safe-area-inset-top,0)); }
   #versionPickerScrim .modal,#bookPickerScrim .modal{ max-height:min(86vh,calc(var(--vvh) - 32px)); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   NOTES DRAWER (js/notesdrawer.js) — a persistent capture surface reachable
+   from every view. #notesLauncher is always present once the app is usable;
+   #notesDrawer docks to the bottom edge on desktop and becomes a scrimmed
+   bottom sheet below 1180px. Both sit below .dict-tooltip/#toast (600) so a
+   citation hover inside the editor still shows, and (on desktop) below
+   #verseToolsPanel (120) so Verse Tools stays usable while the drawer is
+   open. The "active note" is a free-standing note (book:null — the same
+   shape "+ New Note" in My Library makes); the N shortcut, the launcher and
+   Verse Tools' "Add to note" all write to it. */
+:root{ --notes-drawer-h:340px; }
+
+/* These carry an explicit display, so the plain [hidden] attribute (which the
+   JS toggles) needs a higher-specificity rule to actually hide them. */
+#notesLauncher[hidden],#notesDrawer[hidden],#ndSwitcher[hidden],.nd-toolbar[hidden]{ display:none; }
+
+#notesLauncher{ position:fixed; right:24px; bottom:24px; z-index:115; display:flex; align-items:center; gap:11px; background:var(--surface); border:1px solid var(--divider); border-radius:var(--r-pill); box-shadow:0 12px 34px var(--shadow-lg); padding:9px 15px 9px 11px; color:var(--ink); transition:border-color .15s,transform .15s; }
+#notesLauncher:hover{ border-color:var(--brand-line); }
+#notesLauncher.pulse{ animation:ndPulse .5s ease; }
+@keyframes ndPulse{ 40%{ transform:scale(1.05); } }
+.ndl-ic{ position:relative; width:30px; height:30px; border-radius:var(--r-pill); background:var(--brand); color:var(--on-brand); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.ndl-ic svg{ width:15px; height:15px; }
+.ndl-count{ position:absolute; top:-6px; right:-8px; font-family:var(--font-ui); font-size:.56rem; font-weight:800; color:#fff; background:var(--read-check); border-radius:var(--r-pill); padding:1px 5px; opacity:0; transform:scale(.6); transition:opacity .2s,transform .2s; }
+.ndl-count.show{ opacity:1; transform:scale(1); }
+.ndl-wrap{ display:flex; flex-direction:column; line-height:1.25; min-width:0; }
+.ndl-k{ font-family:var(--font-ui); font-size:.56rem; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); }
+.ndl-t{ font-family:var(--font-ui); font-size:.82rem; font-weight:600; color:var(--ink); max-width:190px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ndl-up{ width:22px; height:22px; border-radius:var(--r-sm); background:var(--surface-2); color:var(--muted); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.ndl-up svg{ width:12px; height:12px; }
+
+#notesDrawer{ position:fixed; left:0; right:0; bottom:0; height:var(--notes-drawer-h); min-height:200px; z-index:115; display:flex; flex-direction:column; background:var(--surface); border-top:1px solid var(--divider); box-shadow:0 -14px 40px var(--shadow-lg); font-family:var(--font-ui); }
+.nd-grip{ position:absolute; top:0; left:0; right:0; height:12px; cursor:ns-resize; touch-action:none; }
+.nd-grip::after{ content:""; position:absolute; top:5px; left:50%; transform:translateX(-50%); width:44px; height:4px; border-radius:var(--r-pill); background:var(--divider); }
+
+.nd-head{ display:flex; align-items:center; gap:10px; padding:16px 18px 12px; border-bottom:1px solid var(--divider); flex-shrink:0; }
+.nd-note-ic{ width:30px; height:30px; border-radius:var(--r-sm); background:var(--brand-soft); color:var(--brand); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.nd-note-ic svg{ width:16px; height:16px; }
+.nd-title-input{ flex:1; min-width:0; font-family:var(--font-ui); font-weight:700; font-size:1rem; letter-spacing:-.01em; color:var(--ink); background:none; border:none; outline:none; padding:5px 4px; border-radius:var(--r-sm); }
+.nd-title-input:focus{ background:var(--surface-2); }
+.nd-title-input::placeholder{ color:var(--muted2); font-weight:600; }
+.nd-chevron{ width:24px; height:24px; border-radius:var(--r-sm); border:1px solid var(--divider); background:var(--surface-2); color:var(--muted); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.nd-chevron svg{ width:12px; height:12px; transition:transform .18s; }
+.nd-chevron.on{ border-color:var(--brand-line); background:var(--brand-soft); color:var(--brand); }
+.nd-chevron.on svg{ transform:rotate(180deg); }
+.nd-chip{ font-size:.6rem; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--brand); background:var(--brand-soft); border-radius:var(--r-pill); padding:4px 9px; flex-shrink:0; }
+.nd-saved{ display:flex; align-items:center; gap:5px; font-size:.72rem; color:var(--muted); flex-shrink:0; }
+.nd-saved svg{ width:13px; height:13px; color:var(--read-check); }
+.nd-saved.saving svg{ visibility:hidden; }
+.nd-actions{ margin-left:auto; display:flex; align-items:center; gap:6px; flex-shrink:0; }
+.nd-btn{ width:30px; height:30px; border-radius:var(--r-sm); border:1px solid var(--divider); background:var(--surface-2); color:var(--muted); display:flex; align-items:center; justify-content:center; }
+.nd-btn:hover{ border-color:var(--brand-line); color:var(--brand); }
+.nd-btn svg{ width:15px; height:15px; }
+.nd-btn.primary{ background:var(--brand); border-color:var(--brand); color:var(--on-brand); }
+.nd-btn.primary:hover{ background:var(--brand-2); }
+
+.nd-body{ flex:1; min-height:0; display:flex; }
+.nd-switcher{ width:300px; flex-shrink:0; border-right:1px solid var(--divider); display:flex; flex-direction:column; padding:12px; overflow:hidden; }
+.nd-search{ display:flex; align-items:center; gap:8px; background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-control); padding:8px 11px; color:var(--muted); flex-shrink:0; }
+.nd-search svg{ width:14px; height:14px; flex-shrink:0; }
+.nd-search input{ flex:1; min-width:0; background:none; border:none; outline:none; font-family:var(--font-ui); font-size:.8rem; color:var(--ink); }
+.nd-newnote{ display:flex; align-items:center; justify-content:center; gap:6px; margin-top:10px; flex-shrink:0; background:var(--brand); color:var(--on-brand); border:none; border-radius:var(--r-control); padding:9px; font-family:var(--font-ui); font-size:.76rem; font-weight:700; }
+.nd-newnote:hover{ background:var(--brand-2); }
+.nd-newnote svg{ width:13px; height:13px; }
+.nd-list{ flex:1; min-height:0; overflow-y:auto; margin-top:10px; }
+.nd-list-item{ border-radius:var(--r-control); padding:11px 12px; margin-bottom:5px; border:1px solid transparent; cursor:pointer; }
+.nd-list-item:hover{ background:var(--surface-2); }
+.nd-list-item.active{ background:var(--brand-soft); border-color:var(--brand-line); }
+.nd-li-title{ font-weight:700; font-size:.84rem; color:var(--ink); margin-bottom:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.nd-li-snip{ font-size:.75rem; line-height:1.45; color:var(--muted); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.nd-li-snip:empty{ display:none; }
+.nd-li-meta{ display:flex; align-items:center; gap:8px; margin-top:7px; font-size:.66rem; color:var(--muted2); }
+.nd-li-refs{ font-weight:600; color:var(--brand); background:var(--brand-soft); border-radius:var(--r-pill); padding:2px 7px; }
+.nd-list-empty{ padding:22px 12px; text-align:center; font-size:.8rem; line-height:1.5; color:var(--muted); }
+
+.nd-editor-wrap{ flex:1; min-width:0; padding:14px 18px; display:flex; flex-direction:column; gap:8px; }
+.nd-toolbar{ display:flex; align-items:center; gap:4px; flex-shrink:0; }
+.nd-tb{ min-width:28px; height:28px; padding:0 7px; border-radius:var(--r-sm); border:1px solid var(--divider); background:var(--surface-2); color:var(--muted); font-family:var(--font-ui); font-size:.82rem; line-height:1; display:flex; align-items:center; justify-content:center; }
+.nd-tb:hover{ border-color:var(--brand-line); color:var(--brand); }
+.nd-editor{ flex:1; width:100%; background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-control); padding:14px 16px; font-family:var(--font-ui); font-size:.95rem; line-height:1.7; color:var(--ink); outline:none; resize:none; }
+.nd-editor:focus{ border-color:var(--brand); }
+.nd-editor::placeholder{ color:var(--muted2); }
+/* Read view of the same pane — the note run through renderNoteMarkdown (a small
+   Markdown subset + linkifyCitations, so every verse in it stays
+   hover-previewable). Shown by default; the Edit button (or a click here)
+   swaps in the textarea. Block spacing is shared with My Library via .note-md. */
+.nd-preview{ flex:1; width:100%; overflow:auto; background:var(--surface); border:1px solid transparent; border-radius:var(--r-control); padding:14px 16px; font-family:var(--font-ui); font-size:.95rem; line-height:1.7; color:var(--ink); overflow-wrap:break-word; cursor:text; }
+.nd-preview:hover{ border-color:var(--divider); }
+.nd-preview:focus-visible{ outline:none; border-color:var(--brand); }
+
+/* Shared Markdown-subset rendering for note read views — the drawer's
+   #ndPreview and My Library's note cards (see ndMarkdownToHtml in
+   js/reader.js). Notes are still stored as plain text. */
+.note-md{ white-space:normal; }
+.note-md > :first-child{ margin-top:0; }
+.note-md > :last-child{ margin-bottom:0; }
+.note-md p{ margin:0 0 .7em; }
+.note-md h2,.note-md h3,.note-md h4,.note-md h5{ font-family:var(--font-ui); font-weight:800; letter-spacing:-.01em; line-height:1.3; margin:1.1em 0 .4em; }
+.note-md h2{ font-size:1.08rem; }
+.note-md h3{ font-size:.98rem; }
+.note-md h4,.note-md h5{ font-size:.9rem; }
+.note-md ul,.note-md ol{ margin:0 0 .7em; padding-left:1.4em; }
+.note-md li{ margin:.15em 0; }
+.note-md blockquote{ margin:0 0 .7em; padding:.15em 0 .15em .9em; border-left:3px solid var(--brand-line); color:var(--muted); }
+.note-md code{ font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.86em; background:var(--surface-2); border:1px solid var(--divider); border-radius:3px; padding:.05em .35em; }
+.note-md pre{ margin:0 0 .7em; padding:.7em .9em; background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-sm); overflow-x:auto; }
+.note-md pre code{ background:none; border:none; padding:0; font-size:.85em; }
+.note-md hr{ border:none; border-top:1px solid var(--divider); margin:1.1em 0; }
+.note-md a{ color:var(--brand); text-decoration:underline; }
+
+/* Header Edit / Done toggle — wider than the icon buttons, and filled while
+   you're in the text box so the current mode is never ambiguous. */
+.nd-mode-btn{ width:auto; padding:0 11px; gap:6px; font-family:var(--font-ui); font-size:.72rem; font-weight:700; }
+.nd-mode-btn .nd-mi{ width:14px; height:14px; }
+.nd-mode-btn .nd-mi-done{ display:none; }
+.nd-mode-btn.editing{ background:var(--brand); border-color:var(--brand); color:var(--on-brand); }
+.nd-mode-btn.editing:hover{ background:var(--brand-2); color:var(--on-brand); }
+.nd-mode-btn.editing .nd-mi-edit{ display:none; }
+.nd-mode-btn.editing .nd-mi-done{ display:inline; }
+
+.nd-foot{ display:flex; align-items:center; gap:8px; padding:10px 18px; border-top:1px solid var(--divider); flex-shrink:0; flex-wrap:wrap; }
+.nd-tags{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-width:0; }
+.nd-tag{ display:flex; align-items:center; gap:4px; font-size:.68rem; font-weight:600; color:var(--ink-soft); background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-pill); padding:4px 6px 4px 11px; }
+.nd-tag button{ width:15px; height:15px; border:none; background:none; color:var(--muted); font-size:.95rem; line-height:1; padding:0; display:flex; align-items:center; justify-content:center; }
+.nd-tag button:hover{ color:#dc2626; }
+.nd-tag-input{ background:none; border:none; outline:none; font-family:var(--font-ui); font-size:.72rem; color:var(--ink); width:84px; padding:5px 2px; }
+.nd-tag-input::placeholder{ color:var(--muted2); }
+.nd-foot-right{ margin-left:auto; display:flex; align-items:center; gap:10px; flex-shrink:0; }
+.nd-foot-btn{ font-family:var(--font-ui); font-size:.7rem; font-weight:600; color:var(--brand); background:var(--brand-soft); border:1px solid transparent; border-radius:var(--r-control); padding:7px 12px; }
+.nd-foot-btn:hover{ border-color:var(--brand-line); }
+.nd-foot-link{ font-family:var(--font-ui); font-size:.7rem; font-weight:600; color:var(--muted); background:none; border:none; }
+.nd-foot-link:hover{ color:var(--brand); }
+
+/* Desktop: the drawer is a floating panel aligned to the reading column (not a
+   full-width dock) — a 16px gap off the bottom, radius on all corners. It no
+   longer sits under either nav rail, so only #readMain and the (also centred)
+   Verse Tools panel need to clear it; the launcher still overlaps the right
+   rail on its own, so .cardstack keeps its always-on clearance. */
+@media (min-width:1181px){
+  #notesDrawer{ left:50%; right:auto; transform:translateX(-50%); bottom:16px;
+    width:min(700px,calc(100vw - 640px)); border:1px solid var(--divider);
+    border-radius:var(--r-card); box-shadow:0 22px 60px var(--shadow-lg); overflow:hidden; }
+  body.notes-drawer-open #readMain{ padding-bottom:calc(76px + var(--notes-drawer-h)); }
+  body.notes-drawer-open #verseToolsPanel.show{ bottom:calc(var(--notes-drawer-h) + 32px); }
+  .cardstack{ padding-bottom:84px; }
+}
+
+/* Mobile: a non-modal bottom sheet above #mobileFooterNav (410) — no scrim, so
+   the passage behind it still scrolls and verses can still be selected (→ "Add
+   to Note"). The grip snaps it between two heights (see ndInitResize); the
+   switcher stacks above the editor instead of beside it. */
+@media (max-width:1180px){
+  #notesLauncher{ right:12px; bottom:calc(var(--mfn-h) + 14px); padding:9px; }
+  #notesLauncher .ndl-wrap,#notesLauncher .ndl-up{ display:none; }
+  #notesDrawer{ z-index:430; height:var(--notes-drawer-h); border-radius:20px 20px 0 0; transition:height .24s cubic-bezier(.22,1,.36,1); }
+  #notesDrawer.nd-dragging{ transition:none; } /* follow the finger 1:1 while dragging */
+  #notesDrawer .nd-body{ flex-direction:column; }
+  #notesDrawer .nd-switcher{ width:auto; border-right:none; border-bottom:1px solid var(--divider); max-height:46%; }
+  #notesDrawer .nd-foot{ padding-bottom:calc(10px + env(safe-area-inset-bottom,0)); }
+  #notesDrawer .nd-editor-wrap{ padding:12px 14px; }
+
+  /* "All notes" open: hand the list the whole sheet body. Stacked above the
+     current note's editor it was squeezed into a couple of rows — you couldn't
+     see the other notes to pick one. The editor/footer come back on select. */
+  #notesDrawer.nd-switcher-open .nd-switcher{ max-height:none; flex:1; border-bottom:none; }
+  #notesDrawer.nd-switcher-open .nd-editor-wrap,
+  #notesDrawer.nd-switcher-open .nd-foot{ display:none; }
+
+  /* Lift the reading column and Verse Tools clear of the open sheet so both
+     stay usable with it up; Verse Tools also caps its height to the space left
+     above the sheet (its own body scrolls). #mobileFooterNav is covered by the
+     sheet on purpose — the header's collapse chevron / a drag-down dismisses. */
+  body.notes-drawer-open #readMain{ padding-bottom:calc(var(--notes-drawer-h) + 24px); }
+  body.notes-drawer-open #verseToolsPanel.show{ bottom:calc(var(--notes-drawer-h) + 12px); max-height:calc(100vh - var(--notes-drawer-h) - 24px); }
+}
+@media (max-width:440px){
+  /* header runs out of room once the "Saving…" pill shows — drop the toggle's
+     text label, the filled state still says which mode you're in */
+  .nd-mode-btn{ width:30px; padding:0; }
+  .nd-mode-btn .nd-mode-label{ display:none; }
 }

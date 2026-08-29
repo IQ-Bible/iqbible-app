@@ -144,13 +144,13 @@ async function renderNotesList() {
   matches = librarySort(matches.map(n => ({ ...n, __v0: n.verses[0] })), "updatedAt", "__v0");
 
   const htmlParts = await Promise.all(matches.map(async (n, i) => {
-    const textHtml = await linkifyCitations(n.text);
+    const textHtml = await renderNoteMarkdown(n.text);
     const tagsHtml = n.tags.map(t => `<span class="note-tag-chip">${escHtml(t)}</span>`).join("");
     const meta = [n.versionTitle ? `Written in ${shortVersionLabel(n.versionTitle)}` : "", fmtDate(n.updatedAt)].filter(Boolean).join(" · ");
     return `
       <div class="result-card note-card" style="animation-delay:${Math.min(i * 25, 250)}ms" data-note-id="${n.id}">
         <div class="result-ref">${escHtml(noteRefLabel(n))}</div>
-        <div class="result-text">${textHtml}</div>
+        <div class="result-text note-md">${textHtml}</div>
         ${meta ? `<div class="result-meta">${escHtml(meta)}</div>` : ""}
         ${tagsHtml ? `<div class="note-card-tags">${tagsHtml}</div>` : ""}
         <div class="note-card-actions">

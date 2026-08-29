@@ -3,7 +3,7 @@
    "study Bible" the app didn't cover at all before (Verse Tools has
    Original Language/Cross-refs/Commentary/Compare/Topics, but nothing
    book-level or lexicon-level). Same overlay shell as #exploreOverlay. */
-let studyActiveTab = "word";
+let studyActiveTab = "book";
 function openStudy() {
   switchMainView("study");
   switchStudyTab(studyActiveTab);
@@ -12,8 +12,8 @@ function closeStudy() {
   switchMainView("read");
 }
 const STUDY_TAB_DESC = {
-  word: "Look up a Strong's number for its lexicon entry and every place that word occurs in Scripture.",
   book: "Background on a book of the Bible — who wrote it, when, and its main themes and structure.",
+  word: "Look up a Strong's number for its Hebrew/Greek lexicon entries — Strong's, BDB, LSJ, Abbott-Smith — and every place that word occurs in Scripture.",
   variants: "Places where the manuscript tradition differs, and how the major textual editions read there.",
 };
 function switchStudyTab(tab) {
@@ -32,13 +32,17 @@ function openWordStudy(strongsId) {
   document.getElementById("wordStudySearchInput").value = strongsId;
   runWordStudy(strongsId);
 }
-// Cross-link from the reading header's book-info button — jumps straight to
-// Study Tools > Book Guide for the book currently open, instead of making
-// the reader hunt for it after switching tabs by hand.
+// Cross-link from the reading header's book-info button (current book) and
+// the Book Picker's preview panel (any book) — jumps straight to Study Tools
+// > Book Guide for a specific book. pendingBookGuideBook survives the
+// openStudy() → switchStudyTab("book") → renderStudyBook() hop and is
+// consumed there, so an explicit jump wins over the "default to current
+// book" reset renderStudyBook otherwise does every time the tab opens.
+let pendingBookGuideBook = null;
 function openBookGuide(usfm) {
-  bookGuideSelected = usfm;
+  pendingBookGuideBook = usfm;
+  studyActiveTab = "book";
   openStudy();
-  switchStudyTab("book");
 }
 // Renders an arbitrary key/value object as labeled rows — used for the
 // lexicon endpoints (GET /lexicon/.../{key} has no fixed Go struct; each
@@ -60,27 +64,31 @@ async function renderGenericFields(obj, skipKeys) {
   return rows.join("");
 }
 
-/* ── Word Study — GET /lexicon/{greek|hebrew}/strongs/{key} (+ BDB for
-   Hebrew, LSJ/Abbott-Smith for Greek — each tried independently, a 404 from
-   one source is normal, same tolerance the five dictionary tabs already
-   use), then GET /original-language/search?strongs= for every occurrence
-   across Scripture. Strong's-id input only — there's no by-English-word
-   lexicon search endpoint, so this deliberately doesn't try to guess
-   one. ── */
+/* ── Word Study — GET /lexicon/{greek|hebrew}/strongs/{key} for the Strong's
+   entry, GET /lexicon/crosswalk/{key} to map that Strong's number onto the
+   native key each other source uses (BDB for Hebrew; LSJ/Abbott-Smith for
+   Greek — none of them key on a bare Strong's number), then one lookup per
+   resolved key. Each source is tried independently — a 404 from one is
+   normal, same tolerance the five dictionary tabs already use — and the
+   results are shown one source at a time in a tab row, with a Crosswalk tab
+   for the raw mapping itself. Finally GET /original-language/search?strongs=
+   for every occurrence across Scripture. Strong's-id input only — there's no
+   by-English-word lexicon search endpoint, so this deliberately doesn't try
+   to guess one. ── */
 function renderStudyWord() {
   document.getElementById("studyBody").innerHTML = `
     <div class="msearch" style="margin-bottom:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8"/></svg><input type="text" id="wordStudySearchInput" placeholder="Strong's number, e.g. G26 or H430…" onkeydown="if(event.key==='Enter') runWordStudy(this.value)" autocomplete="off"><button type="button" class="mclear" aria-label="Clear" onclick="clearSearchInput('wordStudySearchInput')">&times;</button></div>
-    <div class="tool-hint">Enter a Strong's id to look up its lexicon entry and every occurrence across Scripture. Find one on any verse via Verse Tools › Original Language.</div>
+    <div class="tool-hint">Enter a Strong's id to look up its lexicon entries — Strong's, plus BDB, LSJ or Abbott-Smith — and every occurrence across Scripture. Find one on any verse via Verse Tools › Original Language.</div>
     <div id="wordStudyArea"></div>`;
 }
-// LSJ/Abbott-Smith key their entries by zero-padded dStrong codes (e.g.
-// "G0026", per both endpoints' own 404 hint), not the bare Strong's number a
-// reader actually types/clicks through with — without this, every LSJ/
-// Abbott-Smith lookup 404s regardless of the word, silently (same "no entry
-// from this source" tolerance as everywhere else), so those two sources
-// never actually returned anything. BDB has no such mapping (its own codes,
-// e.g. "BDB1005", are unrelated to Strong's numbering) — flagged in
-// NOTES.md, not fixable client-side.
+// GET /lexicon/crosswalk/{key} is the real Strong's → native-key bridge and
+// is used first. This stays only as a fallback for the two Greek sources when
+// the crosswalk has no row for a key (or that dataset isn't loaded on the API
+// instance in use): LSJ/Abbott-Smith key their entries by zero-padded dStrong
+// codes (e.g. "G0026", per both endpoints' own 404 hint), which the crosswalk
+// would otherwise be the only way to obtain. No equivalent fallback exists for
+// BDB — its codes ("BDB1005") aren't derivable from a Strong's number, so
+// without a crosswalk row the BDB tab just doesn't appear.
 function zeroPadGreekKey(key) {
   const m = /^G(\d+)([A-Za-z]?)$/i.exec(key);
   return m ? `G${m[1].padStart(4, "0")}${m[2].toUpperCase()}` : key;
@@ -106,6 +114,26 @@ async function renderLexiconEntry(row, sourceLabel) {
     ${extraHtml ? `<div class="lw-extra">${extraHtml}</div>` : ""}
   </div>`;
 }
+// Non-Strong's lexicon sources per language, in tab order after Strong's.
+const LEX_SOURCES = {
+  hebrew: [{ id: "bdb", label: "BDB", name: "Brown-Driver-Briggs" }],
+  greek: [{ id: "lsj", label: "LSJ", name: "Liddell-Scott-Jones" }, { id: "abbott-smith", label: "Abbott-Smith", name: "Abbott-Smith" }],
+};
+// The Crosswalk tab — the raw GET /lexicon/crosswalk/{key} rows, i.e. which
+// other lexicons carry this word and under what native key (the same mapping
+// used above to fetch those entries).
+function renderCrosswalk(rows) {
+  const srcName = {};
+  Object.values(LEX_SOURCES).flat().forEach(s => { srcName[s.id] = s.name; });
+  const items = rows.map(r => `<div class="person-def">
+    <div class="person-def-src">${escHtml(srcName[r.source] || r.source)}</div>
+    <div class="person-def-text">${escHtml(r.native_key)}${r.lemma ? ` · <span class="lw-orig">${escHtml(r.lemma)}</span>` : ""}</div>
+  </div>`).join("");
+  return `<div class="person-section lw-card">
+    <div class="person-section-label">Lexicon Crosswalk</div>
+    <div class="lw-extra" style="border-top:none;padding-top:0">${items}</div>
+  </div>`;
+}
 let wordStudyToken = 0;
 async function runWordStudy(key) {
   key = (key || "").trim();
@@ -114,18 +142,40 @@ async function runWordStudy(key) {
   const area = document.getElementById("wordStudyArea");
   area.innerHTML = `<div class="spin"></div>`;
   const lang = /^h/i.test(key) ? "hebrew" : "greek";
-  const sources = [{ path: `/lexicon/${lang}/strongs/${encodeURIComponent(key)}`, label: "Strong's" }]
-    .concat(lang === "hebrew"
-      ? [{ path: `/lexicon/hebrew/bdb/${encodeURIComponent(key)}`, label: "BDB" }]
-      : [{ path: `/lexicon/greek/lsj/${encodeURIComponent(zeroPadGreekKey(key))}`, label: "LSJ" }, { path: `/lexicon/greek/abbott-smith/${encodeURIComponent(zeroPadGreekKey(key))}`, label: "Abbott-Smith" }]);
-  const sections = [];
-  for (const src of sources) {
-    try {
-      const d = await apiJSON(src.path);
-      for (const row of (d.data || [])) sections.push(await renderLexiconEntry(row, src.label));
-    } catch (e) { /* no entry from this source — normal, same as the dictionary tabs */ }
-  }
+
+  const [strongsRes, crossRes] = await Promise.all([
+    apiJSON(`/lexicon/${lang}/strongs/${encodeURIComponent(key)}`).catch(() => null),
+    apiJSON(`/lexicon/crosswalk/${encodeURIComponent(key)}`).catch(() => null),
+  ]);
   if (token !== wordStudyToken) return;
+  const crossRows = (crossRes && crossRes.data) || [];
+
+  // One tab per source that returned an entry, Strong's first, then a
+  // Crosswalk tab if the mapping had any rows.
+  const tabs = [];
+  for (const row of (strongsRes && strongsRes.data) || []) tabs.push({ label: "Strong's", html: await renderLexiconEntry(row, "Strong's") });
+  for (const src of LEX_SOURCES[lang]) {
+    let keys = crossRows.filter(r => r.source === src.id).map(r => r.native_key);
+    if (!keys.length && lang === "greek") keys = [zeroPadGreekKey(key)]; // crosswalk unavailable — fall back to the documented G0026 shape
+    for (const nk of keys) {
+      try {
+        const d = await apiJSON(`/lexicon/${lang}/${src.id}/${encodeURIComponent(nk)}`);
+        for (const row of (d.data || [])) tabs.push({ label: src.label, html: await renderLexiconEntry(row, src.name) });
+      } catch (e) { /* no entry from this source — normal, same as the dictionary tabs */ }
+    }
+  }
+  if (crossRows.length) tabs.push({ label: "Crosswalk", html: renderCrosswalk(crossRows) });
+  if (token !== wordStudyToken) return;
+
+  let lexHtml;
+  if (!tabs.length) lexHtml = `<div class="dd-empty">No lexicon entry found for "${escHtml(key)}".</div>`;
+  else if (tabs.length === 1) lexHtml = tabs[0].html;
+  else {
+    const btns = tabs.map((t, i) => `<button type="button" class="filter-chip dict-tab-btn${i === 0 ? " active" : ""}" data-idx="${i}">${escHtml(t.label)}</button>`).join("");
+    const panels = tabs.map((t, i) => `<div class="dict-tab-panel${i === 0 ? " active" : ""}" data-idx="${i}">${t.html}</div>`).join("");
+    lexHtml = `<div class="dict-tabs"><div class="dict-tab-btns">${btns}</div>${panels}</div>`;
+  }
+
   let occHtml = "";
   try {
     const d = await apiJSON(`/original-language/search?strongs=${encodeURIComponent(key)}&limit=100&count=1`);
@@ -144,7 +194,7 @@ async function runWordStudy(key) {
     }
   } catch (e) { /* no occurrences — normal */ }
   if (token !== wordStudyToken) return;
-  document.getElementById("wordStudyArea").innerHTML = (sections.join("") || `<div class="dd-empty">No lexicon entry found for "${escHtml(key)}".</div>`) + occHtml;
+  document.getElementById("wordStudyArea").innerHTML = lexHtml + occHtml;
 }
 
 /* ── Book Guide — GET /books/{book}/info (30+ free-form introduction/
@@ -158,8 +208,14 @@ async function runWordStudy(key) {
    (bookInfoPreviewHTML, below) and the Book Picker's preview panel
    (js/catalog.js) — one cached fetch (getBookInfo), three call sites. ── */
 let bookGuideSelected = null;
+let bookGuideToken = 0;
 function renderStudyBook() {
-  bookGuideSelected = bookGuideSelected || current.book;
+  // Opens on the book being read now, every time — a stale pick from an
+  // earlier visit to this tab shouldn't linger. An explicit jump (Book
+  // Picker preview → "Read More in Book Guide") sets pendingBookGuideBook to
+  // override this for that one open.
+  bookGuideSelected = pendingBookGuideBook || current.book;
+  pendingBookGuideBook = null;
   const books = bookList.length ? bookList : [{ usfm: current.book, name: current.bookName }];
   document.getElementById("studyBody").innerHTML = `
     <div class="share-fields" style="margin-bottom:16px">
@@ -224,6 +280,7 @@ async function renderFieldGroup(obj, fieldList) {
   return rows.join("");
 }
 async function runBookGuideLookup() {
+  const token = ++bookGuideToken;
   const area = document.getElementById("bookGuideArea");
   area.innerHTML = `<div class="spin"></div>`;
   const usfm = bookGuideSelected;
@@ -231,6 +288,7 @@ async function runBookGuideLookup() {
     apiJSONCached(`/books/${usfm}/info`),
     apiJSONCached(`/books/${usfm}/commentaries`),
   ]);
+  if (token !== bookGuideToken) return;
   if (infoResult.status !== "fulfilled") { area.innerHTML = `<div class="dd-empty">No book guide data on file for this book.</div>`; return; }
   const info = infoResult.value;
 
@@ -251,11 +309,9 @@ async function runBookGuideLookup() {
     renderFieldGroup(info, BG_CONTEXT_FIELDS),
     renderFieldGroup(info, BG_THEOLOGY_FIELDS),
   ]);
-  let commHtml = "";
-  if (commResult.status === "fulfilled") {
-    const sources = commResult.value.data || [];
-    if (sources.length) commHtml = `<div class="person-section"><div class="person-section-label">Commentary Coverage (${sources.length})</div>${sources.map(s => `<span class="topic-chip">${escHtml(s.author_name || s.name)}</span>`).join("")}</div>`;
-  }
+  const commSources = commResult.status === "fulfilled" ? (commResult.value.data || []) : [];
+  const commHtml = bookCommentaryPickerHTML(usfm, commSources);
+  if (token !== bookGuideToken) return;
   const body = `
     <div class="bg-head">${iconHtml}<div class="bg-title">${escHtml(info.name_en || current.bookName)}</div></div>
     ${metaCells ? `<div class="bg-meta-grid">${metaCells}</div>` : ""}
@@ -265,7 +321,95 @@ async function runBookGuideLookup() {
     ${theologyHtml ? `<details class="bg-accordion"><summary>Theological Themes</summary><div class="bg-accordion-body">${theologyHtml}</div></details>` : ""}
     ${commHtml}`;
   area.innerHTML = (overviewHtml || structureHtml || contextHtml || theologyHtml || commHtml) ? body : `<div class="dd-empty">No book guide data on file for this book.</div>`;
+  if (commHtml) loadBookCommentary(0);
 }
+
+/* Book-level commentary — a dropdown of every commentary source that covers
+   this book (from the single GET /books/{book}/commentaries call
+   runBookGuideLookup already makes), each loading that source's book
+   introduction (GET /commentaries/{name}/{book}/0 — "chapter 0") on select,
+   cached per source for the life of this Book Guide render. A native <select>
+   was rejected for a 2-col grid: a book like Genesis has dozens of sources
+   and the names run long. There's no bulk way to know which of the covering
+   sources actually carry a chapter-0 entry (see NOTES.md / API issue #231),
+   so the list can't be trimmed to only those — a source with no book intro
+   just says so rather than being hidden behind one probe call per source.
+   mhenry/gill (the two whole-Bible commentaries) sort to the front. */
+let bgCommSources = [];
+let bgCommHtml = {};
+let bgCommBook = null;
+let bgCommActive = 0;
+function bookCommentaryPickerHTML(usfm, sources) {
+  const rank = s => s.name === "mhenry" ? 0 : s.name === "gill" ? 1 : 2;
+  bgCommSources = sources.slice().sort((a, b) => rank(a) - rank(b));
+  bgCommHtml = {};
+  bgCommBook = usfm;
+  bgCommActive = 0;
+  if (!bgCommSources.length) return "";
+  const label = s => escHtml(s.author_name || s.name);
+  const opts = bgCommSources.map((s, i) => `<button type="button" class="bg-comm-opt${i === 0 ? " active" : ""}" data-idx="${i}">${label(s)}</button>`).join("");
+  return `<div class="person-section bg-comm">
+    <div class="person-section-label">Commentary</div>
+    <button type="button" class="bg-comm-trigger" aria-expanded="false" aria-haspopup="listbox" onclick="toggleBookCommMenu(this)">
+      <span id="bgCommCurrent">${label(bgCommSources[0])}</span>
+      <svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="bg-comm-menu" id="bgCommMenu" role="listbox">${opts}</div>
+    <div id="bgCommBody"><div class="spin"></div></div>
+  </div>`;
+}
+function toggleBookCommMenu(btn) {
+  const open = document.getElementById("bgCommMenu").classList.toggle("open");
+  btn.setAttribute("aria-expanded", open ? "true" : "false");
+}
+function selectBookCommentary(idx) {
+  if (!bgCommSources[idx]) return;
+  bgCommActive = idx;
+  const menu = document.getElementById("bgCommMenu");
+  if (menu) {
+    menu.classList.remove("open");
+    menu.querySelectorAll(".bg-comm-opt").forEach(b => b.classList.toggle("active", +b.dataset.idx === idx));
+  }
+  const trigger = document.querySelector("#bookGuideArea .bg-comm-trigger");
+  if (trigger) trigger.setAttribute("aria-expanded", "false");
+  const cur = document.getElementById("bgCommCurrent");
+  if (cur) cur.textContent = bgCommSources[idx].author_name || bgCommSources[idx].name;
+  loadBookCommentary(idx);
+}
+async function loadBookCommentary(idx) {
+  const el = document.getElementById("bgCommBody");
+  if (!el || !bgCommSources[idx]) return;
+  if (bgCommHtml[idx] != null) { el.innerHTML = bgCommHtml[idx]; return; }
+  el.innerHTML = `<div class="spin"></div>`;
+  const token = bookGuideToken;
+  const src = bgCommSources[idx], usfm = bgCommBook;
+  let html;
+  try {
+    const d = await apiJSONCached(`/commentaries/${encodeURIComponent(src.name)}/${usfm}/0`);
+    const entries = d.entries || [];
+    if (!entries.length) throw new Error("empty");
+    const paragraphs = await Promise.all(entries.map(e => linkifyPreParsedCitations(e.text || "", e.citations)));
+    html = paragraphs.map(p => `<div class="person-def-text" style="margin-bottom:14px">${p}</div>`).join("");
+  } catch (e) {
+    html = `<div class="dd-empty">No book-level introduction from this source.</div>`;
+  }
+  if (token !== bookGuideToken) return;
+  bgCommHtml[idx] = html;
+  if (bgCommActive === idx) el.innerHTML = html;
+}
+// Commentary picker — option select, plus outside-click to close the menu
+// (no existing dropdown widget in the app to borrow a handler from).
+document.addEventListener("click", e => {
+  const opt = e.target.closest("#bookGuideArea .bg-comm-opt");
+  if (opt) { selectBookCommentary(+opt.dataset.idx); return; }
+  if (e.target.closest("#bookGuideArea .bg-comm")) return;
+  const menu = document.getElementById("bgCommMenu");
+  if (menu && menu.classList.contains("open")) {
+    menu.classList.remove("open");
+    const t = document.querySelector("#bookGuideArea .bg-comm-trigger");
+    if (t) t.setAttribute("aria-expanded", "false");
+  }
+});
 
 /* ── Textual Variants — GET /textual-variants (flat, unscoped list; the
    scoped route requires book AND chapter, so a book-only filter here is

@@ -532,6 +532,8 @@ function planExportMenuHtml(plan) {
   return `<div class="plan-menu-wrap">
       <button class="plan-menu-btn" onclick="event.stopPropagation();togglePlanExportMenu()" title="Export &amp; more" aria-label="Export and more">&#8942;</button>
       <div class="plan-menu${planExportMenuOpen ? " show" : ""}" onclick="event.stopPropagation()">
+        <button class="plan-menu-row" onclick="sharePlan();closePlanExportMenu()">Share Plan</button>
+        <div class="plan-menu-divider"></div>
         ${hasParams ? `<button class="plan-menu-row" onclick="closePlanExportMenu();downloadPlanRemote('pdf')">Download PDF</button>
         <button class="plan-menu-row" onclick="closePlanExportMenu();downloadPlanRemote('ical')">Download iCal</button>` : ""}
         <button class="plan-menu-row" onclick="closePlanExportMenu();downloadPlanCSV()">Download CSV</button>
@@ -651,16 +653,53 @@ async function renderDayDrawerContent() {
     <label class="setfield-check" style="margin-top:14px">
       <input type="checkbox" ${done ? "checked" : ""} onchange="toggleDrawerDayComplete(this.checked)">
       <span>Mark day complete</span>
-    </label>`;
+    </label>
+    ${plan.mode === "topic" ? "" : `<div class="hint">Also counts this day's chapters as read in your Progress. Unchecking leaves them — clear a chapter from the reader if you need to.</div>`}`;
 }
 function toggleDrawerDayComplete(checked) {
   const plan = getPlans().find(p => p.id === plansOpenPlanId);
   if (!plan || dayDrawerDay == null) return;
   let completed = plan.completedDays || [];
-  if (checked) { if (!completed.includes(dayDrawerDay)) completed.push(dayDrawerDay); }
-  else completed = completed.filter(d => d !== dayDrawerDay);
+  if (checked) {
+    if (!completed.includes(dayDrawerDay)) completed.push(dayDrawerDay);
+    const added = markPlanDayChaptersRead(plan, dayDrawerDay);
+    if (added) {
+      toast(`Day ${dayDrawerDay} complete — ${added} chapter${added === 1 ? "" : "s"} added to your Progress`);
+      // The reader may be sitting on one of the chapters just marked — repaint
+      // its chapter-end prompt so it flips to "Marked as read" without a reload.
+      renderChapterReadPrompt();
+    }
+  } else {
+    completed = completed.filter(d => d !== dayDrawerDay);
+  }
   setPlanCompletedDays(plan.id, completed);
   if (plansViewState === "calendar") renderPlanCalendarView(); // refresh the grid behind the drawer
+}
+// Checking a day off by hand ("Mark day complete" in the drawer) is the
+// same statement as reading each of its chapters through the reader prompt,
+// so it writes the same iqb_progress entries — otherwise the reader would
+// keep asking "did you read this chapter?" for a day you've completed, and
+// the Bible-wide "chapters marked read" count would undercount for anyone
+// who tracks a plan mainly from the calendar. Chapter-level plans only
+// (General/M'Cheyne); Topic mode's days are verse-level and this app keeps
+// no verse-level progress record. Unchecking a day deliberately leaves the
+// chapter entries in place — reversing them safely would need per-day
+// bookkeeping of which keys this added (a chapter can recur across M'Cheyne
+// days, or have been read independently first), and quietly deleting
+// read-history on a mis-click is worse than a checkmark the reader's own
+// per-chapter Undo can clear.
+function markPlanDayChaptersRead(plan, day) {
+  if (plan.mode !== "general" && plan.mode !== "mcheyne") return 0;
+  const dayObj = plan.days.find(d => d.day === day);
+  if (!dayObj) return 0;
+  const progress = getProgress();
+  let added = 0;
+  planDayChapterRefs(plan, dayObj).forEach(r => {
+    const k = `${r.book}.${r.chapter}`;
+    if (!progress[k]) { progress[k] = Date.now(); added++; }
+  });
+  if (added) setProgress(progress);
+  return added;
 }
 
 /* ── export — PDF/iCal stay live API calls (format=pdf/ical), the same
@@ -705,6 +744,57 @@ function downloadPlanJSON() {
   const plan = getPlans().find(p => p.id === plansOpenPlanId);
   if (!plan) return;
   triggerBlobDownload(JSON.stringify(planExportObject(plan), null, 2), `${plan.mode}-reading-plan.json`, "application/json");
+}
+// Share a plan with someone so they can follow it too. There's no backend
+// to host a shareable link, so the share carries the plan's own JSON export
+// as a file (the recipient re-creates it with Reading Plans → Import Plan)
+// plus a plain-text summary. Falls through file-share → text-share →
+// clipboard: desktop browsers mostly reject file shares (and .json isn't an
+// allowed share type in Chrome), and some have no navigator.share at all,
+// so each rung that isn't a real user-cancel drops to the next.
+function planShareSummary(plan) {
+  const total = (plan.days || []).length;
+  const done = (plan.completedDays || []).length;
+  const start = plan.planInfo && plan.planInfo.start_date;
+  const end = plan.planInfo && plan.planInfo.end_date;
+  const range = [start, end].filter(Boolean).map(formatShortDate).join(" – ");
+  const pctLine = total && done ? `, ${Math.round((done / total) * 100)}% complete` : "";
+  return `${plan.name} — a ${planModeLabel(plan.mode)} on IQ Bible\n`
+    + `${total} day${total === 1 ? "" : "s"}${range ? ` (${range})` : ""}${pctLine}\n\n`
+    + `Follow along: open https://app.iqbible.com and use Reading Plans → Import Plan with the attached file.`;
+}
+const isShareCancel = e => e && e.name === "AbortError";
+async function sharePlan() {
+  const plan = getPlans().find(p => p.id === plansOpenPlanId);
+  if (!plan) return;
+  const summary = planShareSummary(plan);
+  const json = JSON.stringify(planExportObject(plan), null, 2);
+  const file = new File([json], `${plan.mode}-reading-plan.json`, { type: "application/json" });
+
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: plan.name, text: summary });
+      return;
+    } catch (e) {
+      if (isShareCancel(e)) return; // visitor dismissed the sheet
+      // desktop OSes routinely can't take a file share — fall through to text
+    }
+  }
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: plan.name, text: summary });
+      return;
+    } catch (e) {
+      if (isShareCancel(e)) return;
+      // fall through to clipboard
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(summary);
+    toast("Plan summary copied — use Download JSON to send the file");
+  } catch (e) {
+    toast("Sharing isn't supported here — use Download JSON to send the plan");
+  }
 }
 function csvEscape(v) { const s = String(v == null ? "" : v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }
 function downloadPlanCSV() {
@@ -864,21 +954,67 @@ function findMatchingPlanDay(book, chapter) {
   }
   return null;
 }
+// Compact "you've read this" line below the chapter header (#chapterReadStamp
+// in index.html — its own row, so it never resizes .chhead or the audio
+// player). Shown only once the chapter's been read and only when the Settings
+// toggle is on; the unread call-to-action stays #chapterReadPrompt's job at
+// the foot of the text.
+function formatReadStamp(ts) {
+  const d = new Date(ts);
+  if (isNaN(d)) return "Read";
+  const wd = d.toLocaleDateString("en-US", { weekday: "short" });
+  const date = d.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" });
+  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).toLowerCase();
+  return `Read on ${wd}. ${date} at ${time}`;
+}
+function renderChapterReadStamp() {
+  const el = document.getElementById("chapterReadStamp");
+  if (!el) return;
+  const ts = getReadStampEnabled() ? getProgress()[`${current.book}.${current.chapter}`] : null;
+  if (!ts) { el.className = ""; el.innerHTML = ""; return; }
+  const text = typeof ts === "number" ? formatReadStamp(ts) : "Read";
+  el.className = "show";
+  // A light-green check, clickable to undo the read mark (there's no
+  // bottom "Undo" while the stamp is showing — see renderChapterReadPrompt).
+  el.innerHTML = `<button type="button" class="read-check" onclick="unmarkChapterRead()" title="Mark chapter unread" aria-label="Mark chapter unread"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9.5"/></svg></button>`
+    + `<span class="read-label">${escHtml(text)}</span>`;
+}
 function renderChapterReadPrompt() {
+  renderChapterReadStamp();
   const el = document.getElementById("chapterReadPrompt");
   if (!el) return;
   const key = `${current.book}.${current.chapter}`;
   if (getProgress()[key]) {
+    // When the read-status line is on, it owns the "you've read this" state
+    // (with its own undo) and this bottom box is only the unread nudge. With
+    // it switched off in Settings, fall back to the original inline
+    // confirmation + Undo here so there's still a way to unmark.
+    if (getReadStampEnabled()) { el.className = ""; el.innerHTML = ""; return; }
     el.className = "show done";
     el.innerHTML = `<p>&#10003; Marked as read</p><button class="vt-note-delete" onclick="unmarkChapterRead()">Undo</button>`;
     return;
   }
   const dayMatch = findMatchingPlanDay(current.book, current.chapter);
   const text = dayMatch != null
-    ? "Did you read this chapter? If so we'll check it off on your reading plan and add it to your Progress."
+    ? "Did you read this chapter? We'll count it toward your reading plan and add it to your Progress."
     : "Did you read this chapter? We'll add it to your Progress.";
   el.className = "show";
   el.innerHTML = `<p>${escHtml(text)}</p><button class="setsave" onclick="markChapterRead()">Yes, mark as read</button>`;
+}
+// Every chapter a given plan day schedules (Family + Secret merged for
+// M'Cheyne). Topic mode's verse-level days never reach here.
+function planDayChapterRefs(plan, dayObj) {
+  return plan.mode === "mcheyne"
+    ? [...(dayObj.family || []), ...(dayObj.secret || [])]
+    : (dayObj.chapters || []);
+}
+// A day only auto-completes once *every* chapter it lists has been
+// confirmed read — marking one chapter of a multi-chapter day (or one
+// that isn't the last) must not check the whole day off.
+function planDayFullyRead(plan, dayObj) {
+  const progress = getProgress();
+  const refs = planDayChapterRefs(plan, dayObj);
+  return refs.length > 0 && refs.every(r => progress[`${r.book}.${r.chapter}`]);
 }
 function markChapterRead() {
   const key = `${current.book}.${current.chapter}`;
@@ -888,10 +1024,16 @@ function markChapterRead() {
   const dayMatch = findMatchingPlanDay(current.book, current.chapter);
   if (dayMatch != null) {
     const plan = getActivePlan();
-    const completed = plan.completedDays || [];
-    if (!completed.includes(dayMatch)) completed.push(dayMatch);
-    setPlanCompletedDays(plan.id, completed);
-    toast(`Day ${dayMatch} marked complete!`);
+    const dayObj = plan.days.find(d => d.day === dayMatch);
+    if (dayObj && planDayFullyRead(plan, dayObj)) {
+      const completed = plan.completedDays || [];
+      if (!completed.includes(dayMatch)) completed.push(dayMatch);
+      setPlanCompletedDays(plan.id, completed);
+      toast(`Day ${dayMatch} marked complete!`);
+    } else {
+      const remaining = dayObj ? planDayChapterRefs(plan, dayObj).filter(r => !progress[`${r.book}.${r.chapter}`]).length : 0;
+      toast(remaining ? `Checked off — ${remaining} more chapter${remaining === 1 ? "" : "s"} to finish Day ${dayMatch}` : "Added to your Progress");
+    }
   } else {
     toast("Added to your Progress");
   }
