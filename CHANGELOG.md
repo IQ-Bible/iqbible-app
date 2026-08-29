@@ -8,6 +8,9 @@ All notable changes to this project will be documented in this file. This CHANGE
   Devotionals and My Progress each have their own under the title.
 - **changed:** The copyright/version line in the left nav footer is a little larger and less faded,
   and `404.html`'s copy of it now matches `index.html` (they had drifted).
+- **fixed:** The short version label in the reading header (e.g. "KJV") no longer picks up a stray
+  "(" from a translation whose title ends in a parenthetical like "(wordproject.org)" — the
+  parenthetical is dropped before the acronym is built, and only letter/digit-initial words feed it.
 
 ## [1.4.0] - 2026-08-28
 - **added:** Deep links can now point at a verse range, not just a single verse — `/gal/5/14-16`

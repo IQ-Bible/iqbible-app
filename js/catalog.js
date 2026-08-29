@@ -61,11 +61,17 @@ function setLastVersion(id) { localStorage.setItem("iqb_last_version", id); }
 
 function shortVersionLabel(title) {
   if (!title) return "";
-  const t = title.trim();
+  // Strip any "(…)" source/qualifier (e.g. "Amharic Bible (wordproject.org)")
+  // before abbreviating — otherwise its opening "(" becomes the first letter
+  // of the acronym ("AB(").
+  const t = title.replace(/\s*\([^)]*\)/g, "").replace(/\s+/g, " ").trim();
+  if (!t) return "";
   const colon = t.indexOf(":");
   if (colon > 1 && colon <= 10) return t.slice(0, colon).trim();
   const STOP = new Set(["of", "the", "and", "for", "in", "a", "an"]);
-  const words = t.split(/\s+/).filter(w => !STOP.has(w.toLowerCase()));
+  // Only tokens that start with a letter or digit feed the acronym — a bare
+  // em dash between name parts ("Greek Bible — Modern") isn't an initial.
+  const words = t.split(/\s+/).filter(w => /^[\p{L}\p{N}]/u.test(w) && !STOP.has(w.toLowerCase()));
   if (words.length >= 2) {
     const initials = words.map(w => w[0]).join("").toUpperCase();
     if (initials.length >= 2 && initials.length <= 6) return initials;
