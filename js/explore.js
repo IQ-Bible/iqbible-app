@@ -113,7 +113,7 @@ async function renderHarmonyDetail(section) {
   }));
   return `<div class="tool-back-row"><button onclick="renderExploreHarmonyList()">‹ All Sections</button></div>
     <div class="tool-group-label">${escHtml(section.part_title)}</div>
-    <h3 style="font-family:'Cormorant Garamond',serif;font-weight:600;font-size:1.35rem;margin-bottom:14px">${escHtml(section.title)}</h3>
+    <h3 style="font-family:var(--font-ui);font-weight:700;font-size:1.3rem;letter-spacing:-.01em;margin-bottom:14px">${escHtml(section.title)}</h3>
     <div class="harmony-columns">${cols.join("")}</div>`;
 }
 
@@ -191,7 +191,7 @@ async function openTopicDetail(name) {
     return `<button class="prophecy-ref" style="margin:0 6px 8px 0"${citeAttr}${jump}>${c.label ? escHtml(c.label) + ": " : ""}${escHtml(c.citation)}</button>`;
   }).join("");
   body.innerHTML = backRow +
-    `<h3 style="font-family:'Cormorant Garamond',serif;font-weight:600;font-size:1.35rem;margin-bottom:14px">${escHtml(name)}</h3>
+    `<h3 style="font-family:var(--font-ui);font-weight:700;font-size:1.3rem;letter-spacing:-.01em;margin-bottom:14px">${escHtml(name)}</h3>
     <div>${html || `<div class="dd-empty">No citations for this topic.</div>`}</div>`;
 }
 
@@ -341,7 +341,7 @@ function renderGenealogyPerson(person) {
   const relRow = r => `<div class="person-relative"><span class="person-relative-rel">${escHtml(r.relationship)}</span><button class="prophecy-ref" onclick="runGenealogyLookup('${r.name.replace(/'/g, "\\'")}')">${escHtml(r.name)}</button></div>`;
   const parents = (person.parents || []).length ? `<div class="person-section"><div class="person-section-label">Parents</div>${person.parents.map(relRow).join("")}</div>` : `<div class="tool-hint">No recorded parents.</div>`;
   const children = (person.children || []).length ? `<div class="person-section"><div class="person-section-label">Children</div>${person.children.map(relRow).join("")}</div>` : `<div class="tool-hint">No recorded children.</div>`;
-  return `${crumbs}<h3 style="font-family:'Cormorant Garamond',serif;font-weight:600;font-size:1.35rem;margin:10px 0 14px">${escHtml(person.name)}</h3>${parents}${children}`;
+  return `${crumbs}<h3 style="font-family:var(--font-ui);font-weight:700;font-size:1.3rem;letter-spacing:-.01em;margin:10px 0 14px">${escHtml(person.name)}</h3>${parents}${children}`;
 }
 function jumpGenealogyBreadcrumb(i) {
   const name = genealogyBreadcrumb[i];
@@ -487,7 +487,7 @@ async function openExtraWork(id, title) {
   catch (e) { body.innerHTML = backRow + `<div class="dd-empty">Could not load this work.</div>`; return; }
   const grid = chapters.map(c => `<button class="chapchip" onclick="openExtraChapter('${id}',${c.chapter})">${c.chapter}</button>`).join("");
   body.innerHTML = backRow +
-    `<h3 style="font-family:'Cormorant Garamond',serif;font-weight:600;font-size:1.35rem;margin-bottom:14px">${escHtml(title)}</h3>
+    `<h3 style="font-family:var(--font-ui);font-weight:700;font-size:1.3rem;letter-spacing:-.01em;margin-bottom:14px">${escHtml(title)}</h3>
     <div class="chipgrid">${grid || `<div class="dd-empty">No chapters on file.</div>`}</div>`;
 }
 async function openExtraChapter(id, chapter) {
@@ -500,6 +500,6 @@ async function openExtraChapter(id, chapter) {
   catch (e) { body.innerHTML = backRow + `<div class="dd-empty">Could not load this chapter.</div>`; return; }
   const versesHtml = verses.map(v => `<sup class="vnum">${v.verse}</sup>${escHtml(v.text)} `).join("");
   body.innerHTML = backRow +
-    `<h3 style="font-family:'Cormorant Garamond',serif;font-weight:600;font-size:1.35rem;margin-bottom:14px">${escHtml(workTitle)} ${chapter}</h3>
+    `<h3 style="font-family:var(--font-ui);font-weight:700;font-size:1.3rem;letter-spacing:-.01em;margin-bottom:14px">${escHtml(workTitle)} ${chapter}</h3>
     <div class="dictbody"><div class="dd-def" style="line-height:1.9">${versesHtml || `<div class="dd-empty">No verses on file.</div>`}</div></div>`;
 }

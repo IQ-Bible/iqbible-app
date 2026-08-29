@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file. This CHANGELOG follows SemVer, see https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
+- n/a
+
+## [1.3.0] - 2026-08-28
+- **changed:** The app chrome now follows the IQ Bible brand guide. The wordmark uses the shared
+  construction (sentence-case "IQ Bible", weight 900, tight tracking, "IQ" in brand purple and
+  "Bible" in ink) instead of the old uppercase serif treatment; Inter replaces Cormorant Garamond
+  and Josefin Sans across all UI — nav, labels, buttons, headings, modal titles, pickers — via a
+  new `--font-ui` token; nav items and buttons drop the all-caps/wide-tracking treatment for
+  sentence case (small eyebrow labels stay uppercase, as the brand allows); and corner radii are
+  consolidated onto a brand-aligned scale (`--r-pill`/`--r-card`/`--r-control`/`--r-sm`) — chips
+  and tabs become true pills. The Scripture reading column and verse-quote text stay a reading
+  serif (`--font-reading`, Crimson Pro) on purpose — a documented, intentional exception rather
+  than drift.
 - **added:** Official hosted instance at `app.iqbible.com` — the app now runs there with no API
   key required. A small Cloudflare Worker (`cloudflare/`) sits in front of the authenticated API
   endpoints and injects a shared key server-side; the key never reaches the browser. A visitor who

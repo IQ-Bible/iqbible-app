@@ -12,7 +12,8 @@
      deploying under a subpath is the one case that needs to change it. -->
 <base href="/">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&family=Josefin+Sans:wght@300;400&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/styles.css">
 <link rel="icon" type="image/png" href="img/logo.png">
 <!-- Leaflet — the app's one runtime dependency, added specifically so place
@@ -32,7 +33,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
 <div id="app">
 
   <div id="topbar">
-    <div class="wordmark"><img src="img/logo.png" alt="" class="logo-icon">IQ <span>Bible</span></div>
+    <div class="wordmark"><img src="img/logo.png" alt="" class="logo-icon"><span class="wm-text">IQ <span>Bible</span></span></div>
     <div id="topActions">
       <button id="searchTrigger" onclick="openSearch()" title="Search" aria-label="Search">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>

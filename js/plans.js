@@ -134,7 +134,7 @@ function progressRingSvg(pct) {
   return `<svg width="56" height="56" viewBox="0 0 64 64">
     <circle cx="32" cy="32" r="26" fill="none" stroke="var(--surface-2)" stroke-width="6"/>
     <circle cx="32" cy="32" r="26" fill="none" stroke="var(--brand)" stroke-width="6" stroke-linecap="round" stroke-dasharray="${dash} ${c}" transform="rotate(-90 32 32)"/>
-    <text x="32" y="37" text-anchor="middle" font-family="'Cormorant Garamond',serif" font-weight="600" font-size="14" fill="var(--ink)">${pct}%</text>
+    <text x="32" y="37" text-anchor="middle" font-family="var(--font-ui)" font-weight="700" font-size="13" fill="var(--ink)">${pct}%</text>
   </svg>`;
 }
 function planCardHtml(plan) {
