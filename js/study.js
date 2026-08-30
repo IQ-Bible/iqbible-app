@@ -13,7 +13,9 @@ function closeStudy() {
 }
 const STUDY_TAB_DESC = {
   book: "Background on a book of the Bible — who wrote it, when, and its main themes and structure.",
+  dictionary: "Look up a word or name in the classic Bible dictionaries — Easton's, Smith's, Hastings', Hitchcock's and Schaff's — all at once.",
   word: "Look up a Strong's number for its Hebrew/Greek lexicon entries — Strong's, BDB, LSJ, Abbott-Smith — and every place that word occurs in Scripture.",
+  commentaries: "Read verse-by-verse commentary on any chapter, from Matthew Henry, Gill and hundreds of other classic sources.",
   variants: "Places where the manuscript tradition differs, and how the major textual editions read there.",
 };
 function switchStudyTab(tab) {
@@ -22,6 +24,8 @@ function switchStudyTab(tab) {
   document.getElementById("studyDesc").textContent = STUDY_TAB_DESC[tab] || "";
   if (tab === "word") renderStudyWord();
   else if (tab === "book") renderStudyBook();
+  else if (tab === "dictionary") renderStudyDictionary();
+  else if (tab === "commentaries") renderStudyCommentaries();
   else if (tab === "variants") renderStudyVariants();
 }
 // Cross-link from Verse Tools > Original Language (js/reader.js): each
@@ -196,6 +200,152 @@ async function runWordStudy(key) {
   if (token !== wordStudyToken) return;
   document.getElementById("wordStudyArea").innerHTML = lexHtml + occHtml;
 }
+
+/* ── Dictionary — a manual lookup of a word or name across all five Bible
+   dictionaries at once (GET /dictionaries/{id}?q=<term>). The standalone
+   counterpart to the reader's dictionary-term modal (openDictTermModal,
+   js/reader.js), which can only be reached by clicking a word the chapter
+   text already marked — this lets a reader look up anything. Reuses
+   DICT_SOURCES and linkifyPreParsedCitations from reader.js. Search-only:
+   the API exposes no browse/A–Z term index, so this doesn't invent one. ── */
+let dictStudyQuery = "";
+let dictStudyToken = 0;
+function renderStudyDictionary() {
+  document.getElementById("studyBody").innerHTML = `
+    <div class="msearch" style="margin-bottom:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8"/></svg><input type="text" id="dictStudyInput" placeholder="A word or name — Aaron, Passover, Nazarite…" onkeydown="if(event.key==='Enter') runDictionaryStudy(this.value)" autocomplete="off"><button type="button" class="mclear" aria-label="Clear" onclick="clearSearchInput('dictStudyInput')">&times;</button></div>
+    <div class="tool-hint">Enter a word to see how each dictionary defines it. An exact headword returns that entry; anything else runs as a keyword search.</div>
+    <div id="dictStudyArea"></div>`;
+  if (dictStudyQuery) {
+    document.getElementById("dictStudyInput").value = dictStudyQuery;
+    runDictionaryStudy(dictStudyQuery);
+  }
+}
+async function runDictionaryStudy(term) {
+  term = (term || "").trim();
+  if (!term) return;
+  dictStudyQuery = term;
+  const token = ++dictStudyToken;
+  const area = document.getElementById("dictStudyArea");
+  area.innerHTML = `<div class="spin"></div>`;
+  // One call per source (there's no cross-source lookup endpoint); a 404 or
+  // empty result from any one is normal, same as the reader's dict tabs.
+  const results = await Promise.all(DICT_SOURCES.map(s =>
+    apiJSON(`/dictionaries/${s.id}?q=${encodeURIComponent(term)}`).then(d => d.data || []).catch(() => [])));
+  if (token !== dictStudyToken) return;
+  const tabs = [];
+  for (let i = 0; i < DICT_SOURCES.length; i++) {
+    const src = DICT_SOURCES[i], entries = results[i];
+    if (!entries.length) continue;
+    const blocks = await Promise.all(entries.map(async e => {
+      const defHtml = await linkifyPreParsedCitations(e.definition || "", e.citations);
+      // Multiple entries means it fell back to a keyword search — label each with its headword.
+      const head = entries.length > 1 && e.term ? `<div class="person-def-src">${escHtml(e.term)}</div>` : "";
+      return `<div class="person-def">${head}<div class="person-def-text">${defHtml}</div></div>`;
+    }));
+    tabs.push({ label: src.name, html: `<div class="person-section lw-card"><div class="person-section-label">${escHtml(src.name)}</div>${blocks.join("")}</div>` });
+  }
+  if (token !== dictStudyToken) return;
+  if (!tabs.length) { area.innerHTML = `<div class="dd-empty">No dictionary entry found for "${escHtml(term)}".</div>`; return; }
+  if (tabs.length === 1) { area.innerHTML = tabs[0].html; return; }
+  const btns = tabs.map((t, i) => `<button type="button" class="filter-chip dict-tab-btn${i === 0 ? " active" : ""}" data-idx="${i}">${escHtml(t.label)}</button>`).join("");
+  const panels = tabs.map((t, i) => `<div class="dict-tab-panel${i === 0 ? " active" : ""}" data-idx="${i}">${t.html}</div>`).join("");
+  area.innerHTML = `<div class="dict-tabs"><div class="dict-tab-btns">${btns}</div>${panels}</div>`;
+}
+
+/* ── Commentaries — browse verse-by-verse commentary for any chapter without
+   going through Verse Tools (which only ever shows the one selected verse).
+   GET /commentaries lists sources (reused via getCommentarySources,
+   js/reader.js); GET /commentaries/{name}/{book}/{chapter} returns every
+   entry in that chapter in one call, GET /commentaries/{name}/{book}/{chapter}/{verse}
+   just one. Chapter 0 / verse 0 are the book / chapter introductions in the
+   source's own addressing. Source list is filtered to those covering the
+   selected book — the same book-level filter Verse Tools uses, and per
+   NOTES.md there's no per-verse coverage list to do better without a probe
+   call per source. ── */
+let cmtBook = null, cmtChapter = null, cmtVerse = 0, cmtSource = null;
+let cmtToken = 0;
+async function getBookMeta(usfm) {
+  try { const d = await apiJSONCached(`/bibles/${current.version}/${usfm}/meta`); return d.chapters || []; }
+  catch (e) { return []; }
+}
+async function renderStudyCommentaries() {
+  const body = document.getElementById("studyBody");
+  body.innerHTML = `<div class="spin"></div>`;
+  if (!cmtBook) { cmtBook = current.book; cmtChapter = current.chapter; cmtVerse = 0; }
+  const token = ++cmtToken;
+  const [allSources, meta] = await Promise.all([getCommentarySources(), getBookMeta(cmtBook)]);
+  if (token !== cmtToken) return;
+  const books = bookList.length ? bookList : [{ usfm: cmtBook, name: current.bookName }];
+  const sources = allSources.filter(s => !s.books || !s.books.length || s.books.includes(cmtBook));
+  const rank = s => s.name === "mhenry" ? 0 : s.name === "gill" ? 1 : 2;
+  sources.sort((a, b) => rank(a) - rank(b) || (a.author_name || "").localeCompare(b.author_name || ""));
+  if (!sources.some(s => s.name === cmtSource)) cmtSource = sources.length ? sources[0].name : null;
+
+  const chapterCount = meta.length || 1;
+  if (cmtChapter > chapterCount) cmtChapter = 1;
+  const verseCount = (meta.find(m => m.chapter === cmtChapter) || {}).verse_count || 0;
+  if (cmtVerse > verseCount) cmtVerse = 0;
+
+  if (!sources.length) {
+    body.innerHTML = `
+      <div class="tool-filter-row share-fields">
+        <select onchange="onCommentaryBookChange(this.value)">${books.map(b => `<option value="${escAttr(b.usfm)}"${b.usfm === cmtBook ? " selected" : ""}>${escHtml(b.name)}</option>`).join("")}</select>
+      </div>
+      <div class="dd-empty">No commentary source covers this book.</div>`;
+    return;
+  }
+
+  const chapterOpts = Array.from({ length: chapterCount }, (_, i) => i + 1)
+    .map(c => `<option value="${c}"${c === cmtChapter ? " selected" : ""}>Chapter ${c}</option>`).join("");
+  const verseOpts = `<option value="0"${cmtVerse === 0 ? " selected" : ""}>Whole chapter</option>` +
+    Array.from({ length: verseCount }, (_, i) => i + 1)
+      .map(v => `<option value="${v}"${v === cmtVerse ? " selected" : ""}>Verse ${v}</option>`).join("");
+  const sourceOpts = sources.map(s => `<option value="${escAttr(s.name)}"${s.name === cmtSource ? " selected" : ""}>${escHtml(s.author_name || s.name)}</option>`).join("");
+
+  body.innerHTML = `
+    <div class="tool-filter-row share-fields">
+      <select onchange="onCommentarySourceChange(this.value)">${sourceOpts}</select>
+      <select onchange="onCommentaryBookChange(this.value)">${books.map(b => `<option value="${escAttr(b.usfm)}"${b.usfm === cmtBook ? " selected" : ""}>${escHtml(b.name)}</option>`).join("")}</select>
+      <select onchange="onCommentaryChapterChange(this.value)">${chapterOpts}</select>
+      <select onchange="onCommentaryVerseChange(this.value)">${verseOpts}</select>
+    </div>
+    <div id="cmtStudyArea"></div>`;
+  runCommentaryStudy();
+}
+function onCommentarySourceChange(v) { cmtSource = v; runCommentaryStudy(); }
+function onCommentaryVerseChange(v) { cmtVerse = +v; runCommentaryStudy(); }
+function onCommentaryBookChange(v) { cmtBook = v; cmtChapter = 1; cmtVerse = 0; renderStudyCommentaries(); }
+function onCommentaryChapterChange(v) { cmtChapter = +v; cmtVerse = 0; renderStudyCommentaries(); }
+async function runCommentaryStudy() {
+  const area = document.getElementById("cmtStudyArea");
+  if (!area || !cmtSource) return;
+  const token = ++cmtToken;
+  area.innerHTML = `<div class="spin"></div>`;
+  const path = cmtVerse
+    ? `/commentaries/${encodeURIComponent(cmtSource)}/${cmtBook}/${cmtChapter}/${cmtVerse}`
+    : `/commentaries/${encodeURIComponent(cmtSource)}/${cmtBook}/${cmtChapter}`;
+  let entries;
+  try { entries = (await apiJSONCached(path)).entries || []; }
+  catch (e) { if (token === cmtToken) area.innerHTML = `<div class="dd-empty">Could not load commentary.</div>`; return; }
+  if (token !== cmtToken) return;
+  if (!entries.length) {
+    area.innerHTML = `<div class="dd-empty">No commentary from this source for ${escHtml(bookNameFor(cmtBook))} ${cmtChapter}${cmtVerse ? ":" + cmtVerse : ""}.</div>`;
+    return;
+  }
+  const blocks = await Promise.all(entries.map(async e => {
+    const textHtml = await linkifyPreParsedCitations(e.text || "", e.citations);
+    let label;
+    if (e.verse === 0) label = e.chapter === 0 ? "Book Introduction" : "Chapter Introduction";
+    else label = "Verse " + e.verse + (e.verse_end && e.verse_end !== e.verse ? "–" + e.verse_end : "");
+    const jump = e.verse > 0
+      ? `<button class="prophecy-ref" style="margin-top:8px" onclick="closeStudy();jumpToVerse('${cmtBook}',${e.chapter || cmtChapter},${e.verse})">Go to ${escHtml(bookNameFor(cmtBook))} ${e.chapter || cmtChapter}:${e.verse}</button>`
+      : "";
+    return `<div class="person-section"><div class="person-section-label">${escHtml(label)}</div><div class="person-def-text">${textHtml}</div>${jump}</div>`;
+  }));
+  if (token !== cmtToken) return;
+  area.innerHTML = blocks.join("");
+}
+function bookNameFor(usfm) { return (bookList.find(b => b.usfm === usfm) || {}).name || usfm; }
 
 /* ── Book Guide — GET /books/{book}/info (30+ free-form introduction/
    authorship/theology fields, not a fixed struct — see the API's own

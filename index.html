@@ -16,6 +16,12 @@
 <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/styles.css">
 <link rel="icon" type="image/png" href="img/logo.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#6d28d9">
+<link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="IQ Bible">
 <!-- Leaflet — the app's one runtime dependency, added specifically so place
      maps can use English-labeled (Esri World Street Map) tiles for the
      interactive lightbox view; OpenStreetMap's own embeddable page has no
@@ -89,7 +95,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
         <button class="navitem" data-nav="help" onclick="navMenuClick('help')">Help</button>
         <button class="navitem" data-nav="about" onclick="navMenuClick('about')">About</button>
         <button class="navitem" data-nav="settings" onclick="navMenuClick('settings')">Settings</button>
-        <div class="navfooter">&copy;&nbsp;<span id="navYear" data-app-year></span>&nbsp;IQ&nbsp;Bible<span class="navfoot-ver">v<span id="navVersion" data-app-version></span> &middot; <a href="https://api.iqbible.com" target="_blank" rel="noopener">API</a></span></div>
+        <div class="navfooter">&copy;&nbsp;<span id="navYear" data-app-year></span>&nbsp;<span class="wm">IQ&nbsp;<span>Bible</span></span><span class="navfoot-ver">v<span id="navVersion" data-app-version></span> &middot; <a href="https://api.iqbible.com" target="_blank" rel="noopener">API</a></span></div>
       </div>
     </nav>
 
@@ -305,9 +311,10 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
         </div>
       </div>
 
-      <!-- study tools view — Book Guide, Word Study (multi-lexicon +
-           every-occurrence lookup), and Textual Variants. Same shell as
-           #exploreOverlay. -->
+      <!-- study tools view — Book Guide, Dictionary (encyclopedic term
+           lookup across all sources), Word Study (multi-lexicon +
+           every-occurrence lookup), Commentaries (browse by book/chapter/
+           verse), and Textual Variants. Same shell as #exploreOverlay. -->
       <div id="studyOverlay" class="mainview" role="region" aria-label="Study Tools">
         <div class="overlay-inner">
           <div class="overlay-topbar">
@@ -317,7 +324,9 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
           <div class="overlay-search-area">
             <div class="lib-tabs" id="studyTabs">
               <button class="lib-tab" data-tab="book" onclick="switchStudyTab('book')">Book Guide</button>
+              <button class="lib-tab" data-tab="dictionary" onclick="switchStudyTab('dictionary')">Dictionary</button>
               <button class="lib-tab" data-tab="word" onclick="switchStudyTab('word')">Word Study</button>
+              <button class="lib-tab" data-tab="commentaries" onclick="switchStudyTab('commentaries')">Commentaries</button>
               <button class="lib-tab" data-tab="variants" onclick="switchStudyTab('variants')">Textual Variants</button>
             </div>
             <p class="view-desc" id="studyDesc"></p>
@@ -479,7 +488,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
         <div class="dictbody">
           <div class="about-hero">
             <img src="img/logo.png" alt="" class="about-hero-logo">
-            <h1>About IQ Bible</h1>
+            <h1>About <span class="wm">IQ <span>Bible</span></span></h1>
             <p>A free, open-source Bible reader — and a worked example of building a real app on the <a href="https://api.iqbible.com" target="_blank" rel="noopener">IQ Bible API</a>. Every feature here comes from a real API call.</p>
           </div>
 
@@ -518,7 +527,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
             </div>
           </div>
 
-          <p class="hint about-version">IQ Bible App v<span id="aboutVersion" data-app-version></span></p>
+          <p class="hint about-version"><span class="wm">IQ <span>Bible</span></span> App v<span id="aboutVersion" data-app-version></span></p>
         </div>
       </div>
 
@@ -588,7 +597,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
             <div class="help-card">
               <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h6M10 2v6.5L4.5 18a2 2 0 0 0 1.7 3h11.6a2 2 0 0 0 1.7-3L14 8.5V2"/></svg></div>
               <div class="help-card-title">Study Tools</div>
-              <div class="help-card-body">A word study across the Hebrew &amp; Greek lexicons, per-book guides with book-level commentary, and NT textual variants.</div>
+              <div class="help-card-body">Per-book guides, a Bible-dictionary lookup across all five sources, a word study across the Hebrew &amp; Greek lexicons, verse-by-verse commentary for any chapter, and NT textual variants.</div>
             </div>
             <div class="help-card">
               <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.5 15.4 6.5M8.6 13.5l6.8 4"/></svg></div>
@@ -769,7 +778,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
     <button class="navitem" data-nav="help" onclick="navMenuClick('help');closeMoreMenu()">Help</button>
     <button class="navitem" data-nav="about" onclick="navMenuClick('about');closeMoreMenu()">About</button>
     <button class="navitem" data-nav="settings" onclick="navMenuClick('settings');closeMoreMenu()">Settings</button>
-    <div class="navfooter navfooter-sheet">&copy;&nbsp;<span data-app-year></span>&nbsp;IQ&nbsp;Bible<span class="navfoot-ver">v<span data-app-version></span> &middot; <a href="https://api.iqbible.com" target="_blank" rel="noopener">API</a></span></div>
+    <div class="navfooter navfooter-sheet">&copy;&nbsp;<span data-app-year></span>&nbsp;<span class="wm">IQ&nbsp;<span>Bible</span></span><span class="navfoot-ver">v<span data-app-version></span> &middot; <a href="https://api.iqbible.com" target="_blank" rel="noopener">API</a></span></div>
   </div>
 
   <!-- API key gate — shown whenever no key is set (first load, or after
@@ -1015,7 +1024,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
       <div class="tour-welcome-icon">
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
       </div>
-      <h2>Welcome to IQ Bible</h2>
+      <h2>Welcome to <span class="wm">IQ <span>Bible</span></span></h2>
       <p>Want a two-minute tour of what's here — search, reading plans, notes and more?</p>
       <button class="setsave" style="margin-bottom:0" onclick="startTourFromWelcome()">Take the Tour</button>
       <button class="tour-welcome-later" onclick="dismissTourWelcome()">Maybe later</button>

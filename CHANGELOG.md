@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file. This CHANGE
 ## [Unreleased]
 - n/a
 
+## [1.11.0] - 2026-08-30
+- **added:** Study Tools ▸ Dictionary — look up any word or name across all five Bible dictionaries
+  (Easton's, Smith's, Hastings', Hitchcock's, Schaff's) at once, without having to find it already
+  underlined in the chapter text. An exact headword returns that entry; anything else runs as a
+  keyword search.
+- **added:** Study Tools ▸ Commentaries — read verse-by-verse commentary for any chapter (or a
+  single verse) from Matthew Henry, Gill and hundreds of other classic sources, picking the book,
+  chapter, verse and source directly instead of going through Verse Tools one verse at a time.
+- **changed:** The book picker no longer separates a version's deuterocanonical books (Tobit,
+  Maccabees, Sirach, …) into an "Apocrypha / Deuterocanon" section. On a version whose canon
+  includes them (CPDV, DRC, KJVA, …) they now sit under Old Testament in that version's own order,
+  matching how that tradition reads them.
+- **changed:** The "IQ Bible" wordmark now uses the brand's purple-"IQ" / ink-"Bible" treatment
+  everywhere it appears as a name — the welcome dialog, the About page, and the nav footer — not
+  only in the top bar.
+- **changed:** On very wide screens the Notes launcher button now sits centred under the chapter
+  cards on the right instead of drifting out to the far edge of the window.
+- **fixed:** A Scripture reference at the very start of a piece of text — a note whose whole first
+  line is a reference, a dictionary entry that opens with one — is now hover-previewable like any
+  other. It was silently skipped before.
+- **fixed:** A note's title (including the auto-title taken from a one-line note's text) now makes
+  any reference in it hover-previewable, in both My Library and the notes drawer's list.
+- **changed:** The copyright line in the left-nav footer is now the same small size as the version
+  line beneath it.
+- **added:** The app is now an installable PWA. Browsers offer "Install" / "Add to Home Screen";
+  once installed it opens in its own window and the app shell loads offline (Bible text still needs
+  a connection — the service worker never caches API responses, so rate limits and errors stay
+  visible as before).
+- **fixed:** Changing the translation now keeps your place — same book, chapter and verse — instead
+  of jumping back to the start.
+- **fixed:** Turning to another chapter on mobile (swipe or the Prev/Next buttons) now starts at
+  the top of the chapter instead of keeping the previous scroll position.
+- **fixed:** Bookmarking or highlighting several verses in one action now creates a single entry in
+  My Library (e.g. "John 3:16-18" or "John 3:16, 18, 20") rather than one per verse. The reference
+  on each Bookmark and Highlight card is now hover-previewable.
+- **fixed:** The Remove button on Bookmark and Highlight cards in My Library is now styled to match
+  the rest of the app.
+- **fixed:** My Library ▸ Notes — the "Search notes" field and "New note" button no longer overflow
+  the screen on narrow phones.
+
 ## [1.10.0] - 2026-08-29
 - **changed:** Every "are you sure?" and "name this…" step — deleting a notebook, note, plan or
   your history; creating or renaming a notebook or plan — now uses an in-app dialog styled like

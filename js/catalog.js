@@ -179,7 +179,14 @@ async function selectVersion(id) {
   closeModal("versionPickerScrim");
   bookList = [];
   await loadBooks();
-  await loadChapter(1, true);
+  // Stay exactly where the reader was — same book if this version has it
+  // (loadBooks() already falls back to the first book when it doesn't, e.g.
+  // an NT-only version), same chapter clamped to that book's length, same
+  // verse target.
+  await loadChapterMeta();
+  const maxCh = chapterMeta.length ? chapterMeta[chapterMeta.length - 1].chapter : 1;
+  const ch = Math.min(current.chapter || 1, maxCh);
+  await loadChapter(ch, false, current.verse, current.verseEnd);
 }
 // Sets current.version/versionTitle/textDirection from a version id without
 // any navigation side effects (no chapter reload) — used at init and by the
@@ -236,11 +243,13 @@ function bookGridSection(label, list) {
 function renderBookList(q) {
   q = (q || "").trim().toLowerCase();
   const rows = bookList.filter(b => !q || b.name.toLowerCase().includes(q) || b.usfm.toLowerCase().includes(q));
-  const ot = rows.filter(b => OT_USFM.has(b.usfm));
+  // NT is the fixed 27; everything else (incl. any deuterocanonical books this
+  // version's canon carries) is "Old Testament", kept in the API's returned
+  // canonical order. See NT_USFM's comment for why there's no third section.
   const nt = rows.filter(b => NT_USFM.has(b.usfm));
-  const other = rows.filter(b => !OT_USFM.has(b.usfm) && !NT_USFM.has(b.usfm));
+  const ot = rows.filter(b => !NT_USFM.has(b.usfm));
   document.getElementById("bookList").innerHTML =
-    (bookGridSection("Old Testament", ot) + bookGridSection("New Testament", nt) + bookGridSection("Apocrypha / Deuterocanon", other))
+    (bookGridSection("Old Testament", ot) + bookGridSection("New Testament", nt))
     || `<div class="emptynote" style="padding:24px">No matching book.</div>`;
 }
 async function selectBook(usfm, name) {

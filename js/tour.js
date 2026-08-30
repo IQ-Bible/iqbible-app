@@ -55,7 +55,7 @@ const TOUR_STEPS = [
   // renderTourStep's target resolution below picks whichever candidate is
   // actually visible.
   { selector: '[data-nav="explore"]', title: "Explore", body: "A Gospel harmony, topic browser, Bible atlas, genealogy explorer and curated collections to wander through." },
-  { selector: '[data-nav="study"]', title: "Study Tools", body: "A Strong's word study, a cross-reference graph, per-book guides and NT textual variants." },
+  { selector: '[data-nav="study"]', title: "Study Tools", body: "Per-book guides, a Bible-dictionary lookup, a Strong's word study, verse-by-verse commentary and NT textual variants." },
   { selector: '[data-nav="share"]', title: "Share Tools", body: "Turn any verse into a shareable image, link or embeddable widget." },
   // library/progress/plans/devotionals live in both #navrail and (below
   // 1180px) #moreMenuSheet, both as .navitem — opening the "More" dropup
@@ -101,7 +101,9 @@ const ADVANCED_EXPLORE_STUDY_LIBRARY_STEPS = [
   { selector: '#exploreTabs .lib-tab[data-tab="harmony"]', title: "Explore: Harmony", body: "The four Gospels laid out side-by-side, matched up event by event.", before: () => { openExplore(); switchExploreTab("harmony"); } },
   { selector: '#exploreTabs .lib-tab[data-tab="topics"]', title: "Explore: Topics", body: "Browse the Bible by topic instead of by book and chapter.", before: () => { openExplore(); switchExploreTab("topics"); } },
   { selector: '#studyTabs .lib-tab[data-tab="book"]', title: "Study: Book Guide", body: "A per-book overview — author, setting, structure and themes — plus book-level commentary from the historic sources.", before: () => { openStudy(); switchStudyTab("book"); } },
+  { selector: '#studyTabs .lib-tab[data-tab="dictionary"]', title: "Study: Dictionary", body: "Look up any word or name across all five classic Bible dictionaries at once — Easton's, Smith's, Hastings', Hitchcock's and Schaff's.", before: () => { openStudy(); switchStudyTab("dictionary"); } },
   { selector: '#studyTabs .lib-tab[data-tab="word"]', title: "Study: Word Study", body: "A Strong's-numbered word study across several lexicons — Strong's, BDB, LSJ, Abbott-Smith — plus every other place a word appears.", before: () => { openStudy(); switchStudyTab("word"); } },
+  { selector: '#studyTabs .lib-tab[data-tab="commentaries"]', title: "Study: Commentaries", body: "Read verse-by-verse commentary for any chapter — pick the book, chapter, verse and source, from Matthew Henry and Gill to hundreds of others.", before: () => { openStudy(); switchStudyTab("commentaries"); } },
   { selector: '#studyTabs .lib-tab[data-tab="variants"]', title: "Study: Textual Variants", body: "Where New Testament manuscripts differ, verse by verse.", before: () => { openStudy(); switchStudyTab("variants"); } },
   { selector: '#libraryOverlay .lib-tab[data-tab="notes"]', title: "My Library: Notes", body: "Every note you've written — searchable, taggable, and grouped into notebooks. Editing opens the Notes drawer.", before: () => { openLibrary(); switchLibraryTab("notes"); } },
   { selector: '#libraryOverlay .lib-tab[data-tab="bookmarks"]', title: "My Library: Bookmarks", body: "Every verse you've bookmarked, in one list.", before: () => { openLibrary(); switchLibraryTab("bookmarks"); } },

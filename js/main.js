@@ -283,3 +283,13 @@ async function refreshAppVersionFromChangelog() {
   maybeShowPeriodicBackupReminder();
   maybeShowTourWelcome();
 })();
+
+// PWA: register the app-shell service worker (sw.js). It caches only static
+// assets and never intercepts API calls — see sw.js. Failures are silent;
+// the app works identically without it.
+if ("serviceWorker" in navigator &&
+    (location.protocol === "https:" || ["localhost", "127.0.0.1"].includes(location.hostname))) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => { /* not fatal */ });
+  });
+}

@@ -69,6 +69,11 @@ button{ font-family:inherit; cursor:pointer; }
 .wordmark{ display:flex; align-items:center; gap:9px; font-family:var(--font-ui); font-weight:900; font-size:1.3rem; letter-spacing:-.02em; white-space:nowrap; }
 .wordmark .wm-text{ color:var(--brand); }
 .wordmark .wm-text span{ color:var(--ink); }
+/* Inline form of the wordmark — same color split ("IQ" brand, "Bible" ink) and
+   weight/tracking, for use inside a heading or running text where the flex row
+   + icon of .wordmark doesn't fit. Markup: <span class="wm">IQ <span>Bible</span></span> */
+.wm{ font-family:var(--font-ui); font-weight:900; letter-spacing:-.02em; color:var(--brand); white-space:nowrap; }
+.wm span{ color:var(--ink); }
 .logo-icon{ width:26px; height:26px; border-radius:var(--r-sm); flex-shrink:0; }
 #topActions{ margin-left:auto; display:flex; align-items:center; gap:10px; }
 #searchTrigger,#fontSizeTrigger,#themeTrigger,#profileTrigger{ display:flex; align-items:center; justify-content:center; width:34px; height:34px; flex-shrink:0; background:none; border:1px solid var(--divider); border-radius:var(--r-sm); color:var(--muted); transition:all .2s; }
@@ -191,7 +196,7 @@ button{ font-family:inherit; cursor:pointer; }
 .navitem:hover{ background:var(--brand-soft); color:var(--brand); }
 .navitem.active{ color:var(--brand); border-left-color:var(--brand); background:var(--brand-soft); font-weight:600; }
 .navdivider{ border:none; border-top:1px solid var(--divider); margin:10px 12px; }
-.navfooter{ margin-top:auto; padding:16px 12px 0; font-size:.92rem; line-height:1.5; color:var(--muted); opacity:.85; }
+.navfooter{ margin-top:auto; padding:16px 12px 0; font-size:.56rem; line-height:1.6; color:var(--muted); opacity:.85; }
 /* Version line as a small tracked-caps kicker (à la .ndl-k) — sits under the
    credit line, static, not a control. */
 .navfoot-ver{ display:block; margin-top:5px; font-family:var(--font-ui); font-size:.56rem; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); }
@@ -1035,6 +1040,11 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 .notes-toolbar button{ font-family:var(--font-ui); font-weight:600; font-size:.6rem; letter-spacing:0; padding:7px 14px; border-radius:var(--r-pill); border:1px solid var(--brand-line); background:transparent; color:var(--brand); }
 .notes-toolbar button:hover{ background:var(--brand); color:var(--on-brand); }
 .result-meta{ font-family:var(--font-ui); font-size:.58rem; letter-spacing:.04em; color:var(--muted); margin-top:8px; }
+/* Bookmark / Highlight card "Remove" — a small outline pill, muted until
+   hovered, matching the note card's own danger affordance (.ncard-actions). */
+.note-card-actions{ display:flex; justify-content:flex-end; margin-top:12px; }
+.note-card-actions button.danger{ font-family:var(--font-ui); font-weight:600; font-size:.6rem; letter-spacing:.04em; padding:6px 14px; border-radius:var(--r-pill); border:1px solid var(--divider); background:transparent; color:var(--muted); }
+.note-card-actions button.danger:hover{ border-color:#dc2626; color:#dc2626; background:rgba(220,38,38,.06); }
 .compare-chip-row{ display:flex; flex-wrap:wrap; gap:6px; }
 
 /* ── My Library ▸ Notes — a two-pane workspace (notebook rail + card grid).
@@ -1046,7 +1056,7 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 .notes-workspace{ display:grid; grid-template-columns:196px 1fr; gap:22px; align-items:start; }
 
 .notes-toolbar-row{ display:flex; align-items:center; gap:10px; margin-bottom:12px; }
-.notes-search{ flex:1; display:flex; align-items:center; gap:8px; background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-pill); padding:0 14px; height:38px; }
+.notes-search{ flex:1; min-width:0; display:flex; align-items:center; gap:8px; background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-pill); padding:0 14px; height:38px; }
 .notes-search:focus-within{ border-color:var(--brand); }
 .notes-search svg{ width:15px; height:15px; color:var(--muted); flex-shrink:0; }
 .notes-search input{ flex:1; min-width:0; background:none; border:none; outline:none; font-family:var(--font-ui); font-size:.86rem; color:var(--ink); }
@@ -1140,6 +1150,13 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
   .notes-toolbar-row{ margin-bottom:10px; }
   .notes-subhead{ margin-bottom:12px; }
   .ncard-move-menu{ right:8px; }
+}
+/* Very narrow phones: the "New note" label + full-width search overrun the
+   row — drop the button to its icon and let the field take the rest. */
+@media (max-width:440px){
+  .notes-new-btn{ padding:0; width:38px; height:38px; justify-content:center; }
+  .notes-new-btn span{ display:none; }
+  .notes-new-btn svg{ width:15px; height:15px; }
 }
 
 /* ── Explore / Study Tools — both overlays render everything (per-tab
@@ -1300,10 +1317,17 @@ details.bg-accordion{ border:1px solid var(--divider); border-radius:var(--r-con
    JS toggles) needs a higher-specificity rule to actually hide them. */
 #notesLauncher[hidden],#notesDrawer[hidden],#ndSwitcher[hidden],.nd-toolbar[hidden],.nd-nb-filter[hidden],.nd-anchors[hidden],.nd-notebook-menu[hidden]{ display:none; }
 
-#notesLauncher{ position:fixed; right:24px; bottom:24px; z-index:115; display:flex; align-items:center; gap:11px; background:var(--surface); border:1px solid var(--divider); border-radius:var(--r-pill); box-shadow:0 12px 34px var(--shadow-lg); padding:9px 15px 9px 11px; color:var(--ink); transition:border-color .15s,transform .15s; }
+/* Centre the launcher on the right rail's card stack, not the viewport edge.
+   #shell is capped at 1600px and centred, so the right rail (its last 300px,
+   with the 150px cardstack centred in it) sits 150px in from the shell's
+   right edge. left here is that centre-x measured from the left: below 1600px
+   the shell fills the viewport (100vw - 150px); above it the shell edge is at
+   50vw + 800px, so the rail centre is 50vw + 650px. min() switches at 1600px.
+   translateX(-50%) then centres the pill on that point regardless of width. */
+#notesLauncher{ position:fixed; left:min(calc(100vw - 150px), calc(50vw + 650px)); right:auto; transform:translateX(-50%); bottom:24px; z-index:115; display:flex; align-items:center; gap:11px; background:var(--surface); border:1px solid var(--divider); border-radius:var(--r-pill); box-shadow:0 12px 34px var(--shadow-lg); padding:9px 15px 9px 11px; color:var(--ink); transition:border-color .15s,transform .15s; }
 #notesLauncher:hover{ border-color:var(--brand-line); }
 #notesLauncher.pulse{ animation:ndPulse .5s ease; }
-@keyframes ndPulse{ 40%{ transform:scale(1.05); } }
+@keyframes ndPulse{ 40%{ transform:translateX(-50%) scale(1.05); } }
 .ndl-ic{ position:relative; width:30px; height:30px; border-radius:var(--r-pill); background:var(--brand); color:var(--on-brand); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
 .ndl-ic svg{ width:15px; height:15px; }
 .ndl-count{ position:absolute; top:-6px; right:-8px; font-family:var(--font-ui); font-size:.56rem; font-weight:800; color:#fff; background:var(--read-check); border-radius:var(--r-pill); padding:1px 5px; opacity:0; transform:scale(.6); transition:opacity .2s,transform .2s; }

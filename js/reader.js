@@ -10,6 +10,11 @@ async function loadChapter(chapter, refreshMeta, verse, verseEnd) {
   document.getElementById("btnPickVersion").firstChild.textContent = shortVersionLabel(current.versionTitle) + " ";
   document.getElementById("btnPickBook").firstChild.textContent = current.bookName + " ";
   document.getElementById("readingText").innerHTML = `<div class="spin"></div>`;
+  // A fresh navigation (no target verse) always starts at the top — a cached
+  // chapter renders fast enough that the previous chapter's scroll offset
+  // would otherwise survive the innerHTML swap. A `verse` load is positioned
+  // by scrollHighlightVerse() at the end of this function instead.
+  if (!verse) document.getElementById("readMain").scrollTop = 0;
   // Otherwise the previous chapter's prompt (or its "done" state) stays
   // visible behind the spinner until renderChapterReadPrompt() below re-runs.
   document.getElementById("chapterReadPrompt").className = "";
@@ -1215,13 +1220,18 @@ async function linkifyCitations(text) {
   let html = "";
   let last = 0;
   matches.forEach(m => {
-    if (typeof m.start !== "number" || m.start < last) return;
+    // start is omitted from the response when it's 0 (Go omitempty), i.e. a
+    // citation that opens the string — treat a missing start as 0, the same
+    // way linkifyPreParsedCitations does. Without this, a note/definition/
+    // heading that begins with a reference silently loses its hover link.
+    const start = typeof m.start === "number" ? m.start : 0;
+    if (start < last) return;
     const verses = m.data || [];
     // A bare "Book chapter" match (no verse) or a wide range previews poorly
     // as a hover popup — too much text for "hover to check a verse" to stay
     // useful — so those are left as plain, unlinked text.
     if (!m.verse || !verses.length || verses.length > 6) return;
-    html += escHtml(text.slice(last, m.start));
+    html += escHtml(text.slice(last, start));
     const verseText = verses.map(v => v.text).join(" ").trim();
     const ref = `${m.name_en} ${m.chapter}:${m.verse}${m.verse_end ? "-" + m.verse_end : ""}`;
     const id = registerCiteId(ref, verseText);
@@ -1534,22 +1544,47 @@ document.addEventListener("click", e => {
    backend of this app's own — see CLAUDE.md), keyed by book:chapter:verse
    rather than per-translation, since "I marked this verse" is naturally
    translation-independent. ── */
-// Value is { color, createdAt } — older saves stored a bare color string;
-// migrated to the object shape in place, once, the first time it's read.
+// Value is { color, createdAt, groupId } — groupId ties every verse
+// highlighted in a single action into one My Library entry (same idea as
+// bookmarks below). Older saves stored a bare color string, then a
+// groupId-less object; both migrate in place, once, the first time it's read
+// (groupId:null = its own singleton entry).
 function getHighlights() {
   let m;
   try { m = JSON.parse(localStorage.getItem("iqb_highlights") || "{}"); } catch (e) { m = {}; }
   let migrated = false;
-  Object.keys(m).forEach(k => { if (typeof m[k] === "string") { m[k] = { color: m[k], createdAt: Date.now() }; migrated = true; } });
+  Object.keys(m).forEach(k => {
+    if (typeof m[k] === "string") { m[k] = { color: m[k], createdAt: Date.now(), groupId: null }; migrated = true; }
+    else if (m[k] && m[k].groupId === undefined) { m[k].groupId = null; migrated = true; }
+  });
   if (migrated) setHighlights(m);
   return m;
 }
 function setHighlights(m) { localStorage.setItem("iqb_highlights", JSON.stringify(m)); }
-// Value is a save timestamp (was a bare `true`) — any nonzero number is
-// still truthy everywhere this is checked, so old entries keep working;
-// they just show no date until re-bookmarked.
-function getBookmarks() { try { return JSON.parse(localStorage.getItem("iqb_bookmarks") || "{}"); } catch (e) { return {}; } }
+// Value is { createdAt, groupId } — groupId ties every verse bookmarked in a
+// single action (one contiguous or disjoint selection) into one My Library
+// entry instead of one card per verse. Older saves stored a bare timestamp,
+// or a bare `true` before that; both migrate to the object shape in place,
+// once, the first time this is read (groupId:null = its own singleton entry).
+function getBookmarks() {
+  let m;
+  try { m = JSON.parse(localStorage.getItem("iqb_bookmarks") || "{}"); } catch (e) { m = {}; }
+  let migrated = false;
+  Object.keys(m).forEach(k => {
+    if (typeof m[k] !== "object" || m[k] === null) {
+      m[k] = { createdAt: typeof m[k] === "number" ? m[k] : 0, groupId: null };
+      migrated = true;
+    } else if (m[k].groupId === undefined) {
+      m[k].groupId = null; migrated = true;
+    }
+  });
+  if (migrated) setBookmarks(m);
+  return m;
+}
 function setBookmarks(m) { localStorage.setItem("iqb_bookmarks", JSON.stringify(m)); }
+// Shared by bookmarks and highlights — a single verse-tools action stamps one
+// groupId on every verse it touches, so My Library shows it as one entry.
+function newAnnotationGroupId() { return "g_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 // Reading history — chapter-level, capped, clearable. A repeat visit to the
 // same chapter updates its timestamp in place instead of piling up
 // duplicates, so browsing back and forth doesn't flood the list.
@@ -1746,9 +1781,10 @@ function syncHighlightSwatchState() {
 function applyHighlightColor(color) {
   const map = getHighlights();
   const allSame = selectedVerses.every(v => (map[verseKey(current.book, current.chapter, v)] || {}).color === color);
+  const groupId = newAnnotationGroupId(), createdAt = Date.now();
   selectedVerses.forEach(v => {
     const k = verseKey(current.book, current.chapter, v);
-    if (allSame) delete map[k]; else map[k] = { color, createdAt: Date.now() };
+    if (allSame) delete map[k]; else map[k] = { color, createdAt, groupId };
   });
   setHighlights(map);
   applyVerseAnnotations();
@@ -1759,9 +1795,10 @@ function applyHighlightColor(color) {
 function toggleBookmarkSelection() {
   const map = getBookmarks();
   const allBookmarked = selectedVerses.every(v => map[verseKey(current.book, current.chapter, v)]);
+  const groupId = newAnnotationGroupId(), createdAt = Date.now();
   selectedVerses.forEach(v => {
     const k = verseKey(current.book, current.chapter, v);
-    if (allBookmarked) delete map[k]; else map[k] = Date.now();
+    if (allBookmarked) delete map[k]; else map[k] = { createdAt, groupId };
   });
   setBookmarks(map);
   applyVerseAnnotations();

@@ -30,6 +30,10 @@ This is a plain static site, so any static host works. Two are pre-configured:
 - **GitHub Pages**: enable Pages on your fork (Settings → Pages → deploy from a branch). `404.html` (a copy of `index.html`) makes deep links like `/gen/1/1` work on a fresh page load, which GitHub Pages doesn't otherwise support for a single-page app. The app expects to be served from the domain root — set a custom domain (Pages puts its name in the `CNAME` file and redirects the `username.github.io/reponame` path to it), or if you must serve it from a `/reponame` subpath, set `BASE_PATH` in `js/config.js` and add `<base href="/reponame/">` to `index.html`/`404.html`.
 - **Cloudflare Pages**: point it at this repo — `_redirects` already routes every path to `index.html`. Serve from the domain root.
 
+The app is an installable PWA: `manifest.webmanifest` and `sw.js` (a service worker that caches
+only the app shell — HTML/CSS/JS/icons — and never the API) sit at the site root and need no build
+step. **Bump `CACHE_VERSION` in `sw.js` whenever you deploy** so visitors pick up the new assets.
+
 The hosted instance also runs a Cloudflare Worker (`cloudflare/`) in front of the API — see the next section.
 
 ### If you're deploying for other people to use, not just yourself

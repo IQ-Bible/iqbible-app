@@ -16,13 +16,14 @@ let chapterMeta = [];
 // API itself documents, so traditions with extra OT-side books still split
 // correctly.
 const NT_USFM = new Set(["MAT", "MRK", "LUK", "JHN", "ACT", "ROM", "1CO", "2CO", "GAL", "EPH", "PHP", "COL", "1TH", "2TH", "1TI", "2TI", "TIT", "PHM", "HEB", "JAS", "1PE", "2PE", "1JN", "2JN", "3JN", "JUD", "REV"]);
-// The 39 protocanonical OT books. A version's book list (e.g. KJVA, DRC,
-// CPDV) can also include deuterocanonical/apocryphal/other extrabiblical
-// texts the API's catalog knows about (Tobit, Maccabees, Enoch, ...) —
-// anything outside these two sets is grouped as its own section rather than
-// enumerated by name, so the book picker doesn't need updating every time
-// the catalog's non-canonical coverage grows.
-const OT_USFM = new Set(["GEN", "EXO", "LEV", "NUM", "DEU", "JOS", "JDG", "RUT", "1SA", "2SA", "1KI", "2KI", "1CH", "2CH", "EZR", "NEH", "EST", "JOB", "PSA", "PRO", "ECC", "SNG", "ISA", "JER", "LAM", "EZK", "DAN", "HOS", "JOL", "AMO", "OBA", "JON", "MIC", "NAM", "HAB", "ZEP", "HAG", "ZEC", "MAL"]);
+// The book picker splits only OT vs NT (NT by the fixed set above; everything
+// else is "Old Testament"). It deliberately does NOT carve out a separate
+// "Apocrypha / Deuterocanon" section: the app is denominationally agnostic, so
+// on a version whose canon includes Tobit / Maccabees / Sirach / etc. (CPDV,
+// DRC, KJVA, …) those books belong under OT in the position the version's own
+// book list returns them — not quarantined into a section that presumes a
+// Protestant 66-book canon is the norm. The API returns books in each
+// version's canonical order, so preserving that order is all that's needed.
 
 /* ═══════════════════════════════════════════════════════════════════════
    GENERIC HELPERS */

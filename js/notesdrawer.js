@@ -583,14 +583,17 @@ async function ndRenderSwitcherList() {
     const snipSrc = hasTitle ? n.text : n.text.split("\n").slice(1).join(" ");
     const nb = n.notebookId ? notebookName(n.notebookId) : "";
     return `<div class="nd-list-item${n.id === activeId ? " active" : ""}" data-note-id="${n.id}">
-        <div class="nd-li-title">${title}</div>
+        <div class="nd-li-title" data-li-title="${n.id}">${title}</div>
         <div class="nd-li-snip" data-snip="${n.id}">${escHtml(snipSrc.trim().slice(0, 160))}</div>
         <div class="nd-li-meta">${nb ? `<span class="nd-li-nb">${escHtml(nb)}</span>` : ""}<span class="nd-li-refs" data-refs="${n.id}" hidden></span><span>${escHtml(ndRelTime(n.updatedAt))}</span></div>
       </div>`;
   }).join("");
 
-  // Per note: hover-previewable citations in the snippet + a ref count.
+  // Per note: hover-previewable citations in the title and snippet + a ref count.
   notes.forEach(async n => {
+    const titleEl = list.querySelector(`[data-li-title="${n.id}"]`);
+    const tSrc = titleEl && titleEl.textContent.trim();
+    if (titleEl && tSrc) { const h = await linkifyCitations(tSrc); if (titleEl.isConnected) titleEl.innerHTML = h; }
     const snip = list.querySelector(`[data-snip="${n.id}"]`);
     const src = snip && snip.textContent.trim();
     if (snip && src) { const h = await linkifyCitations(src); if (snip.isConnected) snip.innerHTML = h; }

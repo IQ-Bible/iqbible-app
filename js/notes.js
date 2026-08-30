@@ -200,6 +200,10 @@ async function renderNotesList() {
       const hasTitle = !!(n.title || "").trim();
       const previewSrc = hasTitle ? n.text : n.text.split("\n").slice(1).join("\n").trim();
       const previewHtml = previewSrc ? await renderNoteMarkdown(previewSrc) : "";
+      // A citation the visitor typed can land in the title too — a one-line
+      // note is all title, no preview — so the title itself is run through
+      // linkifyCitations (the shared helper) to stay hover/tap-previewable.
+      const titleHtml = await linkifyCitations(noteDisplayTitle(n));
       const tagsHtml = n.tags.slice(0, 4).map(t => `<span class="ncard-tag">${escHtml(t)}</span>`).join("");
       const ref = noteAnchorLabel(n);
       const nb = n.notebookId ? notebookName(n.notebookId) : "";
@@ -223,7 +227,7 @@ async function renderNotesList() {
             <button data-action="delete" class="danger" title="Delete" aria-label="Delete note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
           </div>
           ${moveMenu}
-          <h3 class="ncard-title">${escHtml(noteDisplayTitle(n))}</h3>
+          <h3 class="ncard-title">${titleHtml}</h3>
           ${previewHtml ? `<div class="ncard-preview note-md">${previewHtml}</div>` : (n.text.trim() ? "" : `<div class="ncard-preview"><span class="ncard-empty">Empty note</span></div>`)}
           <div class="ncard-foot">${foot}</div>
           ${tagsHtml ? `<div class="ncard-tags">${tagsHtml}</div>` : ""}
@@ -242,7 +246,7 @@ async function renderNotesList() {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
             <input id="notesSearchInline" type="text" placeholder="Search notes" value="${escAttr(notesQuery)}" autocomplete="off" spellcheck="false">
           </label>
-          <button class="notes-new-btn" data-notes-new><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New note</button>
+          <button class="notes-new-btn" data-notes-new><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span>New note</span></button>
         </div>
         <div class="notes-subhead">
           <span class="notes-count">${matches.length} ${matches.length === 1 ? "note" : "notes"}${scope ? ` in ${escHtml(scope)}` : ""}${notesActiveTag ? ` tagged “${escHtml(notesActiveTag)}”` : ""}</span>
@@ -481,10 +485,31 @@ function importNotesFile(input) {
   input.value = "";
 }
 
-/* ── Bookmarks tab — getBookmarks() (reader.js) is a flat {key:timestamp}
-   map with no cached text, so previews are fetched via the shared
-   fetchVersePreviews() (reader.js) batched call, one request for every
-   bookmark rather than one per verse. ── */
+/* ── Bookmarks tab — getBookmarks() (reader.js) is a flat
+   {key:{createdAt,groupId}} map with no cached text, so previews are fetched
+   via the shared fetchVersePreviews() (reader.js) batched call, one request
+   for every bookmarked verse rather than one per card. Verses bookmarked in
+   a single action share a groupId and collapse into one entry. ── */
+// Collapses the flat bookmark map into one entry per bookmarking action
+// (shared groupId); a legacy groupId:null bookmark becomes its own entry.
+// Sorted canonically. Shared by the Bookmarks tab and the Markdown export.
+function groupedBookmarkEntries(map) {
+  const groups = {};
+  Object.keys(map).forEach(k => {
+    const [book, chapter, verse] = k.split(":");
+    const v = map[k] || {};
+    const gid = v.groupId || k;
+    const g = groups[gid] || (groups[gid] = { keys: [], book, chapter: Number(chapter), verses: [], savedAt: 0 });
+    g.keys.push(k);
+    g.verses.push(Number(verse));
+    g.savedAt = Math.max(g.savedAt, v.createdAt || 0);
+  });
+  return Object.values(groups).map(g => {
+    g.verses.sort((a, b) => a - b);
+    g.verse = g.verses[0];
+    return g;
+  }).sort((a, b) => canonicalOrderCompare(a, b) || a.verse - b.verse);
+}
 async function renderBookmarksList() {
   const list = document.getElementById("libraryResultList");
   const map = getBookmarks();
@@ -495,56 +520,50 @@ async function renderBookmarksList() {
     return;
   }
 
-  let entries = Object.keys(map).map(k => {
-    const [book, chapter, verse] = k.split(":");
-    const savedAt = map[k];
-    return { key: k, book, chapter: Number(chapter), verse: Number(verse), savedAt: typeof savedAt === "number" ? savedAt : 0 };
-  });
-  entries = librarySort(entries, "savedAt", "verse");
+  let entries = librarySort(groupedBookmarkEntries(map), "savedAt", "verse");
 
-  const previewByRef = await fetchVersePreviews(entries);
+  const previewByRef = await fetchVersePreviews(
+    entries.flatMap(g => g.verses.map(v => ({ book: g.book, chapter: g.chapter, verse: v }))));
+  const groupLabel = g => `${notesBookName(g.book)} ${g.chapter}:${compressVerseRanges(g.verses)}`;
+  const groupText = g => g.verses.map(v => previewByRef[`${g.book}.${g.chapter}.${v}`]).filter(Boolean).join(" ");
 
-  if (q) entries = entries.filter(e => {
-    const label = `${notesBookName(e.book)} ${e.chapter}:${e.verse}`.toLowerCase();
-    const text = (previewByRef[`${e.book}.${e.chapter}.${e.verse}`] || "").toLowerCase();
-    return label.includes(q) || text.includes(q);
-  });
+  if (q) entries = entries.filter(g => groupLabel(g).toLowerCase().includes(q) || groupText(g).toLowerCase().includes(q));
   if (!entries.length) { list.innerHTML = `<div class="emptynote">No bookmarks match.</div>`; return; }
 
-  list.innerHTML = entries.map((e, i) => {
-    const label = `${notesBookName(e.book)} ${e.chapter}:${e.verse}`;
-    const text = previewByRef[`${e.book}.${e.chapter}.${e.verse}`];
+  list.innerHTML = entries.map((g, i) => {
+    const label = groupLabel(g);
+    const text = groupText(g);
+    const citeAttr = text ? ` data-cite-id="${registerCiteId(label, text)}"` : "";
     return `
-      <div class="result-card bookmark-card" style="animation-delay:${Math.min(i * 25, 250)}ms" data-bookmark-key="${e.key}">
-        <div class="result-ref">${escHtml(label)}</div>
+      <div class="result-card bookmark-card" style="animation-delay:${Math.min(i * 25, 250)}ms" data-bookmark-key="${g.keys[0]}" data-bookmark-keys="${g.keys.join(',')}">
+        <div class="result-ref"${citeAttr}>${escHtml(label)}</div>
         ${text ? `<div class="result-text">${escHtml(text)}</div>` : ""}
-        ${e.savedAt ? `<div class="result-meta">${escHtml(fmtDate(e.savedAt))}</div>` : ""}
+        ${g.savedAt ? `<div class="result-meta">${escHtml(fmtDate(g.savedAt))}</div>` : ""}
         <div class="note-card-actions"><button data-action="remove" class="danger">Remove</button></div>
       </div>`;
   }).join("");
 }
-function removeBookmarkFromBrowser(key) {
+function removeBookmarkFromBrowser(keys) {
+  const list = Array.isArray(keys) ? keys : String(keys).split(",").filter(Boolean);
   const map = getBookmarks();
-  delete map[key];
+  list.forEach(k => delete map[k]);
   setBookmarks(map);
-  const [book, chapter] = key.split(":");
-  if (current.book === book && current.chapter === Number(chapter)) applyVerseAnnotations();
-  toast("Bookmark removed");
+  if (list.some(k => k.startsWith(`${current.book}:${current.chapter}:`))) applyVerseAnnotations();
+  toast(list.length > 1 ? "Bookmarks removed" : "Bookmark removed");
   renderLibraryList();
 }
 async function exportBookmarksMarkdown() {
   const map = getBookmarks();
-  const keys = Object.keys(map);
-  if (!keys.length) { toast("No bookmarks to export"); return; }
-  const entries = keys.map(k => { const [book, chapter, verse] = k.split(":"); return { book, chapter: Number(chapter), verse: Number(verse), savedAt: map[k] }; })
-    .sort((a, b) => canonicalOrderCompare(a, b) || a.verse - b.verse);
-  const previewByRef = await fetchVersePreviews(entries);
+  if (!Object.keys(map).length) { toast("No bookmarks to export"); return; }
+  const groups = groupedBookmarkEntries(map);
+  const previewByRef = await fetchVersePreviews(
+    groups.flatMap(g => g.verses.map(v => ({ book: g.book, chapter: g.chapter, verse: v }))));
   let md = `# My Bookmarks — IQ Bible App\nExported ${new Date().toLocaleString()}\n\n`;
   let lastBook = null;
-  entries.forEach(e => {
-    if (e.book !== lastBook) { md += `${lastBook !== null ? "\n" : ""}## ${notesBookName(e.book)}\n\n`; lastBook = e.book; }
-    const text = previewByRef[`${e.book}.${e.chapter}.${e.verse}`];
-    md += `- **${notesBookName(e.book)} ${e.chapter}:${e.verse}**${text ? " — " + text : ""}\n`;
+  groups.forEach(g => {
+    if (g.book !== lastBook) { md += `${lastBook !== null ? "\n" : ""}## ${notesBookName(g.book)}\n\n`; lastBook = g.book; }
+    const text = g.verses.map(v => previewByRef[`${g.book}.${g.chapter}.${v}`]).filter(Boolean).join(" ");
+    md += `- **${notesBookName(g.book)} ${g.chapter}:${compressVerseRanges(g.verses)}**${text ? " — " + text : ""}\n`;
   });
   downloadTextFile("iqbible-bookmarks.md", "text/markdown", md);
 }
@@ -565,9 +584,11 @@ function importBookmarksFile(input) {
     if (!incoming || typeof incoming !== "object" || Array.isArray(incoming)) { toast("Import failed — no valid bookmarks found"); return; }
     const map = getBookmarks();
     let count = 0;
-    Object.entries(incoming).forEach(([k, savedAt]) => {
+    Object.entries(incoming).forEach(([k, val]) => {
       if (!/^[A-Za-z0-9]+:\d+:\d+$/.test(k)) return;
-      map[k] = typeof savedAt === "number" ? savedAt : Date.now();
+      map[k] = val && typeof val === "object"
+        ? { createdAt: typeof val.createdAt === "number" ? val.createdAt : Date.now(), groupId: val.groupId || null }
+        : { createdAt: typeof val === "number" ? val : Date.now(), groupId: null };
       count++;
     });
     if (!count) { toast("Import failed — no valid bookmarks found"); return; }
@@ -580,10 +601,28 @@ function importBookmarksFile(input) {
   input.value = "";
 }
 
-/* ── Highlights tab — getHighlights() (reader.js) is { key: {color,
-   createdAt} }; same batched-preview shape as Bookmarks, plus a color
-   swatch reusing the existing .vtswatch.hl-* dot styling from Verse
-   Tools. ── */
+/* ── Highlights tab — getHighlights() (reader.js) is
+   { key: {color,createdAt,groupId} }; same batched-preview + grouping shape
+   as Bookmarks (verses highlighted in one action share a groupId and collapse
+   into one entry), plus a color swatch reusing the existing .vtswatch.hl-*
+   dot styling from Verse Tools. ── */
+function groupedHighlightEntries(map) {
+  const groups = {};
+  Object.keys(map).forEach(k => {
+    const [book, chapter, verse] = k.split(":");
+    const v = map[k] || {};
+    const gid = v.groupId || k;
+    const g = groups[gid] || (groups[gid] = { keys: [], book, chapter: Number(chapter), verses: [], color: v.color, savedAt: 0 });
+    g.keys.push(k);
+    g.verses.push(Number(verse));
+    g.savedAt = Math.max(g.savedAt, v.createdAt || 0);
+  });
+  return Object.values(groups).map(g => {
+    g.verses.sort((a, b) => a - b);
+    g.verse = g.verses[0];
+    return g;
+  }).sort((a, b) => canonicalOrderCompare(a, b) || a.verse - b.verse);
+}
 async function renderHighlightsList() {
   const list = document.getElementById("libraryResultList");
   const map = getHighlights();
@@ -594,55 +633,50 @@ async function renderHighlightsList() {
     return;
   }
 
-  let entries = Object.keys(map).map(k => {
-    const [book, chapter, verse] = k.split(":");
-    return { key: k, book, chapter: Number(chapter), verse: Number(verse), color: map[k].color, savedAt: map[k].createdAt || 0 };
-  });
-  entries = librarySort(entries, "savedAt", "verse");
+  let entries = librarySort(groupedHighlightEntries(map), "savedAt", "verse");
 
-  const previewByRef = await fetchVersePreviews(entries);
+  const previewByRef = await fetchVersePreviews(
+    entries.flatMap(g => g.verses.map(v => ({ book: g.book, chapter: g.chapter, verse: v }))));
+  const groupLabel = g => `${notesBookName(g.book)} ${g.chapter}:${compressVerseRanges(g.verses)}`;
+  const groupText = g => g.verses.map(v => previewByRef[`${g.book}.${g.chapter}.${v}`]).filter(Boolean).join(" ");
 
-  if (q) entries = entries.filter(e => {
-    const label = `${notesBookName(e.book)} ${e.chapter}:${e.verse}`.toLowerCase();
-    const text = (previewByRef[`${e.book}.${e.chapter}.${e.verse}`] || "").toLowerCase();
-    return label.includes(q) || text.includes(q);
-  });
+  if (q) entries = entries.filter(g => groupLabel(g).toLowerCase().includes(q) || groupText(g).toLowerCase().includes(q));
   if (!entries.length) { list.innerHTML = `<div class="emptynote">No highlights match.</div>`; return; }
 
-  list.innerHTML = entries.map((e, i) => {
-    const label = `${notesBookName(e.book)} ${e.chapter}:${e.verse}`;
-    const text = previewByRef[`${e.book}.${e.chapter}.${e.verse}`];
+  list.innerHTML = entries.map((g, i) => {
+    const label = groupLabel(g);
+    const text = groupText(g);
+    const citeAttr = text ? ` data-cite-id="${registerCiteId(label, text)}"` : "";
     return `
-      <div class="result-card highlight-card" style="animation-delay:${Math.min(i * 25, 250)}ms" data-highlight-key="${e.key}">
-        <div class="result-ref"><span class="vtswatch hl-${e.color}" style="display:inline-block;margin-right:8px"></span>${escHtml(label)}</div>
+      <div class="result-card highlight-card" style="animation-delay:${Math.min(i * 25, 250)}ms" data-highlight-key="${g.keys[0]}" data-highlight-keys="${g.keys.join(',')}">
+        <div class="result-ref"${citeAttr}><span class="vtswatch hl-${g.color}" style="display:inline-block;margin-right:8px"></span>${escHtml(label)}</div>
         ${text ? `<div class="result-text">${escHtml(text)}</div>` : ""}
-        ${e.savedAt ? `<div class="result-meta">${escHtml(fmtDate(e.savedAt))}</div>` : ""}
+        ${g.savedAt ? `<div class="result-meta">${escHtml(fmtDate(g.savedAt))}</div>` : ""}
         <div class="note-card-actions"><button data-action="remove" class="danger">Remove</button></div>
       </div>`;
   }).join("");
 }
-function removeHighlightFromBrowser(key) {
+function removeHighlightFromBrowser(keys) {
+  const list = Array.isArray(keys) ? keys : String(keys).split(",").filter(Boolean);
   const map = getHighlights();
-  delete map[key];
+  list.forEach(k => delete map[k]);
   setHighlights(map);
-  const [book, chapter] = key.split(":");
-  if (current.book === book && current.chapter === Number(chapter)) applyVerseAnnotations();
-  toast("Highlight removed");
+  if (list.some(k => k.startsWith(`${current.book}:${current.chapter}:`))) applyVerseAnnotations();
+  toast(list.length > 1 ? "Highlights removed" : "Highlight removed");
   renderLibraryList();
 }
 async function exportHighlightsMarkdown() {
   const map = getHighlights();
-  const keys = Object.keys(map);
-  if (!keys.length) { toast("No highlights to export"); return; }
-  const entries = keys.map(k => { const [book, chapter, verse] = k.split(":"); return { book, chapter: Number(chapter), verse: Number(verse), color: map[k].color }; })
-    .sort((a, b) => canonicalOrderCompare(a, b) || a.verse - b.verse);
-  const previewByRef = await fetchVersePreviews(entries);
+  if (!Object.keys(map).length) { toast("No highlights to export"); return; }
+  const groups = groupedHighlightEntries(map);
+  const previewByRef = await fetchVersePreviews(
+    groups.flatMap(g => g.verses.map(v => ({ book: g.book, chapter: g.chapter, verse: v }))));
   let md = `# My Highlights — IQ Bible App\nExported ${new Date().toLocaleString()}\n\n`;
   let lastBook = null;
-  entries.forEach(e => {
-    if (e.book !== lastBook) { md += `${lastBook !== null ? "\n" : ""}## ${notesBookName(e.book)}\n\n`; lastBook = e.book; }
-    const text = previewByRef[`${e.book}.${e.chapter}.${e.verse}`];
-    md += `- **${notesBookName(e.book)} ${e.chapter}:${e.verse}** (${e.color})${text ? " — " + text : ""}\n`;
+  groups.forEach(g => {
+    if (g.book !== lastBook) { md += `${lastBook !== null ? "\n" : ""}## ${notesBookName(g.book)}\n\n`; lastBook = g.book; }
+    const text = g.verses.map(v => previewByRef[`${g.book}.${g.chapter}.${v}`]).filter(Boolean).join(" ");
+    md += `- **${notesBookName(g.book)} ${g.chapter}:${compressVerseRanges(g.verses)}** (${g.color})${text ? " — " + text : ""}\n`;
   });
   downloadTextFile("iqbible-highlights.md", "text/markdown", md);
 }
@@ -667,7 +701,7 @@ function importHighlightsFile(input) {
       if (!/^[A-Za-z0-9]+:\d+:\d+$/.test(k)) return;
       const color = typeof v === "string" ? v : (v && v.color);
       if (!HIGHLIGHT_COLOR_ORDER.includes(color)) return;
-      map[k] = { color, createdAt: (v && v.createdAt) || Date.now() };
+      map[k] = { color, createdAt: (v && v.createdAt) || Date.now(), groupId: (v && v.groupId) || null };
       count++;
     });
     if (!count) { toast("Import failed — no valid highlights found"); return; }
@@ -843,7 +877,7 @@ libraryResultList && libraryResultList.addEventListener("click", async e => {
   if (bmCard) {
     const key = bmCard.dataset.bookmarkKey;
     const action = e.target.closest("[data-action]");
-    if (action && action.dataset.action === "remove") { removeBookmarkFromBrowser(key); return; }
+    if (action && action.dataset.action === "remove") { removeBookmarkFromBrowser(bmCard.dataset.bookmarkKeys || key); return; }
     const [book, chapter, verse] = key.split(":");
     closeLibrary();
     await jumpToVerse(book, Number(chapter), Number(verse));
@@ -853,7 +887,7 @@ libraryResultList && libraryResultList.addEventListener("click", async e => {
   if (hlCard) {
     const key = hlCard.dataset.highlightKey;
     const action = e.target.closest("[data-action]");
-    if (action && action.dataset.action === "remove") { removeHighlightFromBrowser(key); return; }
+    if (action && action.dataset.action === "remove") { removeHighlightFromBrowser(hlCard.dataset.highlightKeys || key); return; }
     const [book, chapter, verse] = key.split(":");
     closeLibrary();
     await jumpToVerse(book, Number(chapter), Number(verse));
