@@ -212,7 +212,6 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
                 onkeydown="if(event.key==='Escape') closeLibrary()" autocomplete="off">
               <button type="button" class="mclear" aria-label="Clear" onclick="clearSearchInput('librarySearchInput')">&times;</button>
             </div>
-            <div class="overlay-filters" id="notesTagChips"></div>
             <div class="overlay-filters" id="librarySortRow">
               <span class="filter-label">Sort:</span>
               <button class="filter-chip" id="librarySortBookChip" onclick="setLibrarySort('book')">By Book</button>
@@ -226,20 +225,10 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
               </span>
             </div>
             <div class="notes-toolbar" id="notesToolbar">
-              <button onclick="openNoteComposer()">+ New Note</button>
               <button onclick="exportNotesMarkdown()">Export Markdown</button>
               <button onclick="exportNotesJSON()">Export JSON</button>
               <button onclick="triggerNotesImport()">Import</button>
               <input type="file" id="notesImportInput" accept="application/json" style="display:none" onchange="importNotesFile(this)">
-            </div>
-            <div class="new-note-composer" id="newNoteComposer" style="display:none">
-              <input type="text" id="newNoteTitle" class="vt-note-tags" placeholder="Title (optional)">
-              <textarea id="newNoteText" class="vt-note-input" placeholder="Write a note…"></textarea>
-              <input type="text" id="newNoteTags" class="vt-note-tags" placeholder="Tags, comma-separated">
-              <div class="new-note-composer-actions">
-                <button class="setsave" onclick="saveGeneralNote()">Save Note</button>
-                <button class="vt-note-delete" onclick="closeNoteComposer()">Cancel</button>
-              </div>
             </div>
             <div class="notes-toolbar" id="bookmarksToolbar" style="display:none">
               <button onclick="exportBookmarksMarkdown()">Export Markdown</button>
@@ -593,12 +582,12 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
             <div class="help-card">
               <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-6-4-6 4z"/></svg></div>
               <div class="help-card-title">My Library</div>
-              <div class="help-card-body">Notes, bookmarks, highlights and history, all in one place.</div>
+              <div class="help-card-body">Notes, bookmarks, highlights and history, all in one place. Notes can be grouped into notebooks and filtered by notebook or tag.</div>
             </div>
             <div class="help-card">
               <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5V4Z"/><path d="M9 10h6M9 14h6"/></svg></div>
               <div class="help-card-title">Notes drawer</div>
-              <div class="help-card-body">A dockable notes panel you can open from anywhere with the N key. It opens on a read view where every reference in the note is hover-previewable and a light Markdown subset (bold, italic, headings, lists, quotes) is rendered; hit Edit (or click the text) to change it, with a small formatting toolbar and Ctrl/Cmd+B / +I. "Add to Note" in Verse Tools drops the selected verse straight in. On a phone it's a bottom sheet you can drag by its grip to resize — and the passage stays readable behind it.</div>
+              <div class="help-card-body">The one place notes are written — a dockable panel you can open from anywhere with the N key, and where My Library's notes open to edit too. It shows a read view with every reference hover-previewable and a light Markdown subset (bold, italic, headings, lists, quotes) rendered; hit Edit (or click the text) for the formatting toolbar and Ctrl/Cmd+B / +I. Verse Tools ▸ Note drops a verse's reference and text into a new note, the current one, or one you pick. Assign a note to a notebook from the footer. On a phone it's a bottom sheet you can drag by its grip to resize — and the passage stays readable behind it.</div>
             </div>
             <div class="help-card">
               <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg></div>
@@ -637,7 +626,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
           </div>
           <div class="help-faq-item">
             <div class="help-faq-q">How do I take notes?</div>
-            <div class="help-faq-a">Two kinds. A note tied to a verse: select the verse, then Verse Tools ▸ Note. A free-standing note: open the Notes drawer (press N anywhere, or the Notes button at the bottom-right) — it autosaves as you type, keeps one note "active", and takes a light Markdown subset (bold, italic, headings, lists, quotes) that renders on the read view. Verse Tools ▸ Add to Note drops the selected verse's reference and text into that active note. Everything is searchable, taggable and exportable from My Library.</div>
+            <div class="help-faq-a">Open the Notes drawer — press N anywhere, or the Notes button at the bottom-right. It autosaves as you type, keeps one note "active", and takes a light Markdown subset (bold, italic, headings, lists, quotes) that renders on the read view. To pull a verse in, select it and use Verse Tools ▸ Note, then choose a new note, the current one, or an existing one — its reference and text get dropped in and the verse shows a note icon in the margin. Group notes into notebooks, and search, tag, filter and export everything from My Library.</div>
           </div>
           <div class="help-faq-item">
             <div class="help-faq-q">What are the cards next to the reading pane?</div>
@@ -696,8 +685,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
           <button class="vtswatch hl-pink" data-color="pink" onclick="applyHighlightColor('pink')" title="Pink highlight" aria-label="Pink highlight"></button>
         </div>
         <button class="vtcell vtbtn" onclick="toggleBookmarkSelection()">Bookmark</button>
-        <button class="vtcell vtbtn" onclick="openNoteTool()">Note</button>
-        <button class="vtcell vtbtn" onclick="addSelectionToActiveNote()">Add to Note</button>
+        <button class="vtcell vtbtn" onclick="openNoteTargetPicker()">Note</button>
         <button class="vtcell vtbtn" onclick="copySelection()">Copy</button>
         <button class="vtcell vtbtn" onclick="showShareTool()">Share</button>
         <button class="vtcell vtbtn" onclick="showOriginalLanguageTool()">Orig. Language</button>
@@ -1067,9 +1055,11 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
       <div class="nd-switcher" id="ndSwitcher" hidden>
         <label class="nd-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input id="ndSearch" type="text" placeholder="Search notes" aria-label="Search notes"></label>
         <button class="nd-newnote" onclick="ndNewNote()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New note</button>
+        <div class="nd-nb-filter" id="ndNbFilter" hidden></div>
         <div class="nd-list" id="ndList"></div>
       </div>
       <div class="nd-editor-wrap">
+        <div class="nd-anchors" id="ndAnchors" hidden aria-label="Verses this note is tied to"></div>
         <div class="nd-toolbar" id="ndToolbar" hidden role="toolbar" aria-label="Formatting">
           <button type="button" class="nd-tb" data-fmt="bold" title="Bold (Ctrl+B)" aria-label="Bold"><b>B</b></button>
           <button type="button" class="nd-tb" data-fmt="italic" title="Italic (Ctrl+I)" aria-label="Italic"><i>I</i></button>
@@ -1083,12 +1073,18 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
       </div>
     </div>
     <footer class="nd-foot">
+      <div class="nd-notebook-wrap">
+        <button type="button" class="nd-notebook" id="ndNotebookBtn" title="Assign a notebook" aria-label="Assign a notebook">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h13a2 2 0 0 1 2 2v12H6a2 2 0 0 1-2-2V5Z"/><path d="M4 5a2 2 0 0 1 2-2h11"/></svg>
+          <span>Notebook</span>
+        </button>
+        <div class="nd-notebook-menu" id="ndNotebookMenu" hidden></div>
+      </div>
       <div class="nd-tags" id="ndTags">
         <input id="ndTagInput" class="nd-tag-input" placeholder="+ tag" aria-label="Add tag">
       </div>
       <div class="nd-foot-right">
         <button class="nd-foot-btn" id="ndAttachBtn" onclick="addSelectionToActiveNote()" hidden></button>
-        <button class="nd-foot-link" onclick="closeNotesDrawer();openLibrary()">Open in My Library &#8599;</button>
       </div>
     </footer>
   </section>

@@ -101,6 +101,12 @@ function highlightWords(html, words) {
   return html;
 }
 async function jumpToVerse(bookUsfm, chapter, verse, verseEnd) {
+  // Landing on a verse always means "show it in the reader" — if a menu view
+  // (Study Tools, My Library, …) is covering it, surface the reading view
+  // first so the chapter renders (and its nav buttons get positioned) into a
+  // visible layout, not a display:none one.
+  const rvg = document.getElementById("readViewGroup");
+  if (rvg && rvg.style.display === "none" && typeof switchMainView === "function") switchMainView("read");
   const b = bookList.find(x => x.usfm === bookUsfm);
   current.book = bookUsfm;
   current.bookName = b ? b.name : bookUsfm;

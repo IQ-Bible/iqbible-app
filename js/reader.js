@@ -1207,6 +1207,22 @@ async function renderNoteMarkdown(text) {
   if (!text || !text.trim()) return "";
   return ndMarkdownToHtml(await linkifyCitations(text), text);
 }
+// Flatten the Markdown subset to plain text for a one-line label (launcher
+// pill, switcher/list titles) — so a note that opens with "### …" or "- …"
+// reads as a sentence, not as raw source.
+function stripNoteMarkdown(s) {
+  return (s || "")
+    .replace(/^\s*#{1,6}\s+/, "")
+    .replace(/^\s*>\s?/, "")
+    .replace(/^\s*[-*+]\s+/, "")
+    .replace(/^\s*\d+[.)]\s+/, "")
+    .replace(/^\s*([-*_])\s*(\1\s*){2,}$/, "")            // hr
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .trim();
+}
 
 // Commentary (GET /commentaries/...) and dictionary (GET /dictionaries/{id}
 // ?q=...) entries already carry a server-parsed `citations` array over their
@@ -1449,26 +1465,82 @@ function logHistoryVisit() {
   if (hist.length > 200) hist.splice(0, hist.length - 200);
   setHistory(hist);
 }
-// Notes are objects, not a flat one-verse-per-key map, so one note can cover
-// a multi-verse selection: { id, book, chapter, verses:[1,2,3], text, tags, createdAt, updatedAt }.
-// `verses` is the exact selected set (not just start/end) since a plain click
+// One unified note shape — a document that may be anchored to zero or more
+// verses across the whole Bible:
+//   { id, title, text, tags:[], notebookId,        // null notebookId = Unfiled
+//     anchors:[{book,chapter,verse}],              // 0..n; drives the reading-view note icon
+//     version, versionTitle, createdAt, updatedAt }
+// `anchors` is the exact verse set (not just start/end) since a plain click
 // (not shift-click) can build a disjoint selection — see selectVerse() below.
 function getNotes() {
   let raw;
   try { raw = JSON.parse(localStorage.getItem("iqb_notes") || "[]"); } catch (e) { raw = []; }
   if (!Array.isArray(raw)) {
-    // Legacy shape: { "book:chapter:verse": "text" }. Migrate once, in place.
-    const migrated = Object.entries(raw).map(([k, text]) => {
+    // Oldest shape: { "book:chapter:verse": "text" }. Migrate once, in place.
+    raw = Object.entries(raw).map(([k, text]) => {
       const [book, chapter, verse] = k.split(":");
       return { id: newNoteId(), book, chapter: Number(chapter), verses: [Number(verse)], text, tags: [], createdAt: Date.now(), updatedAt: Date.now() };
     });
-    setNotes(migrated);
-    return migrated;
   }
+  // Second migration: the old two-shape model (verse-tied `{book,chapter,verses}`
+  // vs free `{book:null}`) folds into one — the verse becomes an anchor, so the
+  // reading-view icon still shows, and every note is now just a document.
+  let changed = false;
+  raw.forEach(n => {
+    if (!Array.isArray(n.anchors)) {
+      n.anchors = n.book && Array.isArray(n.verses)
+        ? n.verses.map(v => ({ book: n.book, chapter: Number(n.chapter), verse: Number(v) }))
+        : [];
+      delete n.book; delete n.chapter; delete n.verses;
+      changed = true;
+    }
+    if (n.notebookId === undefined) { n.notebookId = null; changed = true; }
+    if (typeof n.title !== "string") { n.title = ""; changed = true; }
+  });
+  if (changed) setNotes(raw);
   return raw;
 }
 function setNotes(arr) { localStorage.setItem("iqb_notes", JSON.stringify(arr)); }
 function newNoteId() { return "n_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+/* ── notebooks: named groups a note can belong to (notebookId), local-only.
+   Deleting a notebook never deletes its notes — they fall back to Unfiled. ── */
+function getNotebooks() {
+  try { const a = JSON.parse(localStorage.getItem("iqb_notebooks") || "[]"); return Array.isArray(a) ? a : []; }
+  catch (e) { return []; }
+}
+function setNotebooks(arr) { localStorage.setItem("iqb_notebooks", JSON.stringify(arr)); }
+function newNotebookId() { return "nb_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+function createNotebook(name) {
+  name = (name || "").trim();
+  if (!name) return null;
+  const books = getNotebooks();
+  const existing = books.find(b => b.name.toLowerCase() === name.toLowerCase());
+  if (existing) return existing;
+  const nb = { id: newNotebookId(), name, createdAt: Date.now() };
+  books.push(nb);
+  setNotebooks(books);
+  return nb;
+}
+function renameNotebook(id, name) {
+  name = (name || "").trim();
+  if (!name) return;
+  const books = getNotebooks();
+  const nb = books.find(b => b.id === id);
+  if (nb) { nb.name = name; setNotebooks(books); }
+}
+function deleteNotebook(id) {
+  setNotebooks(getNotebooks().filter(b => b.id !== id));
+  const notes = getNotes();
+  let touched = false;
+  notes.forEach(n => { if (n.notebookId === id) { n.notebookId = null; n.updatedAt = Date.now(); touched = true; } });
+  if (touched) setNotes(notes);
+}
+function notebookName(id) {
+  if (!id) return "";
+  const nb = getNotebooks().find(b => b.id === id);
+  return nb ? nb.name : "";
+}
 
 /* ── DATA BACKUP AWARENESS — this app has no accounts/backend (see
    NOTES.md's "generic per-user data store" gap): notes/bookmarks/highlights
@@ -1513,8 +1585,9 @@ function applyVerseAnnotations() {
   // verse -> covering note, for the chapter on screen only.
   const noteByVerse = {};
   getNotes().forEach(n => {
-    if (n.book !== current.book || n.chapter !== current.chapter) return;
-    n.verses.forEach(v => { noteByVerse[v] = n; });
+    (n.anchors || []).forEach(a => {
+      if (a.book === current.book && a.chapter === current.chapter) noteByVerse[a.verse] = n;
+    });
   });
   document.querySelectorAll(".verse-span").forEach(span => {
     const v = Number(span.dataset.verse);
@@ -1527,20 +1600,25 @@ function applyVerseAnnotations() {
       if (!badge) {
         badge = document.createElement("span");
         badge.className = "verse-badge";
-        const vnum = span.querySelector(".vnum");
-        if (vnum) vnum.insertAdjacentElement("afterend", badge); else span.insertBefore(badge, span.firstChild);
+        // Always trail the marker at the end of the verse — a leading
+        // superscript collides with the first verse's big floated .dropcap,
+        // and mixing leading/trailing by verse looked inconsistent.
+        span.appendChild(badge);
       }
       badge.innerHTML = (bookmarks[k] ? BOOKMARK_ICON : "") + (note ? NOTE_ICON : "");
-      // Clicking the note icon jumps straight to editing that note's full
-      // range, not just this one verse — so a multi-verse note doesn't need
-      // to be re-selected by shift-click to edit it again.
       badge.onclick = e => {
         e.stopPropagation();
-        selectedVerses = note ? [...note.verses] : [v];
-        lastClickedVerse = v;
-        renderVerseSelectionUI();
-        openVerseTools();
-        if (note) openNoteTool();
+        if (note) {
+          // Open the note itself in the drawer — it's a document now, not a
+          // verse-scoped annotation.
+          setActiveNoteId(note.id);
+          openNotesDrawer();
+        } else {
+          selectedVerses = [v];
+          lastClickedVerse = v;
+          renderVerseSelectionUI();
+          openVerseTools();
+        }
       };
     } else if (badge) {
       badge.remove();
@@ -1592,51 +1670,35 @@ function toggleBookmarkSelection() {
   toast(allBookmarked ? "Bookmark removed" : "Bookmarked");
   if (!allBookmarked) maybeShowFirstTimeDataWarning();
 }
-// Finds a note whose stored verse set exactly matches the current selection
-// (both sorted) so re-opening the Note tool on the same selection edits it
-// instead of starting a blank one.
-function findNoteForSelection() {
-  const sel = [...selectedVerses].sort((a, b) => a - b);
-  return getNotes().find(n => n.book === current.book && n.chapter === current.chapter
-    && n.verses.length === sel.length && n.verses.every((v, i) => v === sel[i]));
-}
-function openNoteTool() {
+// Verse Tools ▸ Note — pick where the selected verse's reference + text lands:
+// a new note, the current (active) note, or an existing one. The append and
+// anchor bookkeeping live in addSelectionToNote() (js/notesdrawer.js).
+function openNoteTargetPicker() {
   const body = document.getElementById("vtBody");
-  const existing = findNoteForSelection();
   body.innerHTML = `
-    <textarea id="vtNoteInput" class="vt-note-input" placeholder="Add a note for ${escAttr(selectionRefLabel())}…">${escHtml(existing ? existing.text : "")}</textarea>
-    <input type="text" id="vtNoteTags" class="vt-note-tags" placeholder="Tags, comma-separated (e.g. sermon prep, key verse)" value="${escAttr(existing ? existing.tags.join(", ") : "")}">
-    <button class="setsave" style="margin-top:12px" onclick="saveNoteTool(${existing ? `'${existing.id}'` : "null"})">Save Note</button>
-    ${existing ? `<button class="vt-note-delete" onclick="deleteNoteTool('${existing.id}')">Delete Note</button>` : ""}`;
-}
-function saveNoteTool(existingId) {
-  const text = document.getElementById("vtNoteInput").value.trim();
-  const tags = document.getElementById("vtNoteTags").value.split(",").map(t => t.trim().toLowerCase()).filter(Boolean);
-  const notes = getNotes();
-  if (!text) {
-    if (existingId) { setNotes(notes.filter(n => n.id !== existingId)); applyVerseAnnotations(); toast("Note removed"); openNoteTool(); }
-    return;
+    <div class="vt-note-pick-head">Add <strong>${escHtml(selectionRefLabel())}</strong> to a note</div>
+    <button class="setsave" style="margin-top:10px" onclick="addSelectionToNote('new')">+ New note</button>
+    <div id="vtNotePickCurrent"></div>
+    <input type="text" id="vtNotePickSearch" class="vt-note-tags" style="margin-top:10px" placeholder="Search your notes…" oninput="renderNotePickList()" autocomplete="off">
+    <div id="vtNotePickList" class="vt-note-pick-list"></div>`;
+  const active = typeof getActiveNote === "function" ? getActiveNote() : null;
+  if (active) {
+    document.getElementById("vtNotePickCurrent").innerHTML =
+      `<button class="vt-note-pick vt-note-pick-current" onclick="addSelectionToNote('current')">Current note — <span>${escHtml(ndNoteLabel(active))}</span></button>`;
   }
-  if (existingId) {
-    const n = notes.find(n => n.id === existingId);
-    n.text = text; n.tags = tags; n.updatedAt = Date.now();
-  } else {
-    // version/versionTitle are provenance of authorship (what translation was
-    // open when this was written), not updated on later edits — display-only,
-    // never used for matching/lookup.
-    notes.push({ id: newNoteId(), book: current.book, chapter: current.chapter, verses: [...selectedVerses].sort((a, b) => a - b), text, tags, version: current.version, versionTitle: current.versionTitle, createdAt: Date.now(), updatedAt: Date.now() });
-    maybeShowFirstTimeDataWarning();
-  }
-  setNotes(notes);
-  applyVerseAnnotations();
-  toast("Note saved");
-  openNoteTool();
+  renderNotePickList();
 }
-function deleteNoteTool(id) {
-  setNotes(getNotes().filter(n => n.id !== id));
-  applyVerseAnnotations();
-  toast("Note removed");
-  openNoteTool();
+function renderNotePickList() {
+  const wrap = document.getElementById("vtNotePickList");
+  if (!wrap) return;
+  const q = (document.getElementById("vtNotePickSearch").value || "").trim().toLowerCase();
+  const activeId = typeof getActiveNoteId === "function" ? getActiveNoteId() : "";
+  let notes = [...getNotes()].sort((a, b) => b.updatedAt - a.updatedAt).filter(n => n.id !== activeId);
+  if (q) notes = notes.filter(n => (n.title || "").toLowerCase().includes(q) || (n.text || "").toLowerCase().includes(q) || (n.tags || []).some(t => t.includes(q)));
+  notes = notes.slice(0, q ? 20 : 6);
+  wrap.innerHTML = notes.length
+    ? notes.map(n => `<button class="vt-note-pick" onclick="addSelectionToNote('${n.id}')">${escHtml(ndNoteLabel(n))}</button>`).join("")
+    : (q ? `<div class="vt-note-pick-empty">No notes match.</div>` : "");
 }
 
 // Strips the verse number (and, for the first verse in the selection, the

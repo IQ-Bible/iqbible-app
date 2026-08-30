@@ -52,9 +52,11 @@ If you want anonymous end users to skip that step (a consumer app rather than a 
   prophecy fulfillment pairs, and a curated biblical timeline
 - Verse-level study tools: highlights/bookmarks/notes, original-language word data, cross-references,
   commentary, parallel-translation comparison, and topics
-- A dockable **Notes drawer** openable from anywhere (the `N` key), with quick-capture of a verse
-  from Verse Tools into the active note; notes take a light Markdown subset (bold, italic, headings,
-  lists, quotes) rendered on the read view alongside the usual verse hover-previews
+- A dockable **Notes drawer** openable from anywhere (the `N` key) — the single editor for every
+  note. Verse Tools ▸ Note drops a verse's reference and text into a new note, the current one, or
+  one you pick, and the verse gets a margin icon; notes can be grouped into notebooks, and take a
+  light Markdown subset (bold, italic, headings, lists, quotes) rendered on the read view alongside
+  the usual verse hover-previews
 - **Explore**: a Gospel-harmony parallel-column viewer, a topic browser, a standalone Bible atlas, a
   traversable genealogy explorer, and a collections browser (parables, miracles, prayers, names of
   God, titles of Jesus, weights & measures)

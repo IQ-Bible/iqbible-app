@@ -3,7 +3,44 @@
 All notable changes to this project will be documented in this file. This CHANGELOG follows SemVer, see https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
-- n/a
+
+## [1.9.0] - 2026-08-29
+- **added:** Notebooks — notes can be grouped into named notebooks. Assign one from the Notes
+  drawer footer; filter by notebook (and by tag) in My Library and in the drawer's note switcher;
+  Markdown export is grouped by notebook. Deleting a notebook keeps its notes (they become Unfiled).
+- **changed:** One note model. Verse-tied notes and free-standing notes are now the same thing — a
+  document that can carry verse *anchors*. Existing notes migrate automatically on first load: a
+  verse-tied note's verse becomes an anchor, so it still shows the margin note icon and can be
+  jumped to, but it's edited like any other note.
+- **changed:** Verse Tools ▸ **Note** now asks where the verse should go — a new note, the note
+  you're currently in, or one you search for and pick — then drops its reference and text in and
+  opens the Notes drawer on it. The separate "Add to Note" button is gone (it's the "current note"
+  choice now).
+- **changed:** My Library's notes are edited in the Notes drawer now, same as everywhere else —
+  "+ New Note" and a note card's Edit both open it. The separate plain inline composer (which had
+  no Markdown) is gone.
+- **changed:** My Library ▸ Notes is a two-pane workspace — a notebook rail on the left (notebooks
+  with per-notebook counts, inline rename, delete, "New notebook", and a Tags list below) and a
+  card grid on the right, each card showing the title, a short preview, its reference and notebook,
+  and its tags. Search and sort now sit in the workspace itself, so the tab's header is just the
+  description and the export buttons. Sort defaults to most-recently-edited.
+- **added:** Move a note to another notebook without opening it — drag its card onto a notebook in
+  the rail, or use the card's move button.
+- **added:** The Notes drawer's read view shows the note's verse anchors as a chip row — each
+  chip hover-previews and jumps to the verse, and its × detaches that reference (which also clears
+  the verse's margin note icon). Deleting the note clears its icons too.
+- **changed:** Editing a note from My Library opens the Notes drawer over the library view instead
+  of dropping back to the reader behind it. The drawer's "Open in My Library" link is gone (the
+  left nav already goes there).
+- **fixed:** A note's one-line label (the bottom-right Notes button, the switcher list) no longer
+  shows raw Markdown like "### …" — the marks are stripped for the label.
+- **changed:** The margin note/bookmark marker now always trails its verse's text, rather than
+  leading on most verses but trailing on the first (which has the drop cap).
+- **fixed:** The Notes drawer now stands out from the page in dark mode — it was rendering at
+  nearly the same near-black as everything behind it.
+- **fixed:** Clicking a verse chip in the Notes drawer now returns to the reader (and closes the
+  drawer) from wherever you were — it previously stayed in Study Tools / My Library, and left the
+  chapter's prev/next buttons stranded because they were positioned against a hidden layout.
 
 ## [1.8.0] - 2026-08-29
 - **added:** Notes now take a light Markdown subset — `**bold**`, `*italic*`, `` `code` ``,

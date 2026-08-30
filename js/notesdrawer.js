@@ -1,10 +1,11 @@
 /* ═══════════════════════════════════════════════════════════════════════
    NOTES DRAWER — a persistent, dockable capture surface (see the long
-   comment on #notesDrawer in css/styles.css). Reuses reader.js's note model
-   (getNotes/setNotes/newNoteId): the drawer edits *free* notes (book:null —
-   the same shape "+ New Note" in My Library makes), leaving verse-tied notes
-   to Verse Tools as before. One free note is "active" at a time; the N
-   shortcut, the launcher and Verse Tools' "Add to Note" all write to it.
+   comment on #notesDrawer in css/styles.css). It's the one editor for the
+   app's single note model (getNotes/setNotes/newNoteId, reader.js) — used
+   from here, from My Library, and from the reading-view note icon. One note
+   is "active" at a time; the N shortcut, the launcher and Verse Tools ▸ Note
+   all write to it. A note may carry verse anchors (added by Verse Tools) and
+   a notebookId; both are edited here.
 
    Everything here is local-only (localStorage) — no API call is needed to
    store a note. The one API touch is /parse/citations, used (as everywhere
@@ -25,25 +26,28 @@ let ndSearchTimer = null;
 // re-render of an unchanged one is free.
 const ndRefCountCache = new Map();
 
-function ndFreeNotes() { return getNotes().filter(n => !n.book); }
+function ndAllNotes() { return getNotes(); }
 function getActiveNoteId() { return localStorage.getItem(ND_ACTIVE_KEY) || ""; }
 function setActiveNoteId(id) { localStorage.setItem(ND_ACTIVE_KEY, id || ""); }
-function ndCurrentNote() { return ndCurrentId ? getNotes().find(n => n.id === ndCurrentId && !n.book) || null : null; }
+function ndCurrentNote() { return ndCurrentId ? getNotes().find(n => n.id === ndCurrentId) || null : null; }
+const ND_NB_FILTER_KEY = "iqb_notes_nb_filter"; // "" = all, "none" = Unfiled, else a notebookId
+function ndNbFilter() { return localStorage.getItem(ND_NB_FILTER_KEY) || ""; }
+function ndSetNbFilter(v) { localStorage.setItem(ND_NB_FILTER_KEY, v || ""); }
 
-// The active note, or the most recently touched free note, or null when the
+// The active note, or the most recently touched note, or null when the
 // visitor has never written one.
 function getActiveNote() {
-  const free = ndFreeNotes();
-  if (!free.length) return null;
-  const byId = free.find(n => n.id === getActiveNoteId());
+  const all = ndAllNotes();
+  if (!all.length) return null;
+  const byId = all.find(n => n.id === getActiveNoteId());
   if (byId) return byId;
-  const latest = [...free].sort((a, b) => b.updatedAt - a.updatedAt)[0];
+  const latest = [...all].sort((a, b) => b.updatedAt - a.updatedAt)[0];
   setActiveNoteId(latest.id);
   return latest;
 }
 
 function ndBlankNote() {
-  return { id: newNoteId(), book: null, chapter: null, verses: [], title: "", text: "", tags: [], createdAt: Date.now(), updatedAt: Date.now() };
+  return { id: newNoteId(), title: "", text: "", tags: [], notebookId: null, anchors: [], createdAt: Date.now(), updatedAt: Date.now() };
 }
 
 /* ── open / close ── */
@@ -76,6 +80,7 @@ function closeNotesDrawer() {
   document.body.classList.remove("notes-drawer-open");
   ndSyncLauncher();
   document.getElementById("notesLauncher").hidden = false;
+  if (typeof refreshNotesListIfOpen === "function") refreshNotesListIfOpen();
 }
 function toggleNotesDrawer() {
   const d = document.getElementById("notesDrawer");
@@ -97,6 +102,8 @@ function ndLoadActiveIntoEditor(mode) {
   document.getElementById("ndTitle").value = note ? (note.title || "") : "";
   document.getElementById("ndEditor").value = note ? note.text : "";
   ndRenderTags(note ? note.tags : []);
+  ndRenderNotebookChip();
+  ndRenderAnchors();
   ndSetSaved(true);
   ndSyncLauncher();
   ndRenderRefChip();
@@ -119,10 +126,13 @@ function ndFlushSave() {
   if (!editorEl) return;
   const text = editorEl.value, title = titleEl.value.trim();
   const notes = getNotes();
-  let note = notes.find(n => n.id === ndCurrentId && !n.book);
+  let note = notes.find(n => n.id === ndCurrentId);
   if (!note) {
     if (!text.trim() && !title) { ndSetSaved(true); return; }
     note = ndBlankNote();
+    // A note started while a notebook filter is active lands in that notebook.
+    const f = ndNbFilter();
+    if (f && f !== "none") note.notebookId = f;
     notes.push(note);
     ndCurrentId = note.id;
     setActiveNoteId(note.id);
@@ -187,6 +197,7 @@ function ndEnterEdit(opts) {
   pv.hidden = true;
   ed.hidden = false;
   ndSyncModeButton();
+  ndRenderAnchors();
   if (opts.focus !== false) {
     ed.focus();
     let at = typeof opts.caret === "number" ? opts.caret : null;
@@ -202,6 +213,7 @@ function ndEnterRead() {
   if (!text.trim()) { ndEnterEdit({ focus: false }); return; } // nothing to read yet
   ndEditing = false;
   ndSyncModeButton();
+  ndRenderAnchors();
   pv.dataset.src = text;
   const cached = ndPreviewHtmlCache.get(text);
   // Interim (pre-render) view keeps line breaks as <br> so it doesn't reflow
@@ -262,7 +274,7 @@ function ndFmt(kind) {
 }
 
 // Re-render the current view after the note text changed underneath us
-// (Add to Note) — but never yank someone out of the text box mid-edit.
+// (Verse Tools ▸ Note) — but never yank someone out of the text box mid-edit.
 function ndRefreshView() {
   if (ndEditing) return;
   ndEnterRead();
@@ -309,6 +321,8 @@ function ndNewNote() {
   document.getElementById("ndTitle").value = "";
   document.getElementById("ndEditor").value = "";
   ndRenderTags([]);
+  ndRenderNotebookChip();
+  ndRenderAnchors();
   ndSetSaved(true);
   document.getElementById("ndRefChip").hidden = true;
   ndEnterEdit({ focus: false });
@@ -333,7 +347,7 @@ function ndAddTag(raw) {
   const t = raw.trim().toLowerCase().replace(/,+$/, "").trim();
   if (!t) return;
   const notes = getNotes();
-  let n = notes.find(x => x.id === ndCurrentId && !x.book);
+  let n = notes.find(x => x.id === ndCurrentId);
   if (!n) { n = ndBlankNote(); notes.push(n); ndCurrentId = n.id; setActiveNoteId(n.id); maybeShowFirstTimeDataWarning(); }
   if (!n.tags.includes(t)) { n.tags.push(t); n.updatedAt = Date.now(); setNotes(notes); }
   ndRenderTags(n.tags);
@@ -341,7 +355,7 @@ function ndAddTag(raw) {
 }
 function ndRemoveTag(t) {
   const notes = getNotes();
-  const n = notes.find(x => x.id === ndCurrentId && !x.book);
+  const n = notes.find(x => x.id === ndCurrentId);
   if (!n) return;
   n.tags = n.tags.filter(x => x !== t);
   n.updatedAt = Date.now();
@@ -349,12 +363,99 @@ function ndRemoveTag(t) {
   ndRenderTags(n.tags);
 }
 
+/* ── notebook selector (footer chip + menu) ── */
+function ndRenderNotebookChip() {
+  const btn = document.getElementById("ndNotebookBtn");
+  if (!btn) return;
+  const note = ndCurrentNote();
+  const name = note && note.notebookId ? notebookName(note.notebookId) : "";
+  btn.classList.toggle("set", !!name);
+  btn.querySelector("span").textContent = name || "Notebook";
+}
+function ndToggleNotebookMenu() {
+  const menu = document.getElementById("ndNotebookMenu");
+  if (!menu) return;
+  if (!menu.hidden) { menu.hidden = true; return; }
+  const note = ndCurrentNote();
+  const cur = note ? note.notebookId : null;
+  const rows = [`<button class="nd-nb-opt${!cur ? " on" : ""}" data-nb="none">Unfiled</button>`]
+    .concat(getNotebooks().sort((a, b) => a.name.localeCompare(b.name))
+      .map(nb => `<button class="nd-nb-opt${cur === nb.id ? " on" : ""}" data-nb="${nb.id}">${escHtml(nb.name)}</button>`))
+    .concat([`<button class="nd-nb-opt nd-nb-new" data-nb="new">+ New notebook…</button>`]);
+  menu.innerHTML = rows.join("");
+  menu.hidden = false;
+}
+function ndSetNotebook(val) {
+  document.getElementById("ndNotebookMenu").hidden = true;
+  const notes = getNotes();
+  let n = notes.find(x => x.id === ndCurrentId);
+  if (!n) { n = ndBlankNote(); notes.push(n); ndCurrentId = n.id; setActiveNoteId(n.id); maybeShowFirstTimeDataWarning(); }
+  let id = null;
+  if (val === "new") {
+    const name = (prompt("Name the new notebook:") || "").trim();
+    if (!name) return;
+    const nb = createNotebook(name);
+    id = nb ? nb.id : null;
+  } else if (val !== "none") {
+    id = val;
+  }
+  n.notebookId = id;
+  n.updatedAt = Date.now();
+  setNotes(notes);
+  ndRenderNotebookChip();
+  if (ndSwitcherOpen) ndRenderSwitcherList();
+}
+
+/* ── anchors (verses this note is tied to) — a hover-previewable chip row on
+   the read view, so a migrated verse-tied note keeps its verse connection
+   visible even when the text has no explicit "> Ref" line. Each chip jumps to
+   the verse; its × detaches the anchor (which also removes the verse's
+   reading-view note icon). Uses the shared known-ref path (registerCiteId +
+   fetchVersePreviews), never a parser. ── */
+async function ndRenderAnchors() {
+  const wrap = document.getElementById("ndAnchors");
+  if (!wrap) return;
+  const note = ndCurrentNote();
+  const anchors = (note && note.anchors) || [];
+  if (!anchors.length || ndEditing) { wrap.hidden = true; wrap.innerHTML = ""; return; }
+  wrap.hidden = false;
+  wrap.innerHTML = anchors.map(a => {
+    const label = `${notesBookName(a.book)} ${a.chapter}:${a.verse}`;
+    return `<span class="nd-anchor" data-book="${escAttr(a.book)}" data-ch="${a.chapter}" data-v="${a.verse}"><span class="nd-anchor-go">${escHtml(label)}</span><button type="button" class="nd-anchor-x" aria-label="Remove ${escAttr(label)} from this note" title="Remove reference">&times;</button></span>`;
+  }).join("");
+  const previewByRef = await fetchVersePreviews(anchors);
+  const still = ndCurrentNote();
+  if (!still || still.id !== note.id || ndEditing) return;
+  wrap.querySelectorAll(".nd-anchor").forEach(el => {
+    const key = `${el.dataset.book}.${el.dataset.ch}.${el.dataset.v}`;
+    const txt = previewByRef[key];
+    if (txt) {
+      const id = registerCiteId(`${notesBookName(el.dataset.book)} ${el.dataset.ch}:${el.dataset.v}`, txt);
+      el.setAttribute("data-cite-id", id);
+    }
+  });
+}
+function ndDetachAnchor(book, chapter, verse) {
+  const notes = getNotes();
+  const n = notes.find(x => x.id === ndCurrentId);
+  if (!n || !n.anchors) return;
+  n.anchors = n.anchors.filter(a => !(a.book === book && a.chapter === chapter && a.verse === verse));
+  n.updatedAt = Date.now();
+  setNotes(notes);
+  ndRenderAnchors();
+  if (typeof applyVerseAnnotations === "function") applyVerseAnnotations();
+  if (ndSwitcherOpen) ndRenderSwitcherList();
+  toast(`Removed ${notesBookName(book)} ${chapter}:${verse}`);
+}
+
 /* ── launcher ── */
 function ndFirstLine(text) {
   // Skip a leading "> Ref — …" capture line so the first real sentence is what
-  // names the note in the launcher / switcher.
+  // names the note in the launcher / switcher, and flatten Markdown marks so
+  // "### heading" doesn't show through as source.
   const lines = (text || "").split("\n").map(s => s.trim()).filter(Boolean);
-  const line = (lines.find(l => !l.startsWith(">")) || lines[0] || "").replace(/^>\s*/, "");
+  const raw = lines.find(l => !l.startsWith(">")) || lines[0] || "";
+  const line = stripNoteMarkdown(raw);
   return line.length > 46 ? line.slice(0, 46).replace(/\s+\S*$/, "") + "…" : line;
 }
 function ndNoteLabel(note) {
@@ -439,18 +540,38 @@ function ndRelTime(ms) {
   if (diff < 7 * day) return Math.round(diff / day) + "d ago";
   return new Date(ms).toLocaleDateString();
 }
+function ndRenderNbFilter() {
+  const row = document.getElementById("ndNbFilter");
+  if (!row) return;
+  const books = getNotebooks();
+  const f = ndNbFilter();
+  const chip = (val, label) => `<button class="nd-nbf${f === val ? " on" : ""}" data-nbf="${escAttr(val)}">${escHtml(label)}</button>`;
+  if (!books.length) { row.hidden = true; row.innerHTML = ""; return; }
+  row.hidden = false;
+  row.innerHTML = chip("", "All") + chip("none", "Unfiled")
+    + books.slice().sort((a, b) => a.name.localeCompare(b.name)).map(nb => chip(nb.id, nb.name)).join("");
+}
+function ndSetNbFilterAndRender(val) {
+  ndSetNbFilter(val);
+  ndRenderNbFilter();
+  ndRenderSwitcherList();
+}
 async function ndRenderSwitcherList() {
+  ndRenderNbFilter();
   const list = document.getElementById("ndList");
-  const all = ndFreeNotes();
+  const all = ndAllNotes();
   const q = document.getElementById("ndSearch").value.trim().toLowerCase();
+  const f = ndNbFilter();
   let notes = [...all].sort((a, b) => b.updatedAt - a.updatedAt);
+  if (f === "none") notes = notes.filter(n => !n.notebookId);
+  else if (f) notes = notes.filter(n => n.notebookId === f);
   if (q) notes = notes.filter(n =>
     (n.title || "").toLowerCase().includes(q) || (n.text || "").toLowerCase().includes(q) || n.tags.some(t => t.includes(q)));
 
   if (!notes.length) {
     list.innerHTML = `<div class="nd-list-empty">${all.length
       ? "No notes match."
-      : "No notes yet — start typing, or send a verse here with <strong>Add to Note</strong> in Verse Tools."}</div>`;
+      : "No notes yet — start typing, or send a verse here with <strong>Note</strong> in Verse Tools."}</div>`;
     return;
   }
 
@@ -459,10 +580,11 @@ async function ndRenderSwitcherList() {
     const hasTitle = !!(n.title || "").trim();
     const title = escHtml(hasTitle ? n.title.trim() : (ndFirstLine(n.text) || "Untitled note"));
     const snipSrc = hasTitle ? n.text : n.text.split("\n").slice(1).join(" ");
+    const nb = n.notebookId ? notebookName(n.notebookId) : "";
     return `<div class="nd-list-item${n.id === activeId ? " active" : ""}" data-note-id="${n.id}">
         <div class="nd-li-title">${title}</div>
         <div class="nd-li-snip" data-snip="${n.id}">${escHtml(snipSrc.trim().slice(0, 160))}</div>
-        <div class="nd-li-meta"><span class="nd-li-refs" data-refs="${n.id}" hidden></span><span>${escHtml(ndRelTime(n.updatedAt))}</span></div>
+        <div class="nd-li-meta">${nb ? `<span class="nd-li-nb">${escHtml(nb)}</span>` : ""}<span class="nd-li-refs" data-refs="${n.id}" hidden></span><span>${escHtml(ndRelTime(n.updatedAt))}</span></div>
       </div>`;
   }).join("");
 
@@ -484,31 +606,48 @@ function ndSelectNote(id) {
   ndCloseSwitcher();
 }
 
-/* ── "Add to Note" — Verse Tools cell + the drawer's footer button ── */
-function addSelectionToActiveNote() {
+/* ── Verse Tools ▸ Note (target picker) + the drawer's footer button ──
+   target: "new" | "current" | a note id. Appends "> Ref — text" to the note,
+   records each selected verse as an anchor (so the reading-view icon shows),
+   makes it active, and opens the drawer on it. ── */
+function addSelectionToNote(target) {
   if (!selectedVerses.length) { toast("Select a verse first"); return; }
   const ref = selectionRefLabel();
   const body = selectionText();
   const notes = getNotes();
-  let n = ndCurrentId ? notes.find(x => x.id === ndCurrentId && !x.book) : null;
-  if (!n) n = notes.find(x => !x.book && x.id === getActiveNoteId())
-    || [...notes.filter(x => !x.book)].sort((a, b) => b.updatedAt - a.updatedAt)[0];
+
+  let n = null;
+  if (target && target !== "new" && target !== "current") n = notes.find(x => x.id === target);
+  else if (target === "current") {
+    n = (ndCurrentId && notes.find(x => x.id === ndCurrentId))
+      || notes.find(x => x.id === getActiveNoteId())
+      || [...notes].sort((a, b) => b.updatedAt - a.updatedAt)[0];
+  }
   if (!n) { n = ndBlankNote(); notes.push(n); maybeShowFirstTimeDataWarning(); }
 
   const line = `> ${ref} — ${body}`;
   n.text = n.text.trim() ? `${n.text.replace(/\s+$/, "")}\n\n${line}\n` : `${line}\n`;
+  n.anchors = n.anchors || [];
+  selectedVerses.forEach(v => {
+    if (!n.anchors.some(a => a.book === current.book && a.chapter === current.chapter && a.verse === v))
+      n.anchors.push({ book: current.book, chapter: current.chapter, verse: v });
+  });
+  if (!n.version && current.version) { n.version = current.version; n.versionTitle = current.versionTitle; }
   n.updatedAt = Date.now();
   setNotes(notes);
   ndCurrentId = n.id;
   setActiveNoteId(n.id);
+  if (typeof applyVerseAnnotations === "function") applyVerseAnnotations();
 
   const d = document.getElementById("notesDrawer");
-  if (d && !d.hidden) {
+  if (d && d.hidden) openNotesDrawer({ focus: false });
+  else {
     const ed = document.getElementById("ndEditor");
     ed.value = n.text;
     ed.scrollTop = ed.scrollHeight;
     ndSetSaved(true);
     ndRenderRefChip();
+    ndRenderAnchors();
     ndRefreshView(); // re-render the read view with the appended ref (no-op mid-edit)
     if (ndSwitcherOpen) ndRenderSwitcherList();
   }
@@ -516,6 +655,8 @@ function addSelectionToActiveNote() {
   ndFlashLauncher();
   toast(`Added ${ref} to “${ndNoteLabel(n)}”`);
 }
+// The drawer footer "+ Attach <ref>" button — same action, current note.
+function addSelectionToActiveNote() { addSelectionToNote("current"); }
 // Shown only while a verse selection exists (Verse Tools is the primary path;
 // this footer button is the same action from inside the drawer).
 function ndUpdateAttachButton() {
@@ -672,6 +813,40 @@ function initNotesDrawer() {
   document.getElementById("ndList").addEventListener("click", e => {
     const item = e.target.closest(".nd-list-item");
     if (item) ndSelectNote(item.dataset.noteId);
+  });
+  const nbFilter = document.getElementById("ndNbFilter");
+  if (nbFilter) nbFilter.addEventListener("click", e => {
+    const b = e.target.closest("[data-nbf]");
+    if (b) ndSetNbFilterAndRender(b.dataset.nbf);
+  });
+
+  // Notebook selector (footer chip + its popover menu)
+  const nbBtn = document.getElementById("ndNotebookBtn");
+  if (nbBtn) nbBtn.addEventListener("click", e => { e.stopPropagation(); ndToggleNotebookMenu(); });
+  const nbMenu = document.getElementById("ndNotebookMenu");
+  if (nbMenu) nbMenu.addEventListener("click", e => {
+    const o = e.target.closest("[data-nb]");
+    if (o) ndSetNotebook(o.dataset.nb);
+  });
+  document.addEventListener("click", e => {
+    if (nbMenu && !nbMenu.hidden && !e.target.closest("#ndNotebookMenu") && !e.target.closest("#ndNotebookBtn")) nbMenu.hidden = true;
+  });
+
+  // Anchor chips on the read view jump to the verse (hover-preview is wired
+  // generically off [data-cite-id] elsewhere).
+  const anchorRow = document.getElementById("ndAnchors");
+  if (anchorRow) anchorRow.addEventListener("click", e => {
+    const chip = e.target.closest(".nd-anchor");
+    if (!chip) return;
+    if (e.target.closest(".nd-anchor-x")) {
+      ndDetachAnchor(chip.dataset.book, Number(chip.dataset.ch), Number(chip.dataset.v));
+    } else {
+      // Going to the verse — get the drawer out of the way so it isn't
+      // covering the passage you asked to see (the launcher pill still holds
+      // the note, one tap to reopen).
+      closeNotesDrawer();
+      jumpToVerse(chip.dataset.book, Number(chip.dataset.ch), Number(chip.dataset.v));
+    }
   });
 
   ndInitResize();
