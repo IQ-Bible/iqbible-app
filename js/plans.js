@@ -235,25 +235,23 @@ function toggleActivePlan(id) {
   renderPlansView();
   toast(wasActive ? "Plan deactivated" : "Plan set active");
 }
-function deletePlanConfirm(id) {
+async function deletePlanConfirm(id) {
   const plans = getPlans();
   const target = plans.find(p => p.id === id);
   if (!target) return;
-  if (!confirm(`Delete "${target.name}"? This can't be undone.`)) return;
+  if (!await uiConfirm({ title: "Delete plan", message: `Delete “${target.name}”? This can’t be undone.`, okLabel: "Delete", danger: true })) return;
   setPlans(plans.filter(p => p.id !== id));
   if (plansOpenPlanId === id) { plansOpenPlanId = null; plansViewState = "list"; planExportMenuOpen = false; }
   renderPlansView();
   toast("Plan deleted");
 }
-function renamePlanPrompt() {
+async function renamePlanPrompt() {
   const plan = getPlans().find(p => p.id === plansOpenPlanId);
   if (!plan) return;
-  const name = prompt("Rename this plan", plan.name);
-  if (name == null) return;
-  const trimmed = name.trim();
-  if (!trimmed) return;
+  const name = await uiPrompt({ title: "Rename plan", value: plan.name, okLabel: "Rename" });
+  if (!name) return;
   const plans = getPlans();
-  plans.find(p => p.id === plan.id).name = trimmed;
+  plans.find(p => p.id === plan.id).name = name;
   setPlans(plans);
   renderPlansView();
 }

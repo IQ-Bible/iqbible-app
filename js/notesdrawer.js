@@ -60,6 +60,7 @@ function openNotesDrawer(opts) {
   ndApplyStoredHeight();
   d.hidden = false;
   document.body.classList.add("notes-drawer-open");
+  document.body.classList.remove("chrome-hidden"); // bring the chrome back so the drawer doesn't open under a tucked-away topbar
   // Read-first: the drawer opens showing the rendered note with every verse
   // hoverable. Editing is an explicit step (the Edit button, or clicking into
   // the text). A brand-new / empty note has nothing to read, so it opens
@@ -385,14 +386,14 @@ function ndToggleNotebookMenu() {
   menu.innerHTML = rows.join("");
   menu.hidden = false;
 }
-function ndSetNotebook(val) {
+async function ndSetNotebook(val) {
   document.getElementById("ndNotebookMenu").hidden = true;
   const notes = getNotes();
   let n = notes.find(x => x.id === ndCurrentId);
   if (!n) { n = ndBlankNote(); notes.push(n); ndCurrentId = n.id; setActiveNoteId(n.id); maybeShowFirstTimeDataWarning(); }
   let id = null;
   if (val === "new") {
-    const name = (prompt("Name the new notebook:") || "").trim();
+    const name = await uiPrompt({ title: "New notebook", placeholder: "Notebook name", okLabel: "Create" });
     if (!name) return;
     const nb = createNotebook(name);
     id = nb ? nb.id : null;
@@ -730,6 +731,27 @@ function ndInitResize() {
   });
 }
 
+// On mobile the launcher is a slim pull-tab (css/styles.css) — a short
+// upward swipe on it opens the drawer, the same as a tap. A real drag past
+// ~24px suppresses the browser's synthetic click, so this and the tab's
+// onclick stay mutually exclusive.
+function ndInitLauncherSwipe() {
+  const l = document.getElementById("notesLauncher");
+  if (!l) return;
+  let sy = 0, sx = 0, tracking = false;
+  l.addEventListener("touchstart", e => {
+    if (e.touches.length !== 1) { tracking = false; return; }
+    sy = e.touches[0].clientY; sx = e.touches[0].clientX; tracking = true;
+  }, { passive: true });
+  l.addEventListener("touchend", e => {
+    if (!tracking) return;
+    tracking = false;
+    const dy = e.changedTouches[0].clientY - sy;
+    const dx = Math.abs(e.changedTouches[0].clientX - sx);
+    if (dy < -24 && dx < 50 && document.getElementById("notesDrawer").hidden) openNotesDrawer();
+  }, { passive: true });
+}
+
 /* ── init / wiring ── */
 function initNotesDrawer() {
   ndApplyStoredHeight();
@@ -850,6 +872,7 @@ function initNotesDrawer() {
   });
 
   ndInitResize();
+  ndInitLauncherSwipe();
 
   document.addEventListener("keydown", e => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;

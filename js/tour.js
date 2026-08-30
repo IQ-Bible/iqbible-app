@@ -40,7 +40,7 @@ function openVerseToolsForTour() {
 // keep going with a per-button breakdown of the same panel, still open).
 const TOUR_STEPS = [
   { selector: "#readCol .chhead", title: "Reading", body: "Pick a version, book and chapter up here, then just start reading." },
-  { selector: "#audioPlayer", title: "Audio Narration", body: "Versions with narration available show a player right here — tap play to hear the chapter read aloud." },
+  { selector: "#audioPlayer", title: "Audio Narration", body: "Versions with narration available show a player — tap play to hear the chapter read aloud." },
   { selector: "#btnPickNarration", title: "Choose a Voice", body: "Some versions have more than one narrator recorded — pick whichever you like." },
   // #cardStack itself (desktop's always-visible sidebar) or #btnCardsSheet
   // (its mobile trigger, css/styles.css) — never both at once, so this
@@ -48,7 +48,7 @@ const TOUR_STEPS = [
   // below open #moreMenuSheet: those reveal a nav item that's the same kind
   // of thing either width, but auto-opening the cards sheet here would hide
   // the one thing mobile users actually need to learn — the button.
-  { selector: "#cardStack, #btnCardsSheet", title: "Chapter Context", body: "Places (with maps), people, prophecy fulfillments and a timeline for whatever chapter you're reading.", before: () => switchMainView("read") },
+  { selector: "#cardStack, #btnCardsSheet", title: "Chapter Context", body: "Places (with maps), people, prophecy fulfillments and a timeline for whatever chapter you're reading. On a phone, tap this button or swipe in from the right edge.", before: () => switchMainView("read") },
   { selector: "#searchTrigger", title: "Search", body: "Tap here any time to search the whole Bible instantly." },
   // Bare [data-nav] (not .navitem) — below 1180px this is #mobileFooterNav's
   // .mfn-item instead of #navrail's (hidden) .navitem, a different class;

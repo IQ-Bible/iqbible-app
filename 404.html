@@ -149,8 +149,24 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
           <!-- "Did you read this chapter?" — js/plans.js's
                renderChapterReadPrompt(), called from loadChapter (reader.js)
                after every render. A sibling of #readingText, not a child, so
-               renderChapter()'s innerHTML replacement never wipes it. -->
+               renderChapter()'s innerHTML replacement never wipes it. Sits
+               above #chapterEndNav: finish the chapter, mark it, then move on. -->
           <div id="chapterReadPrompt"></div>
+          <!-- End-of-chapter prev/next — a sibling of #readingText (not a
+               child) so renderChapter()'s innerHTML swap never wipes it;
+               labels/disabled state filled by renderChapterEndNav (reader.js).
+               The discoverable in-flow counterpart to the swipe gesture and
+               the fixed side arrows. -->
+          <nav class="chapter-end-nav" id="chapterEndNav" aria-label="Chapter navigation" hidden>
+            <button class="cen-btn" id="cenPrev" onclick="goAdjacentChapter(-1)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+              <span class="cen-lbl"><span class="cen-k">Previous</span><span class="cen-t" id="cenPrevLabel"></span></span>
+            </button>
+            <button class="cen-btn cen-next" id="cenNext" onclick="goAdjacentChapter(1)">
+              <span class="cen-lbl"><span class="cen-k">Next</span><span class="cen-t" id="cenNextLabel"></span></span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+            </button>
+          </nav>
         </div>
       </div>
 
@@ -626,7 +642,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
           </div>
           <div class="help-faq-item">
             <div class="help-faq-q">How do I take notes?</div>
-            <div class="help-faq-a">Open the Notes drawer — press N anywhere, or the Notes button at the bottom-right. It autosaves as you type, keeps one note "active", and takes a light Markdown subset (bold, italic, headings, lists, quotes) that renders on the read view. To pull a verse in, select it and use Verse Tools ▸ Note, then choose a new note, the current one, or an existing one — its reference and text get dropped in and the verse shows a note icon in the margin. Group notes into notebooks, and search, tag, filter and export everything from My Library.</div>
+            <div class="help-faq-a">Open the Notes drawer — press N anywhere, or the Notes button (a slim pull-tab centred on the bottom bar on a phone, bottom-right on a wider screen). It autosaves as you type, keeps one note "active", and takes a light Markdown subset (bold, italic, headings, lists, quotes) that renders on the read view. To pull a verse in, select it and use Verse Tools ▸ Note, then choose a new note, the current one, or an existing one — its reference and text get dropped in and the verse shows a note icon in the margin. Group notes into notebooks, and search, tag, filter and export everything from My Library.</div>
           </div>
           <div class="help-faq-item">
             <div class="help-faq-q">What are the cards next to the reading pane?</div>
@@ -634,7 +650,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
           </div>
           <div class="help-faq-item">
             <div class="help-faq-q">Can I use this on my phone?</div>
-            <div class="help-faq-a">Yes, the reader is fully responsive; the side rails hide below about 1180px wide.</div>
+            <div class="help-faq-a">Yes, the reader is fully responsive; the side rails hide below about 1180px wide. On a phone: swipe the page left or right to turn the chapter (or use the Previous/Next buttons at the end of it), swipe in from the right edge for the chapter-context cards, and the topbar and bars tuck away as you scroll down (scroll back up or tap an empty spot to bring them back).</div>
           </div>
           <div class="help-faq-item">
             <div class="help-faq-q">Is my data backed up anywhere?</div>
@@ -858,6 +874,24 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
       <div class="mhead"><div class="row"><h2 id="apiErrorTitle">API Error</h2><button class="closebtn" onclick="closeModal('apiErrorScrim')">&times;</button></div></div>
       <div class="dictbody" id="apiErrorBody"></div>
       <div style="padding:0 24px 24px"><button class="setsave" style="margin-bottom:0" onclick="closeModal('apiErrorScrim')">Dismiss</button></div>
+    </div>
+  </div>
+
+  <!-- Brand-styled stand-in for window.confirm / window.prompt — one reusable
+       dialog for both (uiConfirm / uiPrompt, js/api.js). Its z-index sits above
+       #notesDrawer's mobile value so a "name the notebook" prompt fired from
+       inside the drawer isn't hidden behind it. -->
+  <div class="modalscrim" id="uiDialogScrim">
+    <div class="modal narrow" role="alertdialog" aria-modal="true" aria-labelledby="uiDialogTitle" aria-describedby="uiDialogMsg">
+      <div class="mhead"><div class="row"><h2 id="uiDialogTitle"></h2><button class="closebtn" id="uiDialogX" aria-label="Cancel">&times;</button></div></div>
+      <div class="uidlg-body">
+        <p id="uiDialogMsg"></p>
+        <input type="text" id="uiDialogInput" class="uidlg-input" autocomplete="off" spellcheck="false" hidden>
+      </div>
+      <div class="uidlg-actions">
+        <button class="uidlg-btn uidlg-cancel" id="uiDialogCancel">Cancel</button>
+        <button class="uidlg-btn uidlg-ok" id="uiDialogOk">OK</button>
+      </div>
     </div>
   </div>
 

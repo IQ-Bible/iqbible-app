@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file. This CHANGELOG follows SemVer, see https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
+- n/a
+
+## [1.10.0] - 2026-08-29
+- **changed:** Every "are you sure?" and "name this…" step — deleting a notebook, note, plan or
+  your history; creating or renaming a notebook or plan — now uses an in-app dialog styled like
+  the rest of the app instead of the browser's grey system prompt.
+- **added:** Previous / Next chapter buttons at the foot of the reading column on mobile, each
+  showing where it leads (e.g. "Exodus 1") — the visible counterpart to the swipe gesture now that
+  the phone layout has no chapter arrows. (Desktop keeps its center-edge arrows.)
+- **changed:** Mobile reading chrome now gets out of the way. Scrolling down tucks the topbar, the
+  chapter-picker header, the bottom nav bar and the audio bar off-screen; scrolling back up — or
+  tapping an empty part of the page — brings them back.
+- **changed:** The mobile audio player is a single full-width bar above the nav bar. Its previous
+  and next chapter arrows are gone (swipe the page left/right to turn the chapter, as before).
+- **changed:** On mobile, an inward swipe from the right edge of the screen opens the Chapter Info
+  cards; the grid button also moves back up into the chapter-picker row.
+- **changed:** The mobile Notes button is now a slim pull-tab centred on the bottom nav bar — tap
+  it or swipe up on it to open the drawer.
 
 ## [1.9.0] - 2026-08-29
 - **added:** Notebooks — notes can be grouped into named notebooks. Assign one from the Notes

@@ -333,19 +333,19 @@ function refreshNotesListIfOpen() {
   const lib = document.getElementById("libraryOverlay");
   if (lib && lib.classList.contains("open") && libraryActiveTab === "notes") renderNotesList();
 }
-function newNotebookFromLibrary() {
-  const name = (prompt("Name the new notebook:") || "").trim();
+async function newNotebookFromLibrary() {
+  const name = await uiPrompt({ title: "New notebook", placeholder: "Notebook name", okLabel: "Create" });
   if (!name) return;
   const nb = createNotebook(name);
   if (nb) { notesActiveNotebook = nb.id; renderNotesList(); }
 }
-function moveNoteToNotebook(noteId, target) {
+async function moveNoteToNotebook(noteId, target) {
   const notes = getNotes();
   const n = notes.find(x => x.id === noteId);
   if (!n) return;
   let nbId = null;
   if (target === "new") {
-    const name = (prompt("Name the new notebook:") || "").trim();
+    const name = await uiPrompt({ title: "New notebook", placeholder: "Notebook name", okLabel: "Create" });
     if (!name) { ncardMenuOpenId = null; renderNotesList(); return; }
     const nb = createNotebook(name);
     nbId = nb ? nb.id : null;
@@ -383,10 +383,11 @@ function startNotebookRename(id) {
   });
   input.addEventListener("blur", commit);
 }
-function confirmDeleteNotebook(id) {
+async function confirmDeleteNotebook(id) {
   nnbMenuOpenId = null;
   const nm = notebookName(id);
-  if (!confirm(`Delete the notebook "${nm}"? Its notes are kept and become Unfiled.`)) { renderNotesList(); return; }
+  const ok = await uiConfirm({ title: "Delete notebook", message: `Delete the notebook “${nm}”? Its notes are kept and become Unfiled.`, okLabel: "Delete", danger: true });
+  if (!ok) { renderNotesList(); return; }
   deleteNotebook(id);
   if (notesActiveNotebook === id) notesActiveNotebook = "";
   toast(`Deleted "${nm}"`);
@@ -395,8 +396,8 @@ function confirmDeleteNotebook(id) {
 
 // Every note now edits in the Notes drawer — the one editor.
 function editNoteFromBrowser(note) { openNoteInDrawer(note.id); }
-function deleteNoteFromBrowser(note) {
-  if (!confirm(`Delete "${noteRefLabel(note)}"?`)) return;
+async function deleteNoteFromBrowser(note) {
+  if (!await uiConfirm({ title: "Delete note", message: `Delete “${noteRefLabel(note)}”?`, okLabel: "Delete", danger: true })) return;
   setNotes(getNotes().filter(n => n.id !== note.id));
   applyVerseAnnotations();
   toast("Note removed");
@@ -699,8 +700,8 @@ function renderHistoryList() {
       <div class="result-meta">${escHtml(fmtDate(e.visitedAt))}</div>
     </div>`).join("");
 }
-function clearHistory() {
-  if (!confirm("Clear your entire reading history?")) return;
+async function clearHistory() {
+  if (!await uiConfirm({ title: "Clear reading history", message: "Clear your entire reading history? This can’t be undone.", okLabel: "Clear", danger: true })) return;
   setHistory([]);
   toast("History cleared");
   renderLibraryList();

@@ -119,10 +119,9 @@ button{ font-family:inherit; cursor:pointer; }
 
 /* ── mobile nav (footer bar + "More" dropup + #rightRail as a bottom sheet)
    — replaces #navrail/#rightRail below 1180px, where both are hidden above.
-   Prev/next chapter (.chapternav, further down) gets the same treatment:
-   docked at the bottom corners instead of position:fixed beside a reading
-   column that no longer has room to spare, plus a swipe gesture on the
-   reading text itself (initChapterSwipe, js/reader.js). ── */
+   Prev/next chapter (.chapternav, further down) is dropped entirely at this
+   width — a horizontal swipe on the reading column turns the chapter
+   (initReaderGestures, js/reader.js). ── */
 .iconbtn.cardsheet-trigger{ display:none; }
 #mobileFooterNav{ display:none; }
 #moreMenuSheet{ display:none; }
@@ -157,6 +156,33 @@ button{ font-family:inherit; cursor:pointer; }
   #cardsSheetScrim{ z-index:415; }
   #rightRail .cardstack{ width:100%; max-width:520px; margin:0 auto; padding:16px 16px calc(16px + var(--mfn-h)); overflow-y:auto; }
   #rightRail .railcard{ aspect-ratio:auto; }
+}
+
+/* ── auto-hiding chrome (below 1180px) — the topbar, the sticky chapter
+   header, the footer nav, the audio bar and the notes pull-tab all slide
+   off-screen while the reader scrolls down, and slide back on scroll-up or a
+   tap on empty reading space (initChromeAutoHide + the tap handler in
+   js/reader.js). #topbar goes position:fixed so it can translate away without
+   leaving a 64px flex gap; #app's padding-top (which reserved its space)
+   animates to 0 in step so the text takes it over. The sticky .chhead slides
+   away in the same beat by pushing its own `top` offset off-screen. ── */
+@media (max-width:1180px){
+  #app{ padding-top:64px; transition:padding-top .28s ease; }
+  #topbar{ position:fixed; top:0; left:0; right:0; transition:transform .28s ease; }
+  #mobileFooterNav{ transition:transform .28s ease; }
+
+  /* .chhead is hidden by pushing its sticky offset off the top rather than
+     transforming it — the mobile audio bar is a position:fixed child, and a
+     transform on .chhead would trap it in a new containing block. Animating
+     `top` slides the stuck header the same way without that. */
+  .chhead{ transition:top .28s ease; }
+
+  body.chrome-hidden #app{ padding-top:0; }
+  body.chrome-hidden #topbar{ transform:translateY(-100%); }
+  body.chrome-hidden .chhead{ top:-200px; }
+  body.chrome-hidden #mobileFooterNav{ transform:translateY(100%); }
+  body.chrome-hidden #audioPlayer{ transform:translateY(calc(100% + var(--mfn-h) + 32px)); }
+  body.chrome-hidden #notesLauncher{ transform:translateX(-50%) translateY(calc(100% + var(--mfn-h) + 8px)); }
 }
 
 /* ── left nav menu ── */
@@ -428,36 +454,26 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 .chapternav{ position:fixed; top:50%; transform:translateY(-50%); width:44px; height:44px; border-radius:var(--r-pill); display:flex; align-items:center; justify-content:center; background:var(--surface); border:1px solid var(--divider); color:var(--brand); z-index:16; transition:border-color .15s,color .15s; box-shadow:0 4px 16px var(--shadow); }
 .chapternav:hover{ border-color:var(--brand); color:var(--brand-2); }
 .chapternav svg{ width:20px; height:20px; }
-@media (max-width:980px){ .chapternav{ display:none; } }
-/* Below 1180px there's no reading-column edge to sit "just outside" of
-   (alignChapterNavButtons, js/reader.js, stops computing left/right at that
-   same width) — docked at the bottom corners instead, above the footer nav.
-   The primary way to change chapter there is the swipe gesture
-   (initChapterSwipe, js/reader.js); these are the discoverable fallback. */
+/* Below 1180px the fixed side arrows are dropped — a horizontal swipe on the
+   reading column (initReaderGestures, js/reader.js) or the Previous/Next
+   buttons at the foot of the chapter (#chapterEndNav) turn the page instead. */
 @media (max-width:1180px){
-  /* The whole footer control strip (prev, audio player, next, and the
-     cards-sheet trigger stacked above next) is centered as one 292px-wide
-     cluster (38 + 8 + 200 + 8 + 38) rather than pinned to the screen edges —
-     prev/next sit calc(50% - 146px) in from center (146 = half that
-     cluster width), so both share the exact same expression symmetrically. */
-  .chapternav{ display:flex; top:auto; bottom:calc(var(--mfn-h) + 14px); transform:none; width:38px; height:38px; left:auto; right:auto; }
-  .chapternav.prev{ left:calc(50% - 146px); }
-  .chapternav.next{ right:calc(50% - 146px); }
+  .chapternav{ display:none; }
 
-  /* Audio player and the cards-sheet trigger both leave .chhead's normal
-     flow here and dock in the same fixed footer row as .chapternav, so all
-     four share one literal bottom offset/height and read as one aligned,
-     centered control strip instead of the player floating mid-page. A
-     solid background is required (not just for looks) since the player now
-     overlaps the reading column itself rather than sitting inside .chhead's
-     own opaque background — without one the scrub bar/time text would bleed
-     into whatever verse text scrolls underneath. The trigger stacks just
-     above .chapternav.next, 10px above its top edge, at that same
-     center-relative offset, since the footer row has no horizontal room
-     left for a fifth control. */
-  #audioPlayer{ position:fixed; left:50%; transform:translateX(-50%); width:200px; bottom:calc(var(--mfn-h) + 14px); height:38px; margin:0; justify-content:center; z-index:16; background:var(--surface); border:1px solid var(--divider); border-radius:var(--r-pill); box-shadow:0 4px 16px var(--shadow); padding:0 14px; }
+  /* Audio player: a full-width bar docked just above #mobileFooterNav (and
+     above the notes pull-tab that sits on the footer's top edge). A solid
+     background is required — it overlaps the scrolling reading column, not
+     .chhead's own opaque box. Slides out with the rest of the chrome, see
+     body.chrome-hidden below (initChromeAutoHide, js/reader.js). */
+  #audioPlayer{ position:fixed; left:12px; right:12px; width:auto; transform:none; bottom:calc(var(--mfn-h) + env(safe-area-inset-bottom,0) + 24px); height:40px; margin:0; justify-content:center; z-index:16; background:var(--surface); border:1px solid var(--divider); border-radius:var(--r-pill); box-shadow:0 4px 16px var(--shadow); padding:0 16px; transition:transform .28s ease; }
   .audio-controls-row{ width:100%; max-width:none; }
-  .iconbtn.cardsheet-trigger{ position:fixed; right:calc(50% - 146px); bottom:calc(var(--mfn-h) + 14px + 38px + 10px); z-index:16; }
+
+  /* The cards-sheet trigger drops back into .chtitlewrap's normal flow so it
+     rides with the auto-hiding chapter header (a right-edge inward swipe
+     opens the same sheet). Smaller and centre-aligned so it sits with the
+     baseline-aligned pickers instead of poking below them. */
+  .chhead .iconbtn.cardsheet-trigger{ align-self:center; width:30px; height:30px; }
+  .chhead .iconbtn.cardsheet-trigger svg{ width:15px; height:15px; }
 }
 
 /* ── audio player — inline in the chapter header, right after the version
@@ -658,6 +674,25 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 .mhead h2{ font-family:var(--font-ui); font-weight:800; letter-spacing:-.02em; font-size:1.3rem; color:var(--brand); }
 .closebtn{ width:28px; height:28px; border-radius:var(--r-sm); background:var(--surface-2); border:none; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:1.1rem; }
 .closebtn:hover{ color:var(--brand); background:var(--brand-soft); }
+
+/* ── brand confirm / prompt dialog (#uiDialogScrim — uiConfirm / uiPrompt in
+   js/api.js, standing in for window.confirm / window.prompt) ── */
+#uiDialogScrim{ z-index:560; } /* above #notesDrawer's mobile 430 / #cardsSheetScrim 415; below .dict-tooltip / #toast (600) */
+#uiDialogScrim .mhead .row{ margin-bottom:0; }
+#uiDialogScrim .mhead h2:empty{ display:none; }
+.uidlg-body{ padding:18px 24px 2px; }
+.uidlg-body p{ color:var(--ink-soft); font-size:.95rem; line-height:1.55; }
+.uidlg-body p:empty{ display:none; }
+.uidlg-input{ width:100%; margin-top:14px; font-family:var(--font-ui); font-size:.95rem; color:var(--ink); background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-sm); padding:10px 12px; }
+.uidlg-input:focus{ outline:none; border-color:var(--brand-line); }
+.uidlg-actions{ display:flex; justify-content:flex-end; gap:10px; padding:20px 24px 22px; }
+.uidlg-btn{ font-family:var(--font-ui); font-weight:700; font-size:.82rem; letter-spacing:0; border-radius:var(--r-control); padding:10px 18px; border:1px solid transparent; transition:background .15s,color .15s; }
+.uidlg-cancel{ color:var(--muted); background:var(--surface-2); }
+.uidlg-cancel:hover{ color:var(--ink); }
+.uidlg-ok{ color:var(--on-brand); background:var(--brand); }
+.uidlg-ok:hover{ background:var(--brand-2); }
+.uidlg-ok.danger{ color:#fff; background:#dc2626; }
+.uidlg-ok.danger:hover{ background:#b91c1c; }
 .msearch{ display:flex; align-items:center; gap:10px; background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-control); padding:9px 13px; }
 .msearch svg{ color:var(--muted); width:15px; height:15px; flex-shrink:0; }
 .msearch input{ border:none; outline:none; background:transparent; font-family:var(--font-ui); font-size:.95rem; flex:1; color:var(--ink); }
@@ -828,6 +863,24 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 .dd-drawer-title{ font-family:var(--font-ui); font-weight:800; letter-spacing:-.02em; font-size:1.15rem; color:var(--ink); }
 .dd-drawer-row{ display:flex; gap:10px; padding:10px 0; border-bottom:1px solid var(--divider); }
 .dd-drawer-label{ font-family:var(--font-ui); font-size:.58rem; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); min-width:52px; padding-top:2px; flex-shrink:0; }
+
+/* ── end-of-chapter prev / next (#chapterEndNav, renderChapterEndNav in
+   js/reader.js) — an in-flow pair at the foot of the reading column. Shown
+   only below 1180px, where the fixed center-edge arrows are gone; on desktop
+   those arrows already cover chapter turning (mid-scroll, which this can't),
+   so it stays hidden there. ── */
+.chapter-end-nav{ display:none; grid-template-columns:1fr 1fr; gap:12px; margin:36px 0 4px; padding-top:24px; border-top:1px solid var(--divider); }
+@media (max-width:1180px){ .chapter-end-nav{ display:grid; } }
+.chapter-end-nav[hidden]{ display:none; } /* higher specificity than the media rule — keeps JS's pre-render/error hidden state winning */
+.cen-btn{ display:flex; align-items:center; gap:10px; padding:12px 14px; background:var(--surface); border:1px solid var(--divider); border-radius:var(--r-control); color:var(--ink); text-align:left; transition:border-color .15s,background .15s; }
+.cen-btn:hover:not(:disabled){ border-color:var(--brand-line); background:var(--brand-soft); }
+.cen-btn:disabled{ opacity:.4; }
+.cen-btn.cen-next{ flex-direction:row-reverse; text-align:right; }
+.cen-btn svg{ width:18px; height:18px; flex-shrink:0; color:var(--brand); }
+.cen-lbl{ display:flex; flex-direction:column; line-height:1.3; min-width:0; }
+.cen-next .cen-lbl{ align-items:flex-end; }
+.cen-k{ font-family:var(--font-ui); font-size:.56rem; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); }
+.cen-t{ font-family:var(--font-ui); font-size:.85rem; font-weight:600; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; }
 
 /* ── "did you read this?" prompts — js/plans.js's renderChapterReadPrompt
    and js/devotionals.js's renderDevoReadPrompt share this chrome, same
@@ -1410,8 +1463,18 @@ details.bg-accordion{ border:1px solid var(--divider); border-radius:var(--r-con
    to Note"). The grip snaps it between two heights (see ndInitResize); the
    switcher stacks above the editor instead of beside it. */
 @media (max-width:1180px){
-  #notesLauncher{ right:12px; bottom:calc(var(--mfn-h) + 14px); padding:9px; }
-  #notesLauncher .ndl-wrap,#notesLauncher .ndl-up{ display:none; }
+  /* A slim centre pull-tab sitting on #mobileFooterNav's top edge — the
+     mobile stand-in for the launcher pill. Tap or short upward swipe on it
+     opens the drawer (ndInitLauncherSwipe, js/notesdrawer.js). */
+  #notesLauncher{ left:50%; right:auto; transform:translateX(-50%); bottom:calc(var(--mfn-h) + env(safe-area-inset-bottom,0));
+    width:66px; height:22px; min-height:0; padding:0; gap:0; justify-content:center;
+    border-radius:11px 11px 0 0; border-bottom:none; box-shadow:0 -3px 12px var(--shadow);
+    transition:transform .28s ease; }
+  #notesLauncher::before{ content:""; width:26px; height:4px; border-radius:2px; background:var(--muted2); }
+  #notesLauncher .ndl-ic,#notesLauncher .ndl-wrap,#notesLauncher .ndl-up{ display:none; }
+  /* keep the centred transform during the save-nudge pulse */
+  #notesLauncher.pulse{ animation:ndPulseTab .5s ease; }
+  @keyframes ndPulseTab{ 40%{ transform:translateX(-50%) scale(1.08); } }
   #notesDrawer{ z-index:430; height:var(--notes-drawer-h); border-radius:20px 20px 0 0; transition:height .24s cubic-bezier(.22,1,.36,1); }
   #notesDrawer.nd-dragging{ transition:none; } /* follow the finger 1:1 while dragging */
   #notesDrawer .nd-body{ flex-direction:column; }

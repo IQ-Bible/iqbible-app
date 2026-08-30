@@ -14,6 +14,7 @@ async function loadChapter(chapter, refreshMeta, verse, verseEnd) {
   // visible behind the spinner until renderChapterReadPrompt() below re-runs.
   document.getElementById("chapterReadPrompt").className = "";
   document.getElementById("chapterReadStamp").className = "";
+  document.getElementById("chapterEndNav").hidden = true;
 
   if (refreshMeta) await loadChapterMeta();
 
@@ -27,6 +28,7 @@ async function loadChapter(chapter, refreshMeta, verse, verseEnd) {
     loadSidebarCards();
     markDictionaryTerms();
     renderChapterReadPrompt();
+    renderChapterEndNav();
   } catch (e) {
     if (e.message !== "no_api_key") {
       document.getElementById("readingText").innerHTML = `<div class="errnote">Could not load ${escHtml(current.bookName)} ${chapter}. ${escHtml(e.message)}</div>`;
@@ -116,6 +118,29 @@ async function goAdjacentChapter(dir) {
   await loadChapter(targetChapter, false);
 }
 
+// End-of-chapter prev/next (#chapterEndNav) — fills in where each arrow
+// leads (next chapter in this book, or the first chapter / name of the
+// adjacent book at a boundary) and greys out the arrow that would run off
+// the ends of the canon. goAdjacentChapter still guards the boundary itself.
+function renderChapterEndNav() {
+  const nav = document.getElementById("chapterEndNav");
+  if (!nav) return;
+  const maxCh = chapterMeta.length ? chapterMeta[chapterMeta.length - 1].chapter : current.chapter;
+  const idx = (typeof bookList !== "undefined" && bookList) ? bookList.findIndex(b => b.usfm === current.book) : -1;
+  const destLabel = dir => {
+    const t = current.chapter + dir;
+    if (t >= 1 && t <= maxCh) return `${current.bookName} ${t}`;
+    const nb = idx !== -1 ? bookList[idx + dir] : null;
+    if (!nb) return "";
+    return dir > 0 ? `${nb.name} 1` : nb.name; // last chapter of the previous book — count not known here
+  };
+  document.getElementById("cenPrevLabel").textContent = destLabel(-1);
+  document.getElementById("cenNextLabel").textContent = destLabel(1);
+  document.getElementById("cenPrev").disabled = current.chapter <= 1 && idx <= 0;
+  document.getElementById("cenNext").disabled = current.chapter >= maxCh && idx !== -1 && idx >= bookList.length - 1;
+  nav.hidden = false;
+}
+
 // Positions the fixed prev/next buttons just outside #readCol's own
 // edges — no static CSS value can express that once the reading column's
 // own width varies with viewport, so this measures at runtime.
@@ -137,29 +162,102 @@ function alignChapterNavButtons() {
 }
 window.addEventListener("resize", alignChapterNavButtons);
 
-// Swipe left/right on the reading column to turn the chapter — below 1180px
-// the .chapternav buttons are docked out of the way at the bottom corners
-// (css/styles.css) rather than beside a reading column with no room to
-// spare, so this is the primary way to move between chapters there, not
-// just a nicety. Passive listeners (no preventDefault) so vertical scroll
-// and tap-to-select-verse both keep working untouched; a swipe only fires
-// goAdjacentChapter once it's clearly more horizontal than vertical and past
-// a minimum distance, so an ordinary scroll gesture can't misfire it.
-(function initChapterSwipe() {
+// Touch gestures for the reader (all below 1180px, where the on-screen
+// chrome is deliberately sparse):
+//   • a horizontal swipe on the reading column turns the chapter — the
+//     .chapternav arrows are gone at this width (css/styles.css), so this is
+//     the primary way between adjacent chapters, not a nicety;
+//   • an inward swipe from the right screen edge opens the Chapter Info sheet
+//     (its docked button is gone on mobile too);
+//   • a tap on empty reading space toggles the auto-hiding chrome — the only
+//     way to bring it back without scrolling up.
+// Passive listeners (no preventDefault) so vertical scroll and
+// tap-to-select-verse keep working untouched; a swipe only acts once it's
+// clearly more horizontal than vertical and past a minimum distance, so an
+// ordinary scroll can't misfire it.
+(function initReaderGestures() {
   const col = document.getElementById("readCol");
   if (!col) return;
-  let sx = 0, sy = 0, tracking = false;
-  col.addEventListener("touchstart", e => {
+  const EDGE = 30;
+  let sx = 0, sy = 0, tracking = false, fromRightEdge = false, actedGesture = false;
+
+  document.addEventListener("touchstart", e => {
     if (e.touches.length !== 1) { tracking = false; return; }
-    sx = e.touches[0].clientX; sy = e.touches[0].clientY; tracking = true;
+    sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+    tracking = true; actedGesture = false;
+    fromRightEdge = sx >= window.innerWidth - EDGE;
   }, { passive: true });
-  col.addEventListener("touchend", e => {
+
+  document.addEventListener("touchend", e => {
     if (!tracking) return;
     tracking = false;
+    if (window.innerWidth > 1180) return;
+    if (typeof tourActive !== "undefined" && tourActive) return;
+    const rvg = document.getElementById("readViewGroup");
+    if (rvg && rvg.style.display === "none") return; // Search / Explore / etc. is up, not the reader
     const dx = e.changedTouches[0].clientX - sx;
     const dy = e.changedTouches[0].clientY - sy;
-    if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 2) goAdjacentChapter(dx < 0 ? 1 : -1);
+
+    // Right edge → inward: open Chapter Info. Claims the gesture so the
+    // chapter-turn check below can't also fire off the same drag.
+    if (fromRightEdge && dx < -50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (document.getElementById("notesDrawer").hidden && !document.querySelector(".modalscrim.show")) {
+        openCardsSheet();
+        actedGesture = true;
+      }
+    }
+
+    if (!actedGesture && !fromRightEdge &&
+        Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 2 &&
+        e.target.closest && e.target.closest("#readCol")) {
+      goAdjacentChapter(dx < 0 ? 1 : -1);
+      actedGesture = true;
+    }
   }, { passive: true });
+
+  col.addEventListener("click", e => {
+    if (window.innerWidth > 1180 || actedGesture) return;
+    if (typeof tourActive !== "undefined" && tourActive) return;
+    if (e.target.closest(".verse-span, a, button, input, textarea, .dict-term, [data-cite-id], .inline-illust, [onclick]")) return;
+    if (window.getSelection().toString()) return;
+    document.body.classList.toggle("chrome-hidden");
+  });
+})();
+
+// Below 1180px the topbar / chapter header / footer nav / audio bar hide on
+// scroll-down and return on scroll-up (css/styles.css body.chrome-hidden) —
+// more of a small screen goes to the text while you're actually reading.
+(function initChromeAutoHide() {
+  const sc = document.getElementById("readMain");
+  if (!sc) return;
+  let last = 0, ticking = false;
+  function update() {
+    ticking = false;
+    const rvg = document.getElementById("readViewGroup");
+    if (window.innerWidth > 1180 || !document.getElementById("notesDrawer").hidden ||
+        (rvg && rvg.style.display === "none") ||
+        (typeof tourActive !== "undefined" && tourActive)) { // don't tuck the chrome away mid-tour — steps spotlight it
+      document.body.classList.remove("chrome-hidden");
+      return;
+    }
+    const y = sc.scrollTop;
+    const dy = y - last;
+    last = y;
+    if (y <= 64) { document.body.classList.remove("chrome-hidden"); return; }
+    if (Math.abs(dy) > 200) return; // a big jump is a programmatic scroll (deep-link landing, view-switch restore) — resync, don't treat it as a direction
+    if (dy > 6) {
+      document.body.classList.add("chrome-hidden");
+      if (typeof closeMoreMenu === "function") closeMoreMenu(); // it's anchored to the footer that's sliding away
+    } else if (dy < -6) {
+      document.body.classList.remove("chrome-hidden");
+    }
+  }
+  sc.addEventListener("scroll", () => {
+    if (!ticking) { requestAnimationFrame(update); ticking = true; }
+  }, { passive: true });
+  window.addEventListener("resize", () => {
+    if (window.innerWidth > 1180) document.body.classList.remove("chrome-hidden"); // the hide transforms are mobile-only; don't leave the class stuck on
+  });
 })();
 
 // .chhead is sticky (top:0 of #readMain's own scrollport), so it's always

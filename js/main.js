@@ -53,6 +53,7 @@ function switchMainView(key) {
   document.querySelectorAll("[data-nav]").forEach(b => b.classList.toggle("active", b.dataset.nav === key));
   document.getElementById("mfnMoreBtn").classList.toggle("active", MORE_MENU_KEYS.includes(key));
   if (key !== "read") { closeVerseTools(); closeCardsSheet(); }
+  document.body.classList.remove("chrome-hidden"); // don't land on another view with the topbar still tucked away
   mainViewBeforeSwitch = key;
   setMenuHash(key);
   if (key === "read") {

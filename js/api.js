@@ -41,6 +41,89 @@ function openModal(id) { document.getElementById(id).classList.add("show"); }
 function closeModal(id) { document.getElementById(id).classList.remove("show"); }
 function fmtTime(s) { if (!isFinite(s)) return "0:00"; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, "0")}`; }
 
+/* ── brand-styled confirm / prompt (#uiDialogScrim) — window.confirm and
+   window.prompt look like nothing else in the app and can't be themed, so
+   every destructive-action confirm and every name-this input routes through
+   here instead. Promise-based: callers `await uiConfirm(...)` / `uiPrompt(...)`.
+   uiConfirm resolves true/false; uiPrompt resolves the trimmed string, or
+   null if cancelled (same contract as window.prompt). Both accept either a
+   plain message string or an options object. */
+let _uiDlgResolve = null;
+function _uiDlgSettle(result) {
+  if (!_uiDlgResolve) return;
+  const done = _uiDlgResolve; _uiDlgResolve = null;
+  closeModal("uiDialogScrim");
+  done(result);
+}
+function _openUiDialog(cfg) {
+  if (_uiDlgResolve) _uiDlgSettle(null); // never leave a prior dialog's promise hanging
+  document.getElementById("uiDialogTitle").textContent = cfg.title;
+  const msg = document.getElementById("uiDialogMsg");
+  msg.textContent = cfg.message || ""; msg.hidden = !cfg.message;
+  const input = document.getElementById("uiDialogInput");
+  input.hidden = !cfg.input;
+  const ok = document.getElementById("uiDialogOk");
+  ok.textContent = cfg.okLabel;
+  ok.classList.toggle("danger", !!cfg.danger);
+  document.getElementById("uiDialogCancel").textContent = cfg.cancelLabel;
+  const p = new Promise(res => { _uiDlgResolve = res; });
+  openModal("uiDialogScrim");
+  if (cfg.input) {
+    input.value = cfg.value || "";
+    input.placeholder = cfg.placeholder || "";
+    setTimeout(() => { input.focus(); input.select(); }, 40);
+  } else {
+    // focus the safe choice for a destructive confirm, the primary otherwise
+    setTimeout(() => document.getElementById(cfg.danger ? "uiDialogCancel" : "uiDialogOk").focus(), 40);
+  }
+  return p;
+}
+function uiConfirm(opts) {
+  if (typeof opts === "string") opts = { message: opts };
+  return _openUiDialog({
+    title: opts.title || "Are you sure?",
+    message: opts.message || "",
+    okLabel: opts.okLabel || "OK",
+    cancelLabel: opts.cancelLabel || "Cancel",
+    danger: opts.danger,
+    input: false,
+  }).then(v => v !== null);
+}
+function uiPrompt(opts) {
+  if (typeof opts === "string") opts = { message: opts };
+  return _openUiDialog({
+    title: opts.title || "",
+    message: opts.message || "",
+    okLabel: opts.okLabel || "Save",
+    cancelLabel: opts.cancelLabel || "Cancel",
+    input: true,
+    placeholder: opts.placeholder || "",
+    value: opts.value || "",
+  }).then(v => v === null ? null : v.trim());
+}
+(function initUiDialog() {
+  const scrim = document.getElementById("uiDialogScrim");
+  if (!scrim) return;
+  const ok = document.getElementById("uiDialogOk");
+  const input = document.getElementById("uiDialogInput");
+  const submit = () => _uiDlgSettle(input.hidden ? "" : input.value);
+  ok.addEventListener("click", submit);
+  document.getElementById("uiDialogCancel").addEventListener("click", () => _uiDlgSettle(null));
+  document.getElementById("uiDialogX").addEventListener("click", () => _uiDlgSettle(null));
+  scrim.addEventListener("click", e => { if (e.target === scrim) _uiDlgSettle(null); });
+  input.addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); submit(); }
+  });
+  // Registered before main.js's global Escape handler (script order), so a
+  // stopImmediatePropagation here keeps Escape from also bouncing the main
+  // view to Read while the dialog is up.
+  document.addEventListener("keydown", e => {
+    if (!_uiDlgResolve || e.key !== "Escape") return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    _uiDlgSettle(null);
+  });
+})();
+
 /* ═══════════════════════════════════════════════════════════════════════
    AUTH — every user brings their own API key (free at developer.iqbible.com),
    stored only in this browser's localStorage. Nothing is hardcoded or
