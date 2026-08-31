@@ -250,32 +250,20 @@ async function runAtlasSearch(q) {
   atlasLastResults = places;
   renderAtlasResults(places, q);
 }
-// GeoPlace (the API's place record) has no description/encyclopedia field
-// of its own — confirmed against the backend struct, logged in NOTES.md.
-// The app's existing dictionary sources (DICT_SOURCES, js/reader.js — the
-// same five used for the reading-text tooltip/term modal) genuinely cover
-// well-known place names though (Smith's in particular is a Bible
-// geography dictionary), so a place detail tries all five for an exact-name
-// hit, same "a miss from one source is normal" tolerance runWordStudy uses.
-// No section renders at all if nothing hits — honest absence, not filler.
-// One tab per dictionary source that had an entry, rather than dumping every
-// hit consecutively — .dict-tabs/.dict-tab-btn/.dict-tab-panel (styles in
-// css/styles.css, switcher delegated in main.js) so a single-hit place skips
-// the tab row entirely and just shows its one definition.
-async function fetchAtlasPlaceDescription(name) {
-  const results = await Promise.allSettled(DICT_SOURCES.map(s => apiJSON(`/dictionaries/${s.id}?q=${encodeURIComponent(name)}`)));
-  const hits = [];
-  results.forEach((r, i) => {
-    const entry = r.status === "fulfilled" && (r.value.data || [])[0];
-    if (entry && entry.definition) hits.push({ source: DICT_SOURCES[i].name, definition: entry.definition, citations: entry.citations });
-  });
-  if (!hits.length) return "";
-  const rows = await Promise.all(hits.map(h => linkifyPreParsedCitations(h.definition, h.citations)));
-  const tabBtns = hits.length > 1
-    ? `<div class="dict-tab-btns">${hits.map((h, i) => `<button type="button" class="filter-chip dict-tab-btn${i === 0 ? " active" : ""}" data-idx="${i}">${escHtml(h.source)}</button>`).join("")}</div>`
+// GET /geo/places/{id} carries a `description` object — the best-matching
+// public-domain dictionary entry for the place, paired server-side by
+// scoring each candidate entry's own citations against the place's verses
+// (so "Ai 1" in Joshua resolves to the right headword/sense, not "Ai 2" in
+// Jeremiah). `{ text, source, match_method, url, ... }`; omitted for a place
+// no dictionary carries. The text is free-text prose, so its references go
+// through linkifyCitations like any other API prose.
+async function atlasPlaceDescriptionHTML(desc) {
+  if (!desc || !desc.text) return "";
+  const html = await linkifyCitations(desc.text);
+  const credit = desc.source
+    ? `<div class="person-def-src" style="margin-top:8px">${escHtml(desc.source)}${desc.match_method === "name-only" ? " · matched by name" : ""}</div>`
     : "";
-  const panels = rows.map((html, i) => `<div class="dict-tab-panel${i === 0 ? " active" : ""}" data-idx="${i}"><div class="person-def-src">${escHtml(hits[i].source)}</div><div class="person-def-text">${html}</div></div>`).join("");
-  return `<div class="person-section dict-tabs"><div class="person-section-label">Description</div>${tabBtns}${panels}</div>`;
+  return `<div class="person-section"><div class="person-section-label">Description</div><div class="person-def-text">${html}</div>${credit}</div>`;
 }
 async function openAtlasPlace(id) {
   const backRow = `<div class="tool-back-row"><button onclick="renderExploreAtlas()">‹ Search Places</button></div>`;
@@ -283,7 +271,7 @@ async function openAtlasPlace(id) {
   atlasListScrollTop = body.parentElement.scrollTop;
   body.innerHTML = backRow + `<div class="spin"></div>`;
   let p;
-  try { p = await apiJSON(`/geo/places/${id}`); }
+  try { p = await apiJSONCached(`/geo/places/${id}`); }
   catch (e) { body.innerHTML = backRow + `<div class="dd-empty">Could not load this place.</div>`; return; }
   const title = (p.preceding_article ? p.preceding_article + " " : "") + p.name;
   const meta = [p.place_type, p.modern_name ? `modern: ${p.modern_name}` : ""].filter(Boolean).join(" · ");
@@ -292,14 +280,13 @@ async function openAtlasPlace(id) {
   const map = hasCoords ? placeMapPreviewHTML(p.lat, p.lon, title) : (p.special ? `<div class="dd-empty">${escHtml(p.special)}</div>` : "");
   const allVerses = p.verses || [];
   const verses = allVerses.slice(0, 40);
-  const [previewByRef, descHtml] = await Promise.all([fetchVersePreviews(verses), fetchAtlasPlaceDescription(p.name)]);
+  const [previewByRef, descHtml] = await Promise.all([fetchVersePreviews(verses), atlasPlaceDescriptionHTML(p.description)]);
   // With a description to flow in beside it, media floats narrow
   // (.atlas-media, css/styles.css) so the text wraps around it. A place with
-  // no description at all (e.g. "the Sea of Egypt" — GeoPlace has no prose
-  // field of its own, see NOTES.md, and no dictionary source had an entry
-  // either) has nothing to wrap around it, so the thumb and map instead go
-  // side by side full-width — .place-media-row, the same pattern the
-  // chapter-scoped Places modal already uses (js/reader.js).
+  // no description (a minor or extra-biblical name no dictionary carries)
+  // has nothing to wrap around it, so the thumb and map instead go side by
+  // side full-width — .place-media-row, the same pattern the chapter-scoped
+  // Places modal already uses (js/reader.js).
   const mediaHtml = !thumb && !map ? "" :
     descHtml ? `<div class="atlas-media">${thumb}${map}</div>` :
     (thumb && map) ? `<div class="place-media-row">${thumb}${map}</div>` : (thumb || map);
@@ -475,7 +462,7 @@ async function renderExploreExtrabiblical() {
     // description is free-text prose from the API and can itself cite a verse
     // (e.g. "quoted in Jude 1:14-15") — linkifyCitations per CLAUDE.md's rule
     // for any embedded free-text citation, same as every other detail prose
-    // field in this file (fetchAtlasPlaceDescription above, etc.).
+    // field in this file (atlasPlaceDescriptionHTML above, etc.).
     const desc = w.description ? await linkifyCitations(w.description) : "";
     const meta = [w.language_name, w.license].filter(Boolean).join(" · ");
     return `<div class="prophecy-entry">

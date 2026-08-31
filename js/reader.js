@@ -25,17 +25,34 @@ async function loadChapter(chapter, refreshMeta, verse, verseEnd) {
 
   try {
     const data = await apiJSONCached(`/bibles/${current.version}/${current.book}/${chapter}?include=words_of_jesus`);
-    document.getElementById("readingText").dir = current.textDirection;
-    renderChapter(data.data || []);
-    applyVerseAnnotations();
-    loadInlineIllustrations();
-    loadInlineStoryTitles();
-    loadSidebarCards();
-    markDictionaryTerms();
-    renderChapterReadPrompt();
-    renderChapterEndNav();
+    if (!(data.data || []).length) {
+      // A verse range that overshoots a real chapter still 200s with the
+      // verses that exist (beta-46) — an empty list here means an odd edge
+      // case, treated the same as an out-of-range chapter. A genuinely
+      // out-of-range chapter/verse now 404s and is handled in the catch.
+      document.getElementById("readingText").innerHTML = `<div class="errnote">${escHtml(current.bookName)} ${chapter} isn't in ${escHtml(current.versionTitle)}. Switch to a translation that includes it to read it.</div>`;
+    } else {
+      document.getElementById("readingText").dir = current.textDirection;
+      renderChapter(data.data);
+      applyVerseAnnotations();
+      loadInlineIllustrations();
+      loadInlineStoryTitles();
+      loadSidebarCards();
+      markDictionaryTerms();
+      renderChapterReadPrompt();
+      renderChapterEndNav();
+    }
   } catch (e) {
-    if (e.message !== "no_api_key") {
+    if (e.message === "book_not_found" || e.message === "chapter_not_found" || e.message === "verse_not_found") {
+      // A deep link (or Back/Forward, or chapter picker) landed on a book
+      // this translation doesn't carry (a deuterocanonical book under a
+      // 66-book version) or a chapter/verse beyond its range (Catholic
+      // Daniel 13/14, the Greek Esther additions) — the API 404s distinctly
+      // for each (beta-46). jumpToVerse() screens for this first with a
+      // switch offer; this is the backstop for a direct load.
+      const what = e.message === "book_not_found" ? escHtml(current.bookName) : `${escHtml(current.bookName)} ${chapter}`;
+      document.getElementById("readingText").innerHTML = `<div class="errnote">${what} isn't in ${escHtml(current.versionTitle)}. Switch to a translation that includes it to read it.</div>`;
+    } else if (e.message !== "no_api_key") {
       document.getElementById("readingText").innerHTML = `<div class="errnote">Could not load ${escHtml(current.bookName)} ${chapter}. ${escHtml(e.message)}</div>`;
     }
   }
@@ -328,28 +345,35 @@ async function getAllProphecies() {
   }
   return allProphecies;
 }
-let allChronology = null;
-async function getAllChronology() {
-  if (!allChronology) {
-    try { const d = await apiJSON("/chronology"); allChronology = d.data || []; }
-    catch (e) { allChronology = []; }
-  }
-  return allChronology;
+// Deuterocanon USFM codes. GET /chronology and /chronology/for take a
+// ?canon= hint so deuterocanon-only events (the Hasmonean sequence) resolve
+// their 1–2 Maccabees citations — ?version= can't do it because every
+// English version shares one canon_id API-side regardless of apocrypha
+// coverage, so the app supplies the hint from what the current version's
+// book list actually carries.
+const DEUTERO_USFM = new Set(["TOB", "JDT", "ESG", "WIS", "SIR", "BAR", "LJE", "S3Y", "SUS", "BEL", "1MA", "2MA", "1ES", "2ES", "MAN", "PS2", "3MA", "4MA", "ODA", "PSS"]);
+function chronologyParams() {
+  const canon = bookList.some(b => DEUTERO_USFM.has(b.usfm)) ? "&canon=catholic" : "";
+  return `?version=${encodeURIComponent(current.version)}${canon}`;
 }
-// /chronology has no per-chapter filter server-side (it's a flat curated
-// list spanning all of Scripture, not scoped to one book), but each entry's
-// `reference` is a free-text "Book chapter:verse" string — matched against
-// the current book/chapter client-side rather than a second API round trip,
-// since the whole list is already cached in memory.
-function chronologyForChapter(all, bookName, chapter) {
-  const re = new RegExp("^" + bookName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s+(\\d+)");
-  return all.filter(e => {
-    const m = e.reference && e.reference.match(re);
-    return m && parseInt(m[1], 10) === chapter;
-  });
+async function getChronologyList() {
+  try { const d = await apiJSONCached(`/chronology${chronologyParams()}`); return d.data || []; }
+  catch (e) { return []; }
 }
-function railCard(label, body, onclick) {
-  const cls = "railcard" + (onclick ? " clickable" : "");
+// GET /chronology/for/{book}/{chapter} places the current chapter on the
+// timeline through three layers (a curated event covering it, else a story
+// anchor for the chapter, else the book's era) — always resolves to
+// something, and replaces the old client-side regex match of the flat
+// list's free-text `reference` strings.
+async function getChronologyForChapter(book, chapter) {
+  try { return await apiJSONCached(`/chronology/for/${book}/${chapter}${chronologyParams()}`); }
+  catch (e) { return null; }
+}
+// extraClass: "railcard--feature" (square, for About This Chapter / Places
+// without media) or "railcard--compact" (one-line teaser — Timeline, People,
+// Prophecies). Keeps all five cards visible without scrolling the rail.
+function railCard(label, body, onclick, extraClass) {
+  const cls = "railcard" + (onclick ? " clickable" : "") + (extraClass ? " " + extraClass : "");
   const click = onclick ? ` onclick="${onclick}"` : "";
   return `<div class="${cls}"${click}><div class="rc-label">${escHtml(label)}</div><div class="rc-body">${body}</div></div>`;
 }
@@ -406,9 +430,10 @@ async function loadPlacesCard() {
     } else if (typeof first.lat === "number" && typeof first.lon === "number") {
       media = `<img class="rc-thumb" src="${staticMapTileURL(first.lon, first.lat, 7)}" alt="Map of ${escHtml(first.name)}" onerror="this.remove()">`;
     }
-    // Only the media variant keeps the 1:1 square (see .railcard--media, CSS) —
-    // a Places card with just names, no thumbnail/coords, sizes to content.
-    return `<div class="railcard clickable${media ? " railcard--media" : ""}" onclick="openPlacesModal()"><div class="rc-label">Places</div>${media ? `<div class="rc-media">${media}</div>` : ""}<div class="rc-body">${moreText}</div></div>`;
+    // Square either way: 1:1 with the media (.railcard--media), or a plain
+    // square holding the name list when there's no thumbnail/coords
+    // (.railcard--feature) — Places is an "anchor" card, not a compact one.
+    return `<div class="railcard clickable ${media ? "railcard--media" : "railcard--feature"}" onclick="openPlacesModal()"><div class="rc-label">Places</div>${media ? `<div class="rc-media">${media}</div>` : ""}<div class="rc-body">${moreText}</div></div>`;
   } catch (e) { return null; }
 }
 // Opens with a real embedded map per place — a plain OpenStreetMap iframe
@@ -447,21 +472,21 @@ async function openPlacesModal() {
   }).join("");
   places.forEach(p => loadPlaceShortDescription(p));
 }
-// Short Easton's-first blurb + "Read More" into the full Atlas place page
-// (Explore > Atlas), rather than duplicating that page's full multi-source
-// description here — this card is a preview, the Atlas page is the detail
-// view. Loaded per place after the list paints so a slow/missing dictionary
-// hit for one place doesn't hold up the others.
+// Short blurb + "Read More" into the full Atlas place page (Explore > Atlas).
+// GET /geo/places/{id} carries the server-matched `description` (the same one
+// the Atlas page shows in full) — a real, verse-verified dictionary pairing,
+// not a client-side exact-name probe. Loaded per place after the list paints
+// so a slow/missing one doesn't hold up the others.
 async function loadPlaceShortDescription(p) {
   const el = document.getElementById(`placeDesc${p.id}`);
   if (!el) return;
-  let entry;
-  try { const d = await apiJSON(`/dictionaries/easton?q=${encodeURIComponent(p.name)}`); entry = (d.data || [])[0]; }
-  catch (e) { entry = null; }
+  let desc;
+  try { const d = await apiJSONCached(`/geo/places/${p.id}`); desc = d.description; }
+  catch (e) { desc = null; }
   if (!el.isConnected) return;
-  if (!entry || !entry.definition) { el.remove(); return; }
-  const def = entry.definition;
-  const short = def.length > 200 ? def.slice(0, 200).replace(/\s+\S*$/, "") + "…" : def;
+  if (!desc || !desc.text) { el.remove(); return; }
+  const t = desc.text;
+  const short = t.length > 200 ? t.slice(0, 200).replace(/\s+\S*$/, "") + "…" : t;
   el.innerHTML = `<div class="dd-def">${await linkifyCitations(short)}</div><button class="prophecy-origin" onclick="goToAtlasPlace(${p.id})">Read More ›</button>`;
 }
 function goToAtlasPlace(id) {
@@ -482,18 +507,17 @@ async function loadPeopleCard() {
     const people = d.data || [];
     currentChapterPeople = people;
     if (!people.length) return null;
-    const names = people.slice(0, 4).map(p => escHtml(p.name)).join(", ");
-    return railCard("People", names + (people.length > 4 ? ` +${people.length - 4} more` : ""), "openPeopleModal()");
+    const names = people.slice(0, 3).map(p => escHtml(p.name)).join(", ");
+    return railCard("People", names + (people.length > 3 ? ` <span class="rc-dim">+${people.length - 3}</span>` : ""), "openPeopleModal()", "railcard--compact");
   } catch (e) { currentChapterPeople = []; return null; }
 }
-// Detail view resolves one name via the exact-match GET /bible-characters/{name}
-// lookup — that's the real, permanent API path for a person profile (kept
-// distinct from /bible-people, which only ever lists; see biblecharacters.go's
-// own doc comment), not something to rename along with the UI. Name-keyed,
-// not ustrong — TIPNR disambiguation between two same-named individuals is
-// out of scope for this endpoint. A name from the chapter list can still
-// occasionally 404 here in principle; shown as a plain empty state, not an
-// error, since that's honest API behavior rather than a bug.
+// Detail view resolves a person via GET /bible-characters/by-ustrong/{ustrong}
+// when the caller has the disambiguated code (every /bible-people row and
+// every relationship/namesake chip carries one), falling back to the
+// bare-name GET /bible-characters/{name} only when there's genuinely no code.
+// The name route returns the lowest-id namesake for a shared name (eleven
+// Michaels, two Naamahs), so the ustrong path is what gets the right person.
+// A lookup can still 404 in principle; shown as a plain empty state.
 let personDetailToken = 0;
 function openPeopleModal() {
   closeCardsSheet(); // else this modal opens beneath the still-open mobile Chapter Info sheet — see openPlacesModal
@@ -508,21 +532,29 @@ function renderPeopleList() {
   const body = document.getElementById("peopleBody");
   if (!currentChapterPeople.length) { body.innerHTML = `<div class="dd-empty">No people found for this chapter.</div>`; return; }
   body.innerHTML = currentChapterPeople.map(p =>
-    `<button class="person-row" onclick="openPersonDetail('${p.name.replace(/'/g, "\\'")}')">${escHtml(p.name)}<span class="person-row-arrow">›</span></button>`
+    `<button class="person-row" onclick="openPersonDetail('${p.name.replace(/'/g, "\\'")}'${p.ustrong ? `, '${p.ustrong}'` : ""})">${escHtml(p.name)}<span class="person-row-arrow">›</span></button>`
   ).join("");
 }
-async function openPersonDetail(name) {
+async function openPersonDetail(name, ustrong) {
   const token = ++personDetailToken;
   document.getElementById("peopleBackBtn").style.display = "flex";
   document.getElementById("peopleTitle").textContent = name;
   const body = document.getElementById("peopleBody");
   body.innerHTML = `<div class="spin"></div>`;
   let d;
-  try { d = await apiJSON(`/bible-characters/${encodeURIComponent(name)}`); }
-  catch (e) {
-    if (token !== personDetailToken) return;
-    body.innerHTML = `<div class="dd-empty">No further details on file for "${escHtml(name)}".</div>`;
-    return;
+  try {
+    d = await apiJSON(ustrong
+      ? `/bible-characters/by-ustrong/${encodeURIComponent(ustrong)}`
+      : `/bible-characters/${encodeURIComponent(name)}`);
+  } catch (e) {
+    // by-ustrong can 404 (a relationship edge to a person with no profile);
+    // fall back to the bare name once before giving up.
+    if (ustrong) { try { d = await apiJSON(`/bible-characters/${encodeURIComponent(name)}`); } catch (e2) {} }
+    if (!d) {
+      if (token !== personDetailToken) return;
+      body.innerHTML = `<div class="dd-empty">No further details on file for "${escHtml(name)}".</div>`;
+      return;
+    }
   }
   if (token !== personDetailToken) return;
   body.innerHTML = await renderPersonProfile(d);
@@ -532,27 +564,28 @@ async function openPersonDetail(name) {
 // field on it) is entirely omitempty, so a real profile can legitimately
 // have anywhere from zero to all sections below; nothing here is filtered
 // or reshaped, just laid out. Layout runs identity block (epithet, summary,
-// a small first/last appearance line) → family (inline name chips per
-// relationship) → Key Events (collapsed accordion, the one big/messy block)
-// → tabbed definitions: the structured
-// data stays compact so the dictionary prose (the bulk of the content) sits
-// near the top instead of below a long scroll.
-// Definitions' prose (and only that — scripture_refs/citations elsewhere are
-// already-structured refs, not free text) goes through linkifyCitations per
-// CLAUDE.md's citation rule, one tab at a time; key_events/first/last
-// appearance use registerCiteId + one batched fetchVersePreviews call, same
-// pattern as the Prophecies modal.
+// a small first/last appearance line) → "other people named X" (namesakes,
+// when the name resolved by bare string and the API knows homonyms) →
+// family (inline name chips per relationship) → tabbed definitions: the
+// structured data stays compact so the dictionary prose (the bulk of the
+// content) sits near the top instead of below a long scroll.
+// Definitions' prose goes through linkifyPreParsedCitations — the entry's
+// own API-resolved citations[] array, no re-parse — per CLAUDE.md's citation
+// rule, one tab at a time; first/last appearance use registerCiteId + one
+// batched fetchVersePreviews call, same pattern as the Prophecies modal.
 // parents/siblings/partners/children (TIPNR, bible_people_relationships)
-// carry no per-edge verse citation — the related person's own name is the
-// only thing to show, so those rows just drill into that name's own
-// profile via openPersonDetail rather than jumping to a verse.
+// each carry the related person's disambiguated `ustrong` — the chip drills
+// into that exact individual via openPersonDetail(name, ustrong), not a
+// bare-name lookup that would land on the lowest-id namesake.
 async function renderPersonProfile(d) {
   const c = d && d.data;
   if (!c) return `<div class="dd-empty">No further details on file for this name.</div>`;
-  const bookName = usfm => (bookList.find(b => b.usfm === usfm) || {}).name || usfm;
+  // bookNameByUsfm (GET /books/abbreviations) covers every book incl. the
+  // deuterocanon; the current version's bookList may not (a KJV reader whose
+  // person's last appearance is in Sirach).
+  const bookName = usfm => bookNameByUsfm[usfm] || (bookList.find(b => b.usfm === usfm) || {}).name || usfm;
 
   const refs = [];
-  (c.key_events || []).forEach(e => { if (e.verses && e.verses[0]) refs.push(e.verses[0]); });
   if (c.first_appearance) refs.push(c.first_appearance);
   if (c.last_appearance) refs.push(c.last_appearance);
   const previewByRef = await fetchVersePreviews(refs);
@@ -560,10 +593,12 @@ async function renderPersonProfile(d) {
   const out = [];
 
   // Identity block — epithet, one-sentence summary, and a small first/last
-  // appearance line. NB the appearance refs come from the API's name-matched
-  // Nave/Torrey citation range, not a true narrative first/last mention (see
-  // NOTES.md) — rendered as-is, not second-guessed here.
+  // appearance line. first/last appearance are the resolved person's own
+  // first and last TIPNR verse citations in canonical order (API beta-41) —
+  // a real narrative first/last mention, rendered as-is.
   const eyebrow = c.tribe_nation || (c.gender ? c.gender[0].toUpperCase() + c.gender.slice(1) : "");
+  const dcBadge = (c.confirmed_by || []).includes("deuterocanon")
+    ? `<span class="person-dc-badge">Deuterocanonical</span>` : "";
   const summaryText = c.brief || c.summary || c.briefest || c.short || c.description || "";
   const appearItem = (label, v) => {
     if (!v) return "";
@@ -573,8 +608,23 @@ async function renderPersonProfile(d) {
     return `<span class="person-appear-item"><span class="person-appear-label">${escHtml(label)}</span> <button class="person-appear-ref"${citeAttr} onclick="closeModal('peopleScrim');jumpToVerse('${v.book}',${v.chapter},${v.verse})">${escHtml(refLabel)}</button></span>`;
   };
   const appearParts = [appearItem("First appearance", c.first_appearance), appearItem("Last appearance", c.last_appearance)].filter(Boolean);
-  if (eyebrow || summaryText || appearParts.length) {
-    out.push(`<div class="person-id">${eyebrow ? `<div class="person-id-eyebrow">${escHtml(eyebrow)}</div>` : ""}${summaryText ? `<div class="person-id-summary">${escHtml(summaryText)}</div>` : ""}${appearParts.length ? `<div class="person-appear">${appearParts.join(`<span class="person-appear-sep"> · </span>`)}</div>` : ""}</div>`);
+  if (eyebrow || dcBadge || summaryText || appearParts.length) {
+    const eyebrowHtml = (eyebrow || dcBadge)
+      ? `<div class="person-id-eyebrow">${eyebrow ? escHtml(eyebrow) : ""}${eyebrow && dcBadge ? " " : ""}${dcBadge}</div>` : "";
+    out.push(`<div class="person-id">${eyebrowHtml}${summaryText ? `<div class="person-id-summary">${escHtml(summaryText)}</div>` : ""}${appearParts.length ? `<div class="person-appear">${appearParts.join(`<span class="person-appear-sep"> · </span>`)}</div>` : ""}</div>`);
+  }
+
+  // "Other people named X" — only when the lookup resolved by bare name and
+  // the API flagged homonyms it knows about (resolved_by / namesakes[], API
+  // beta-53). Each chip opens that specific individual by ustrong.
+  if (c.resolved_by === "name" && c.namesakes && c.namesakes.length) {
+    const chips = c.namesakes.map(ns => {
+      const hint = ns.briefest || ns.tribe_nation || ns.description || "";
+      const fa = ns.first_appearance;
+      const appear = fa ? ` · ${bookName(fa.book)} ${fa.chapter}:${fa.verse}` : "";
+      return `<button class="prophecy-ref person-namesake" onclick="openPersonDetail('${c.name.replace(/'/g, "\\'")}', '${ns.ustrong}')">${escHtml(c.name)}${hint ? ` — ${escHtml(hint)}` : ""}${escHtml(appear)}</button>`;
+    }).join("");
+    out.push(`<div class="person-section"><div class="person-section-label">Other people named ${escHtml(c.name)}</div><div class="person-namesakes">${chips}</div></div>`);
   }
 
   // Family — one group per relationship in a 2-up grid, the names as inline
@@ -584,26 +634,18 @@ async function renderPersonProfile(d) {
   // ("Parents" → "father" / "mother").
   const relChip = (r, groupSingular) => {
     const showRel = r.relationship && r.relationship.toLowerCase() !== groupSingular;
-    return `<span class="person-rel-item">${showRel ? `<span class="person-rel-tag">${escHtml(r.relationship)}</span>` : ""}<button class="prophecy-ref" onclick="openPersonDetail('${r.name.replace(/'/g, "\\'")}')">${escHtml(r.name)}</button></span>`;
+    const arg = r.ustrong ? `, '${r.ustrong}'` : "";
+    return `<span class="person-rel-item">${showRel ? `<span class="person-rel-tag">${escHtml(r.relationship)}</span>` : ""}<button class="prophecy-ref" onclick="openPersonDetail('${r.name.replace(/'/g, "\\'")}'${arg})">${escHtml(r.name)}</button></span>`;
   };
   const relGroups = [["Parents", "parent", c.parents], ["Siblings", "sibling", c.siblings], ["Partners", "partner", c.partners], ["Children", "child", c.children]]
     .filter(([, , list]) => list && list.length)
     .map(([label, singular, list]) => `<div class="person-rel-group"><div class="person-section-label">${label}</div><div class="person-rel-names">${list.map(r => relChip(r, singular)).join("")}</div></div>`);
   if (relGroups.length) out.push(`<div class="person-rel-groups">${relGroups.join("")}</div>`);
 
-  // Key Events — often 20+ rows of API topical citations, some mislabelled or
-  // cross-entity (see NOTES.md), so it stays folded away and sits last before
-  // the definitions rather than pushing everything down.
-  if (c.key_events && c.key_events.length) {
-    const pills = c.key_events.map(e => {
-      const v = e.verses && e.verses[0];
-      const text = v && previewByRef[`${v.book}.${v.chapter}.${v.verse}`];
-      const citeAttr = text ? ` data-cite-id="${registerCiteId(e.citation, text)}"` : "";
-      const jump = v ? ` onclick="closeModal('peopleScrim');jumpToVerse('${v.book}',${v.chapter},${v.verse})"` : "";
-      return `<button class="prophecy-ref" style="margin:0 6px 8px 0"${citeAttr}${jump}>${e.label ? escHtml(e.label) + ": " : ""}${escHtml(e.citation)}</button>`;
-    }).join("");
-    out.push(`<div class="person-section">${personAccordion("Key Events", c.key_events.length, pills)}</div>`);
-  }
+  // (Key Events removed — the API dropped `key_events` in beta-41: it was
+  // bare-name-matched to a Nave/Torrey heading, which merged homonyms and
+  // carried upstream-corrupted labels, and TIPNR has no per-person events
+  // dataset to key it to. Not rebuilt client-side per the GOLDEN RULE.)
 
   // Definitions last but visible without a long scroll — tabbed by source
   // rather than stacked. openPersonDetail linkifies the first tab; the rest
@@ -611,9 +653,6 @@ async function renderPersonProfile(d) {
   if (c.definitions && c.definitions.length) out.push(personDefsSection(c.definitions));
 
   return out.length ? out.join("") : `<div class="dd-empty">No further details on file for "${escHtml(c.name)}".</div>`;
-}
-function personAccordion(label, count, bodyHtml) {
-  return `<details class="bg-accordion person-acc"><summary><span>${escHtml(label)} <span class="person-acc-count">${count}</span></span></summary><div class="bg-accordion-body">${bodyHtml}</div></details>`;
 }
 // Ordered by DICT_SOURCES (Easton's, Smith's, …) with any unknown source
 // appended; a person with one entry skips the tab row. Panels render with
@@ -627,7 +666,7 @@ function personDefsSection(defs) {
   const ordered = [];
   DICT_SOURCES.forEach(s => { const d = defs.find(x => x.source === s.id); if (d) ordered.push({ name: s.name, def: d }); });
   defs.forEach(d => { if (!ordered.some(o => o.def === d)) ordered.push({ name: d.source, def: d }); });
-  personDefs = ordered.map(o => ({ name: o.name, definition: o.def.definition || "" }));
+  personDefs = ordered.map(o => ({ name: o.name, definition: o.def.definition || "", citations: o.def.citations || [] }));
   const multi = personDefs.length > 1;
   const btns = multi
     ? `<div class="dict-tab-btns">${personDefs.map((d, i) => `<button type="button" class="filter-chip dict-tab-btn${i === 0 ? " active" : ""}" data-idx="${i}">${escHtml(d.name)}</button>`).join("")}</div>`
@@ -647,7 +686,7 @@ async function ensurePersonDefLinkified(idx) {
   if (personDefLinkified[idx] || !personDefs[idx]) return;
   personDefLinkified[idx] = true;
   const token = personDetailToken;
-  const html = await linkifyCitations(personDefs[idx].definition);
+  const html = await linkifyPreParsedCitations(personDefs[idx].definition, personDefs[idx].citations);
   if (token !== personDetailToken) return;
   const el = document.getElementById("personDefBody" + idx);
   if (el) el.innerHTML = html;
@@ -689,15 +728,13 @@ async function loadPropheciesCard() {
     const all = await getAllProphecies();
     const entries = propheciesEntriesForChapter(all, current.book, current.chapter);
     if (!entries.length) return null;
-    const shown = entries.slice(0, 2);
-    const previewByRef = await fetchVersePreviews(shown.map(e => e.ref));
-    const lines = shown.map(e => {
-      const text = previewByRef[`${e.ref.book}.${e.ref.chapter}.${e.ref.verse}`];
-      const citeAttr = text ? ` data-cite-id="${registerCiteId(e.citation, text)}"` : "";
-      return `<div class="rc-entry">${escHtml(e.prefix)}<span class="citelink"${citeAttr}>${escHtml(e.citation)}</span></div>`;
-    }).join("");
-    const more = entries.length > 2 ? `<div class="rc-more">+${entries.length - 2} more</div>` : "";
-    return railCard("Prophecies", lines + more, "openPropheciesModal()");
+    const e0 = entries[0];
+    const previewByRef = await fetchVersePreviews([e0.ref]);
+    const text = previewByRef[`${e0.ref.book}.${e0.ref.chapter}.${e0.ref.verse}`];
+    const citeAttr = text ? ` data-cite-id="${registerCiteId(e0.citation, text)}"` : "";
+    const body = `${escHtml(e0.prefix)}<span class="citelink"${citeAttr}>${escHtml(e0.citation)}</span>`
+      + (entries.length > 1 ? ` <span class="rc-dim">+${entries.length - 1}</span>` : "");
+    return railCard("Prophecies", body, "openPropheciesModal()", "railcard--compact");
   } catch (e) { return null; }
 }
 async function openPropheciesModal() {
@@ -732,45 +769,84 @@ async function openPropheciesModal() {
   }).join("");
 }
 async function loadTimelineCard() {
-  const all = await getAllChronology();
-  const matches = chronologyForChapter(all, current.bookName, current.chapter);
-  if (!matches.length) {
-    return railCard("Timeline", all.length ? `${all.length} curated events` : "Explore biblical chronology", "openTimelineModal()");
+  const info = await getChronologyForChapter(current.book, current.chapter);
+  if (!info) return railCard("Timeline", "Explore biblical chronology", "openTimelineModal()", "railcard--compact");
+  const events = info.events || [];
+  let body;
+  if (events.length) {
+    // One-line teaser — the modal carries the dates, refs and hover-previews.
+    body = escHtml(events[0].event) + (events.length > 1 ? ` <span class="rc-dim">+${events.length - 1}</span>` : "");
+  } else {
+    const anchor = (info.story_anchor && info.story_anchor.title) || `${current.bookName} ${current.chapter}`;
+    body = escHtml(anchor) + (info.era ? ` <span class="rc-dim">· ${escHtml(info.era)}</span>` : "");
   }
-  const shown = matches.slice(0, 2);
-  const lines = shown.map(e => {
-    const refSpan = e.reference
-      ? ` <span class="citelink tl-ref" data-ref="${escAttr(e.reference)}" onmouseenter="resolveTimelineRef(this, this.dataset.ref)">${escHtml(e.reference)}</span>`
-      : "";
-    return `<div class="rc-entry">${e.date ? escHtml(e.date) + " — " : ""}${escHtml(e.event)}${refSpan}</div>`;
-  }).join("");
-  const more = matches.length > 2 ? `<div class="rc-more">+${matches.length - 2} more</div>` : "";
-  return railCard("Timeline", lines + more, "openTimelineModal()");
+  return railCard("Timeline", body, "openTimelineModal()", "railcard--compact");
 }
 async function openTimelineModal() {
   closeCardsSheet(); // else this modal opens beneath the still-open mobile Chapter Info sheet — see openPlacesModal
-  const book = current.book, chapter = current.chapter, bookName = current.bookName;
+  const book = current.book, chapter = current.chapter;
   const body = document.getElementById("timelineBody");
   body.innerHTML = `<div class="spin"></div>`;
   openModal("timelineScrim");
-  const all = await getAllChronology();
+  const [all, info] = await Promise.all([getChronologyList(), getChronologyForChapter(book, chapter)]);
   if (current.book !== book || current.chapter !== chapter) return;
   if (!all.length) { body.innerHTML = `<div class="dd-empty">Could not load the timeline.</div>`; return; }
-  const re = new RegExp("^" + bookName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s+(\\d+)");
-  body.innerHTML = all.map(e => {
-    const m = e.reference && e.reference.match(re);
-    const isCurrent = m && parseInt(m[1], 10) === chapter;
+  // A "you're reading" marker is slotted into the timeline itself and
+  // scrolled to — the previous design only showed the placement as a header
+  // note that scrolled out of sight. For an `event`-granularity chapter the
+  // marker is the matched event's own row (highlighted). Otherwise (a story
+  // anchor or a book-era placement — Genesis 6 "Noah Builds the Ark",
+  // Genesis 8 "A New Beginning", Psalms) the API can't date the chapter
+  // precisely, so the marker is slotted by the current chapter's *canonical*
+  // position among the events' own `reference`s — right, since the flat list
+  // is chronological and narrative books read in chronological order.
+  const currentEvents = new Set((info && info.events || []).map(e => e.event));
+  const eventGranularity = !!(info && info.granularity === "event" && currentEvents.size);
+
+  const bookIdx = new Map(bookList.map((b, i) => [b.name, i]));
+  const curIdx = bookList.findIndex(b => b.usfm === book);
+  const pastCurrentChapter = ref => {
+    const m = (ref || "").match(/^(.+?)\s+(\d+)/);
+    const bi = m && bookIdx.get(m[1].trim());
+    if (bi == null) return false;
+    return bi > curIdx || (bi === curIdx && parseInt(m[2], 10) > chapter);
+  };
+
+  const anchorTitle = (info && info.story_anchor && info.story_anchor.title)
+    || (info && info.events && info.events[0] && info.events[0].event) || "";
+  // The marker is slotted at the chapter's own place in the reading order, so
+  // show the era name only — never `info.date`, which for a story anchor is
+  // the whole book-era *range* ("creation to c. 1700 B.C.") and reads as
+  // nonsense sitting between two dated events. `book` granularity is the one
+  // case where even the slot is a guess (poetic/prophetic books, canonical
+  // order ≠ chronological), so it says so.
+  const bookEra = info && info.granularity === "book";
+  const anchorSub = (info && info.era) ? escHtml(info.era) + (bookEra ? " · placed by reading order" : "") : "";
+  const markerHtml = `<div class="timeline-entry tl-here" id="tlHere">
+    <div class="tl-here-pin">You’re reading</div>
+    <div class="timeline-event">${escHtml(current.bookName)} ${chapter}${anchorTitle ? ` — ${escHtml(anchorTitle)}` : ""}</div>
+    ${anchorSub ? `<div class="tl-here-sub">${anchorSub}</div>` : ""}
+  </div>`;
+
+  const rows = [];
+  let placed = false;
+  all.forEach(e => {
+    if (!eventGranularity && !placed && pastCurrentChapter(e.reference)) { rows.push(markerHtml); placed = true; }
+    const isCurrent = currentEvents.has(e.event);
+    const isContext = e.kind === "context";
     const refBtn = e.reference
       ? `<button class="prophecy-ref" style="margin-top:6px" data-ref="${escAttr(e.reference)}" onmouseenter="resolveTimelineRef(this, this.dataset.ref)" onclick="jumpFreeTextRef('${e.reference.replace(/'/g, "\\'")}',()=>closeModal('timelineScrim'))">${escHtml(e.reference)}</button>`
       : "";
-    return `<div class="timeline-entry${isCurrent ? " tl-current" : ""}" ${isCurrent ? 'id="tlCurrent"' : ""}>
-      <div class="timeline-date">${escHtml(e.date)}</div>
+    rows.push(`<div class="timeline-entry${isCurrent ? " tl-current" : ""}${isContext ? " tl-context" : ""}" ${isCurrent && eventGranularity ? 'id="tlHere"' : ""}>
+      <div class="timeline-date">${escHtml(e.date)}${isContext ? ` <span class="tl-context-tag">world history</span>` : ""}</div>
       <div class="timeline-event">${escHtml(e.event)}</div>
       ${refBtn}
-    </div>`;
-  }).join("");
-  const current_ = document.getElementById("tlCurrent");
-  if (current_) requestAnimationFrame(() => current_.scrollIntoView({ block: "center" }));
+    </div>`);
+  });
+  if (!eventGranularity && !placed) rows.push(markerHtml); // current chapter is after every dated event
+  body.innerHTML = rows.join("");
+  const here = document.getElementById("tlHere");
+  if (here) requestAnimationFrame(() => here.scrollIntoView({ block: "center" }));
 }
 // Chronology references are free text ("Genesis 23:1-2"), not a resolved
 // book/chapter/verse, so hover-preview can't use the batched
@@ -790,7 +866,7 @@ async function resolveTimelineRef(el, refText) {
     return;
   }
   try {
-    const d = await apiJSON(`/parse/citations?text=${encodeURIComponent(refText)}&hydrate=true`);
+    const d = await apiJSON(`/parse/citations?text=${encodeURIComponent(refText)}&hydrate=true&version=${encodeURIComponent(current.version)}`);
     const m = (d.citations || [])[0];
     const verses = (m && m.data) || [];
     if (!m || !m.verse || !verses.length) { timelineRefCache.set(refText, null); return; }
@@ -822,13 +898,177 @@ async function jumpFreeTextRef(refText, onClose) {
     await jumpToVerse(c.book, c.chapter, c.verse || 1);
   } catch (e) { /* apiJSON already surfaced the error */ }
 }
+
+/* ── About This Chapter — GET /books/{book}/chapters/{chapter}/info. A
+   version-independent chapter "argument" (prose overview) drawn from a
+   public-domain commentary, the source picked server-side (Matthew Henry →
+   Gill → first available) so the app doesn't stitch one from verse-by-verse
+   entries. 404 chapter_info_not_available for every deuterocanonical book
+   (no public-domain source wrote chapter arguments for them) and for
+   chapter 0 — the card just doesn't render in those cases. ── */
+let chapterInfo = null;
+let chapterInfoKey = null;
+let chapterInfoSource = null; // an explicit ?source= override for this open
+async function getChapterInfo(book, chapter, source) {
+  const key = `${book}/${chapter}${source ? "?" + source : ""}`;
+  if (chapterInfoKey === key && chapterInfo) return chapterInfo;
+  try {
+    const q = source ? `?source=${encodeURIComponent(source)}` : "";
+    chapterInfo = await apiJSONCached(`/books/${book}/chapters/${chapter}/info${q}`);
+    chapterInfoKey = key;
+    return chapterInfo;
+  } catch (e) { chapterInfo = null; chapterInfoKey = key; return null; }
+}
+async function loadChapterInfoCard() {
+  chapterInfoSource = null;
+  const info = await getChapterInfo(current.book, current.chapter);
+  if (!info || !info.summary) return null;
+  // CSS line-clamps the square card; a little slack past that is fine.
+  const snippet = info.summary.length > 240 ? info.summary.slice(0, 240).replace(/\s+\S*$/, "") + "…" : info.summary;
+  return railCard("About This Chapter", escHtml(snippet), "openChapterInfoModal()", "railcard--feature");
+}
+async function openChapterInfoModal() {
+  closeCardsSheet();
+  const book = current.book, chapter = current.chapter;
+  document.getElementById("chapterInfoTitle").textContent = `About ${current.bookName} ${chapter}`;
+  const body = document.getElementById("chapterInfoBody");
+  body.innerHTML = `<div class="spin"></div>`;
+  openModal("chapterInfoScrim");
+  const info = await getChapterInfo(book, chapter, chapterInfoSource);
+  if (current.book !== book || current.chapter !== chapter) return;
+  if (!info || !info.summary) { body.innerHTML = `<div class="dd-empty">No chapter overview available.</div>`; return; }
+  body.innerHTML = renderChapterInfo(info);
+  const el = document.getElementById("chapterInfoSummary");
+  if (el) el.innerHTML = await linkifyPreParsedCitations(info.summary, info.citations);
+}
+function renderChapterInfo(info) {
+  const credit = [[info.source_author, info.source_year].filter(Boolean).join(", "), info.source_category].filter(Boolean).join(" · ");
+  const sources = info.available_sources || [];
+  const picker = sources.length > 1
+    ? `<div class="ci-sources"><span class="person-section-label">Commentator</span>${sources.map(s => {
+        const active = s.name === info.source;
+        return `<button class="filter-chip${active ? " active" : ""}" ${active ? "disabled" : `onclick="switchChapterInfoSource('${s.name.replace(/'/g, "\\'")}')"`}>${escHtml(s.author_name || s.name)}</button>`;
+      }).join("")}</div>`
+    : "";
+  return `<div class="ci-summary person-def-text" id="chapterInfoSummary">${escHtml(info.summary)}</div>
+    ${credit ? `<div class="ci-credit">— ${escHtml(credit)}</div>` : ""}
+    ${picker}`;
+}
+function switchChapterInfoSource(name) {
+  chapterInfoSource = name;
+  chapterInfo = null; chapterInfoKey = null;
+  openChapterInfoModal();
+}
+// Can the translation on screen actually show this reference? False when the
+// book isn't in its canon (1 Maccabees, Wisdom under a 66-book version) OR
+// when the book is there but the chapter/verse is beyond what this version
+// carries (Catholic Daniel 13/14; the Prayer of Azariah at Daniel 3:24-90;
+// the Greek Esther additions). Checked up front from the book's /meta
+// (already cached for the book being read) so jumpToVerse() can show the
+// switch-offer dialog instead of navigating into a bare 404 errnote — the
+// passage call does now 404 distinctly (beta-46), which loadChapter()
+// handles as the backstop for a direct load.
+async function versionCanShowRef(bookUsfm, chapter, verse) {
+  if (bookList.length && !bookList.some(x => x.usfm === bookUsfm)) return false;
+  let chapters;
+  try {
+    const d = await apiJSONCached(`/bibles/${current.version}/${bookUsfm}/meta`);
+    chapters = d.chapters || [];
+  } catch (e) { return true; } // meta unavailable — let the reader try rather than false-block
+  if (!chapters.length) return true;
+  const cm = chapters.find(c => Number(c.chapter) === Number(chapter));
+  if (!cm) return false;
+  if (verse && cm.verse_count && Number(verse) > cm.verse_count) return false;
+  return true;
+}
+// GET /bibles?contains=BOOK[.CHAPTER[.VERSE]] — the translations that
+// actually carry a given reference (a book outside the 66, or a chapter/
+// verse a larger canon adds to a shared book). Cached; the set only changes
+// on an import. Used to name a concrete switch target when the reference
+// itself didn't record one.
+async function versionsContainingRef(bookUsfm, chapter, verse) {
+  const ref = bookUsfm + (chapter ? "." + chapter + (verse ? "." + verse : "") : "");
+  try {
+    const d = await apiJSONCached(`/bibles?contains=${encodeURIComponent(ref)}`);
+    return d.data || [];
+  } catch (e) { return []; }
+}
+// jumpToVerse() routes here when versionCanShowRef() is false, instead of
+// letting the reader render a raw error / an empty chapter. Prefer the
+// translation the reference itself came from (a note anchor's captured
+// version); else ask GET /bibles?contains= for one that has it and offer
+// that; else fall back to the translation picker.
+async function handleRefNotInVersion(bookUsfm, chapter, verse, verseEnd, preferVersion) {
+  const name = bookNameByUsfm[bookUsfm] || bookUsfm;
+  const refLabel = `${name} ${chapter}${verse ? ":" + verse : ""}`;
+  const bookMissing = bookList.length && !bookList.some(x => x.usfm === bookUsfm);
+  const subject = bookMissing ? name : refLabel; // "1 Maccabees" vs "Daniel 14"
+  let target = preferVersion && preferVersion !== current.version
+    ? (catalog || []).find(v => v.version_id === preferVersion) : null;
+  let fromNote = !!target;
+  if (!target) {
+    const curLang = ((catalog || []).find(v => v.version_id === current.version) || {}).language_name;
+    const has = await versionsContainingRef(bookUsfm, chapter, verse);
+    // A widely-recognised English translation-with-apocrypha first (KJVA is
+    // the natural companion for the common KJV reader), then any version in
+    // the reader's own language, then any English one.
+    const PREF = ["eng_kja", "eng_kjva", "eng_dra", "eng_web", "eng_cpdv"];
+    target = PREF.map(id => has.find(v => v.version_id === id)).find(Boolean)
+      || has.find(v => v.language_name === curLang)
+      || has.find(v => v.language_code === "eng")
+      || has[0] || null;
+  }
+  if (target) {
+    const ok = await uiConfirm({
+      title: `${subject} isn't in ${current.versionTitle}`,
+      message: fromNote
+        ? `This reference is from ${target.title || target.version_id}. Switch to it and go to ${refLabel}?`
+        : `${target.title || target.version_id} includes ${subject}. Switch to it and go to ${refLabel}?`,
+      okLabel: "Switch & read", cancelLabel: "Cancel",
+    });
+    if (ok) await switchVersionAndJump(target.version_id, bookUsfm, chapter, verse, verseEnd);
+    return;
+  }
+  const ok = await uiConfirm({
+    title: `${subject} isn't in ${current.versionTitle}`,
+    message: `Open the translation picker to switch to a version that includes ${subject}?`,
+    okLabel: "Choose translation", cancelLabel: "Cancel",
+  });
+  if (ok && typeof openVersionPicker === "function") openVersionPicker("navigate");
+}
+async function switchVersionAndJump(versionId, bookUsfm, chapter, verse, verseEnd) {
+  if (!applyVersionById(versionId)) { toast("Couldn't load that translation"); return; }
+  setLastVersion(versionId);
+  const v = (catalog || []).find(x => x.version_id === versionId);
+  if (v && v.language_name) setLastLang(v.language_name);
+  closeModal("versionPickerScrim");
+  bookList = [];
+  await loadBooks();
+  // loadChapter() (via jumpToVerse) refreshes the version button, meta and rails.
+  await jumpToVerse(bookUsfm, chapter, verse, verseEnd);
+}
 async function loadSidebarCards() {
   const stack = document.getElementById("cardStack");
   if (!stack) return;
-  const [places, people, prophecies, timeline] = await Promise.all([
-    loadPlacesCard(), loadPeopleCard(), loadPropheciesCard(), loadTimelineCard()
+  renderChapterCtxChips(); // three static chips — no need to wait on the card fetches
+  const [places, people, prophecies, timeline, chapterInfoCard] = await Promise.all([
+    loadPlacesCard(), loadPeopleCard(), loadPropheciesCard(), loadTimelineCard(), loadChapterInfoCard()
   ]);
-  stack.innerHTML = [places, timeline, people, prophecies].filter(Boolean).join("");
+  stack.innerHTML = [chapterInfoCard, places, timeline, people, prophecies].filter(Boolean).join("");
+}
+// Mobile only (#chapterCtxChips is display:none above 1180px). Three plain
+// chips under the pickers, replacing the old unlabeled grid icon + ⓘ button:
+// About <book> (book intro), About Ch. (chapter overview), Ch. Info (the
+// places/people/prophecies/timeline sheet — #cardStack, same content the
+// desktop right rail shows).
+function renderChapterCtxChips() {
+  const el = document.getElementById("chapterCtxChips");
+  if (!el) return;
+  el.innerHTML =
+    `<button class="ctx-chip ctx-about" onclick="openBookInfoModal('${current.book}')">About ${escHtml(current.bookName)}</button>`
+    + `<button class="ctx-chip" onclick="openChapterInfoModal()">About Ch.</button>`
+    + `<button class="ctx-chip" onclick="openCardsSheet()">Ch. Info</button>`;
+  el.hidden = false;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -996,14 +1236,24 @@ let audioNarrations = [];
 // does — otherwise every chapter change (refreshAudioAvailability runs on
 // every loadChapter) would silently reset back to the first narration.
 let selectedNarrations = {};
+const AUDIO_PLAY_SVG = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5.5v13l11-6.5-11-6.5Z"/></svg>`;
+const AUDIO_PAUSE_SVG = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg>`;
+function setAudioPlayingUI(playing) {
+  const pb = document.getElementById("playBtn");
+  if (pb) pb.innerHTML = playing ? AUDIO_PAUSE_SVG : AUDIO_PLAY_SVG;
+}
+function setAudioProgressUI(frac) {
+  const sf = document.getElementById("scrubFill");
+  if (sf) sf.style.width = Math.max(0, Math.min(1, frac || 0)) * 100 + "%";
+}
 function resetAudioPlayerUI() {
   const el = document.getElementById("audioEl");
   el.pause(); el.removeAttribute("src");
   document.getElementById("audioPlayer").dataset.loaded = "0";
-  document.getElementById("scrubFill").style.width = "0%";
+  setAudioProgressUI(0);
   document.getElementById("audioCur").textContent = "0:00";
   document.getElementById("audioDur").textContent = "0:00";
-  document.getElementById("playBtn").innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5.5v13l11-6.5-11-6.5Z"/></svg>`;
+  setAudioPlayingUI(false);
 }
 async function refreshAudioAvailability() {
   resetAudioPlayerUI();
@@ -1015,6 +1265,7 @@ async function refreshAudioAvailability() {
   const v = (catalog || []).find(x => x.version_id === current.version);
   const hasAudio = v && v.audio_count > 0;
   wrap.style.display = hasAudio ? "flex" : "none";
+  document.body.classList.toggle("has-audio", !!hasAudio); // reserves --audio-h below the reading column (mobile)
   if (!hasAudio) return;
   current.audioId = current.version;
   try {
@@ -1024,8 +1275,17 @@ async function refreshAudioAvailability() {
       const pref = selectedNarrations[current.version];
       current.audioId = (pref && audioNarrations.some(n => n.audio_id === pref)) ? pref : audioNarrations[0].audio_id;
     }
-    if (audioNarrations.length > 1) narrationBtn.style.display = "flex";
+    if (audioNarrations.length > 1) { narrationBtn.style.display = "flex"; syncNarrationName(); }
   } catch (e) { /* discovery call failed — fall back to the version id itself as the audio id */ }
+}
+// The voice button's label — the current narrator's name (truncated), or
+// just "Voice" if the API didn't name them.
+function syncNarrationName() {
+  const el = document.getElementById("narrationName");
+  if (!el) return;
+  const n = audioNarrations.find(x => x.audio_id === current.audioId);
+  const name = (n && (n.narrator || n.name)) || "";
+  el.textContent = name ? (name.length > 14 ? name.slice(0, 13) + "…" : name) : "Voice";
 }
 function openNarrationPicker() {
   const list = document.getElementById("narrationList");
@@ -1039,6 +1299,7 @@ function selectNarration(audioId) {
   current.audioId = audioId;
   selectedNarrations[current.version] = audioId;
   closeModal("narrationPickerScrim");
+  syncNarrationName();
   resetAudioPlayerUI();
 }
 async function toggleAudio() {
@@ -1051,16 +1312,17 @@ async function toggleAudio() {
       wrap.dataset.loaded = "1";
       el.ontimeupdate = () => {
         document.getElementById("audioCur").textContent = fmtTime(el.currentTime);
-        document.getElementById("scrubFill").style.width = (el.duration ? (el.currentTime / el.duration * 100) : 0) + "%";
+        setAudioProgressUI(el.duration ? el.currentTime / el.duration : 0);
       };
       el.onloadedmetadata = () => { document.getElementById("audioDur").textContent = fmtTime(el.duration); };
+      el.onended = () => setAudioPlayingUI(false);
     } catch (e) {
       if (e.message !== "no_api_key") toast("No narration available for this version/chapter");
       return;
     }
   }
-  if (el.paused) { el.play(); document.getElementById("playBtn").innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg>`; }
-  else { el.pause(); document.getElementById("playBtn").innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5.5v13l11-6.5-11-6.5Z"/></svg>`; }
+  if (el.paused) { el.play(); setAudioPlayingUI(true); }
+  else { el.pause(); setAudioPlayingUI(false); }
 }
 function seekAudio(e) {
   const el = document.getElementById("audioEl");
@@ -1208,13 +1470,37 @@ function registerCiteId(ref, previewText) {
   citePreviewData.set(id, { ref, preview });
   return id;
 }
-async function linkifyCitations(text) {
+async function linkifyCitations(text, version) {
   if (!text || !text.trim()) return escHtml(text || "");
-  let matches;
+  // Hydrate against a caller-supplied version (a note's own translation —
+  // see notePreviewVersion), else the one being read, never the endpoint's
+  // eng_kjv default: otherwise a preview shows KJV text under a reader on
+  // another translation. Deuterocanonical citations — the book name spelled
+  // out ("1 Maccabees 1:1", "Sirach 2:4") as well as the USFM code, and the
+  // extra-chapter cases ("Daniel 14:1") — now resolve too: the endpoint
+  // detects the names and auto-falls-back to an apocrypha-carrying version
+  // for the text (API beta-44/45), so nothing special is needed here.
+  version = version || current.version;
+  // The endpoint scans ~8 KB per call and returns next_offset to resume
+  // (beta-44) — loop for a long note/definition so citations past the first
+  // window aren't lost. start/end are absolute once ?offset= is passed;
+  // dedupe by start across the overlapping seam.
+  let matches = [];
   try {
-    const d = await apiJSON(`/parse/citations?text=${encodeURIComponent(text)}&hydrate=true`);
-    matches = d.citations || [];
+    let offset = 0;
+    for (let i = 0; i < 9; i++) {
+      const chunk = offset ? text.slice(offset) : text;
+      const url = `/parse/citations?text=${encodeURIComponent(chunk)}&hydrate=true&version=${encodeURIComponent(version)}${offset ? `&offset=${offset}` : ""}`;
+      const d = await apiJSON(url);
+      (d.citations || []).forEach(m => {
+        const s = typeof m.start === "number" ? m.start : 0;
+        if (!matches.some(x => (typeof x.start === "number" ? x.start : 0) === s)) matches.push(m);
+      });
+      if (typeof d.next_offset !== "number") break;
+      offset = d.next_offset;
+    }
   } catch (e) { return escHtml(text); }
+  matches.sort((a, b) => (typeof a.start === "number" ? a.start : 0) - (typeof b.start === "number" ? b.start : 0));
   if (!matches.length) return escHtml(text);
 
   let html = "";
@@ -1311,9 +1597,20 @@ function ndMarkdownToHtml(escaped, rawText) {
   flushAll();
   return out.join("").replace(/\u0000(\d+)\u0000/g, (m, i) => tok[+i] || "");
 }
-async function renderNoteMarkdown(text) {
+// A note's verse previews resolve against the note's own translation, not
+// whatever's being read — so a note written against a Catholic version keeps
+// previewing "Daniel 14:1" / "1MA 1:1" in its body after you've moved on to
+// a 66-book version. Prefer the note's recorded version, then a verse
+// anchor's, then what's on screen.
+function notePreviewVersion(note) {
+  if (!note) return current.version;
+  return note.version
+    || ((note.anchors || []).find(a => a.version) || {}).version
+    || current.version;
+}
+async function renderNoteMarkdown(text, note) {
   if (!text || !text.trim()) return "";
-  return ndMarkdownToHtml(await linkifyCitations(text), text);
+  return ndMarkdownToHtml(await linkifyCitations(text, notePreviewVersion(note)), text);
 }
 // Flatten the Markdown subset to plain text for a one-line label (launcher
 // pill, switcher/list titles) — so a note that opens with "### …" or "- …"
@@ -1332,15 +1629,15 @@ function stripNoteMarkdown(s) {
     .trim();
 }
 
-// Commentary (GET /commentaries/...) and dictionary (GET /dictionaries/{id}
-// ?q=...) entries already carry a server-parsed `citations` array over their
-// own Text/Definition (same scanCitations engine /parse/citations uses, run
-// once at fetch time) — reusing it here means never re-sending that prose
-// through /parse/citations, which both avoids a redundant call and sidesteps
-// its ?text= length cap entirely (long-form commentary routinely exceeds
-// it). Unlike linkifyCitations, hydration isn't included server-side for
-// these, so verse text is fetched here via the same batched
-// fetchVersePreviews() every other "ref already known" call site uses.
+// Commentary, dictionary, bible-character definition and devotional-reading
+// responses already carry a server-parsed `citations` array over their own
+// prose (same scanCitations engine /parse/citations uses, run once at fetch
+// time) — reusing it here means never re-sending that prose through
+// /parse/citations, which both avoids a redundant call and sidesteps the
+// windowing/length handling for long-form text. Unlike linkifyCitations,
+// hydration isn't included server-side for these, so verse text is fetched
+// here via the same batched fetchVersePreviews() every other "ref already
+// known" call site uses.
 async function linkifyPreParsedCitations(text, citations) {
   if (!text) return escHtml(text || "");
   // Same "too wide to preview usefully" cutoff linkifyCitations applies,
@@ -1387,12 +1684,17 @@ async function linkifyPreParsedCitations(text, citations) {
 // every "I already know the ref, I just need its text" call site shares one
 // implementation instead of each reinventing it. Returns a map keyed by
 // "book.chapter.verse" -> verse text (missing entries just get no preview).
-async function fetchVersePreviews(refs) {
+// `version` defaults to what's being read, but a caller with refs from a
+// different translation (a note anchor captured in another version — a
+// deuterocanonical verse especially) passes that version so the preview
+// still resolves while the reader is elsewhere.
+async function fetchVersePreviews(refs, version) {
   if (!refs.length) return {};
+  version = version || current.version;
   const refStrings = refs.map(r => `${r.book}.${r.chapter}.${r.verse}`);
   const out = {};
   try {
-    const bd = await apiJSONCached(`/bibles/${current.version}/verses?refs=${refStrings.join(",")}`);
+    const bd = await apiJSONCached(`/bibles/${version}/verses?refs=${refStrings.join(",")}`);
     const notFound = new Set(bd.not_found || []);
     refStrings.filter(r => !notFound.has(r)).forEach((r, i) => { if (bd.data[i]) out[r] = bd.data[i].text; });
   } catch (e) { /* preview text is a nice-to-have; refs still work without it */ }
@@ -1601,7 +1903,7 @@ function logHistoryVisit() {
 // One unified note shape — a document that may be anchored to zero or more
 // verses across the whole Bible:
 //   { id, title, text, tags:[], notebookId,        // null notebookId = Unfiled
-//     anchors:[{book,chapter,verse}],              // 0..n; drives the reading-view note icon
+//     anchors:[{book,chapter,verse,version?}],     // 0..n; drives the reading-view note icon (version = the translation the verse was captured in)
 //     version, versionTitle, createdAt, updatedAt }
 // `anchors` is the exact verse set (not just start/end) since a plain click
 // (not shift-click) can build a disjoint selection — see selectVerse() below.
@@ -1985,13 +2287,31 @@ async function getCommentarySources() {
   return commentarySources;
 }
 async function showCommentaryTool() {
-  const book = current.book;
+  const book = current.book, chapter = current.chapter, verse = selectedVerses[0];
   const body = document.getElementById("vtBody");
   body.innerHTML = `<div class="spin"></div>`;
-  const sources = (await getCommentarySources()).filter(s => !s.books || !s.books.length || s.books.includes(book));
+  // GET /books/{book}/commentaries?chapter=&verse= returns exactly the
+  // sources that have an entry for the selected verse (API beta-47) — no
+  // more listing every source that covers the book and then showing "no
+  // entry from this source" once the reader picks one. Falls back to the
+  // book-level list when nothing has that exact verse.
+  let sources = [];
+  let scoped = false;
+  if (verse) {
+    try {
+      const d = await apiJSONCached(`/books/${book}/commentaries?chapter=${chapter}&verse=${verse}`);
+      sources = d.data || [];
+      scoped = sources.length > 0;
+    } catch (e) { /* fall through */ }
+  }
+  if (!sources.length) {
+    sources = (await getCommentarySources()).filter(s => !s.books || !s.books.length || s.books.includes(book));
+  }
   if (!sources.length) { body.innerHTML = `<div class="dd-empty">No commentary source covers this book.</div>`; return; }
   const preferred = sources.find(s => s.name === "mhenry") || sources.find(s => s.name === "gill") || sources[0];
-  body.innerHTML = `<select id="vtCommentarySelect" class="vt-source-select" onchange="loadCommentaryText(this.value)">` +
+  body.innerHTML =
+    (scoped ? "" : `<div class="tool-hint" style="margin-bottom:10px">No source has an entry for this exact verse — showing everything that covers ${escHtml(bookNameByUsfm[book] || book)}.</div>`) +
+    `<select id="vtCommentarySelect" class="vt-source-select" onchange="loadCommentaryText(this.value)">` +
     sources.map(s => `<option value="${escHtml(s.name)}"${s.name === preferred.name ? " selected" : ""}>${escHtml(s.author_name)}</option>`).join("") +
     `</select><div id="vtCommentaryText" style="margin-top:14px"></div>`;
   loadCommentaryText(preferred.name);

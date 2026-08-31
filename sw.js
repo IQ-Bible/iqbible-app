@@ -15,6 +15,12 @@
 const CACHE_VERSION = "1.10.0";
 const CACHE = `iqbible-shell-${CACHE_VERSION}`;
 
+// Local development: serving from localhost/127.0.0.1 means every edit to a
+// js/*.js, the CSS or CHANGELOG.md would otherwise be one reload stale
+// (stale-while-revalidate below). Make the worker a pure pass-through there
+// so `npx serve .` / Live Server behave like a plain static host.
+const DEV = ["localhost", "127.0.0.1"].includes(self.location.hostname);
+
 // Enough to boot the SPA offline; everything else same-origin (every js/*.js,
 // img/*) is filled in on first visit by the runtime handler below, so there's
 // no file list here to keep in sync.
@@ -32,18 +38,22 @@ const CORE = [
 ];
 
 self.addEventListener("install", e => {
+  if (DEV) { self.skipWaiting(); return; }
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", e => {
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      // In dev, drop every shell cache so a worker left over from a prod
+      // visit (or an earlier build) stops serving stale files immediately.
+      .then(keys => Promise.all(keys.filter(k => DEV || k !== CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
 
 self.addEventListener("fetch", e => {
+  if (DEV) return; // pass-through: let the browser hit the dev server directly
   const req = e.request;
   if (req.method !== "GET") return;
 

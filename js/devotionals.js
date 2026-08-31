@@ -115,7 +115,11 @@ async function renderDevotionals() {
   await Promise.all(["morning", "evening"].map(async key => {
     const r = data[key];
     if (!r) return;
-    const bodyHtml = await linkifyCitations(r.body || "");
+    // The reading's own API-resolved citations[] (beta-44) rather than
+    // re-parsing the prose through /parse/citations — no length cap, one
+    // fewer call. Spurgeon quotes Scripture as prose far more than by
+    // reference, so this is usually empty and the body renders plain.
+    const bodyHtml = await linkifyPreParsedCitations(r.body || "", r.citations || []);
     const previewByRef = await fetchVersePreviews([{ book: r.book, chapter: r.chapter, verse: r.verse }]);
     const text = previewByRef[`${r.book}.${r.chapter}.${r.verse}`];
     const citeAttr = text ? ` data-cite-id="${registerCiteId(r.heading_citation, text)}"` : "";

@@ -42,6 +42,7 @@ async function overlaySearch(reset = true) {
     overlayCursor = null; overlayResultOffset = 0; overlayTotalCount = null;
     document.getElementById("overlayResultList").innerHTML = "";
     document.getElementById("overlayResultsMeta").textContent = "Searching…";
+    document.getElementById("overlaySearchNotice").hidden = true;
   }
   document.getElementById("overlayLoadMore").style.display = "none";
 
@@ -60,6 +61,14 @@ async function overlaySearch(reset = true) {
     const res = await apiFetch(url);
     const data = await res.json();
     const results = data.data || [];
+
+    // The full-text index silently ignores stop-words ("are", "the", "of")
+    // and terms under 3 characters. The API now says so per response
+    // (beta-49) — surface it rather than letting a phrase search quietly
+    // match on only some of the typed words.
+    const notice = document.getElementById("overlaySearchNotice");
+    if (reset && data.notice) { notice.textContent = data.notice; notice.hidden = false; }
+    else if (reset) notice.hidden = true;
 
     const from = overlayResultOffset + 1;
     const to = overlayResultOffset + results.length;
@@ -100,7 +109,17 @@ function highlightWords(html, words) {
   });
   return html;
 }
-async function jumpToVerse(bookUsfm, chapter, verse, verseEnd) {
+async function jumpToVerse(bookUsfm, chapter, verse, verseEnd, opts) {
+  // A reference can point somewhere the current translation can't show — a
+  // book outside its canon (1 Maccabees, Wisdom under a 66-book version), or
+  // a chapter/verse beyond its range (Catholic Daniel 13/14, the Daniel 3
+  // additions). Hand off to the switch/picker prompt instead of navigating
+  // into a "book_not_found" error or a silently empty chapter.
+  // opts.preferVersion (a note anchor's captured version) lets it offer a
+  // one-tap switch to the exact translation the reference came from.
+  if (!(await versionCanShowRef(bookUsfm, chapter, verse))) {
+    return handleRefNotInVersion(bookUsfm, chapter, verse, verseEnd, opts && opts.preferVersion);
+  }
   // Landing on a verse always means "show it in the reader" — if a menu view
   // (Study Tools, My Library, …) is covering it, surface the reading view
   // first so the chapter renders (and its nav buttons get positioned) into a

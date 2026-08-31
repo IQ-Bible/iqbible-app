@@ -15,10 +15,15 @@ async function loadCatalog() {
 // shows the full name via a tooltip, and the chapter header always shows it
 // in full once a book is selected.
 let bookAbbrev = {};
+// Version-independent USFM -> full English name, so a book can be named even
+// when it isn't in the current version's bookList (e.g. a deuterocanonical
+// reference followed from a note while reading a 66-book translation).
+let bookNameByUsfm = {};
 async function loadBookAbbreviations() {
   try {
     const data = await apiJSON("/books/abbreviations");
     (data.data || []).forEach(b => {
+      bookNameByUsfm[b.usfm_code] = b.name_en;
       // Some books carry more than one is_primary entry, including the
       // full English name itself (e.g. GEN: "Gen" and "Genesis" both
       // flagged primary; COL: only "Colossians" is flagged primary, "Col"

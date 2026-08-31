@@ -5,6 +5,95 @@ All notable changes to this project will be documented in this file. This CHANGE
 ## [Unreleased]
 - n/a
 
+## [1.13.0] - 2026-08-31
+- **changed:** The mobile bottom bar is reworked (issue #247). **Notes** is now one of the five
+  nav tabs — Read · Explore · Study · Notes · More — instead of a slim pull-tab that was easy to
+  miss; **Share Tools** moves into the "More" menu.
+- **changed:** On a phone the audio-narration player is a bar docked above the nav (it slides
+  away with the rest of the chrome as you scroll and comes back on scroll-up), its play button
+  lined up over the Read tab, and with a labelled **Voice** button — showing the narrator's name
+  where the source provides one — whenever a version has more than one recording.
+- **changed:** The chapter-context cards (places, people, prophecies, timeline) are reached on a
+  phone from three plain chips under the book/chapter pickers — **About <book>**, **About Ch.**,
+  **Ch. Info** — replacing an unlabelled grid icon and a separate "about this book" button. The
+  chips are part of the sticky header, so they slide away and return with the pickers as you
+  scroll.
+- **changed:** *(dev)* The service worker is a pure pass-through when the site is served from
+  `localhost` / `127.0.0.1`, so a local checkout picks up every edit on the next reload instead of
+  one reload later; added `serve.py`, a zero-dependency static server with the SPA fallback
+  deep links need. No change to the hosted/deployed behaviour.
+
+## [1.12.0] - 2026-08-30
+- **added:** "About This Chapter" — a new context card beside the reading column with a short
+  overview of what the chapter is about (the "argument of the chapter" from a classic
+  public-domain commentary), the commentator credited, and every reference in it hover-previewable.
+  Where more than one commentary wrote one, a switcher lets you compare. Not available for the
+  deuterocanonical books.
+- **changed:** The context cards beside the reading column are now sized so all of them fit
+  without the column scrolling or tucking under the Notes button — "About This Chapter" and
+  "Places" are square, Timeline / People / Prophecies are one-line teasers that open the full
+  view on click.
+- **changed:** The Timeline now marks the chapter you're reading *in the timeline itself* — a
+  "You're reading" marker slotted at the chapter's place among the events (its own event when it
+  has a dated one, otherwise its story title and era at the chapter's chronological position,
+  flagged approximate), scrolled into view on open. It was previously only a line of text above
+  the list that scrolled out of sight. The Timeline card beside the reading column shows the same
+  placement instead of a bare event count. The full timeline is now canon-aware: on a translation
+  with the deuterocanon the Maccabean-era events carry their 1–2 Maccabees references, and a set
+  of secular world-history anchors (Rome founded, Vesuvius, …) is woven in for a feel of the
+  period, shown in a lighter style.
+- **changed:** In the People card, tapping a person — or one of their family chips — now opens the
+  exact individual, not whichever namesake happens to come first. Genesis 8 → Noah → "Naamah" now
+  opens Naamah the daughter of Lamech (Genesis 4:22), not the later Ammonite queen; Revelation 12
+  → "Michael" opens the archangel, not the Numbers 13 spy. When a name is shared and the lookup
+  can't tell which is meant, an "other people named …" row lists the alternatives.
+- **added:** People cards now populate for the deuterocanonical books — Tobit, Judith, 1–2
+  Maccabees, Sirach, Susanna, Bel and the Dragon and the rest — on a translation whose canon
+  includes them. People sourced from those books are marked "Deuterocanonical" in their detail
+  view.
+- **changed:** A person's "first appearance" / "last appearance" are now their actual first and
+  last mention in Scripture. The "Key Events" list has been removed — it was built by matching the
+  bare name against a topical index, which merged different people who share a name and carried
+  garbled labels; there's no reliable per-person source for it yet.
+- **changed:** Verse-by-verse commentary pickers (Verse Tools ▸ Commentary, and Study Tools ▸ Book
+  Guide) now list only the sources that actually have something for the verse — or, for a book
+  introduction, the sources that actually wrote one — instead of every source that touches the
+  book and an empty panel when you pick the wrong one.
+- **changed:** Bible Atlas place descriptions now come from a dictionary entry matched to the place
+  by its own Scripture citations — so "Ai" resolves to the Canaanite city of Joshua, not the
+  village in Jeremiah — rather than an exact-name lookup that missed anything not spelled as a
+  19th-century headword. Places with no matching entry (a handful of minor or extra-biblical
+  names) simply show no description.
+- **fixed:** Following a Scripture reference the current translation can't show — a note anchored
+  to a deuterocanonical verse (1 Maccabees, Wisdom, …), or to an extra chapter or verse a larger
+  canon adds (Daniel 13-14, the Prayer of Azariah at Daniel 3:24-90, the Greek additions to
+  Esther) — followed while reading a translation without it, no longer drops the reader on an
+  error or a silently empty chapter. Instead a dialog offers to switch, and now **names a
+  translation that has the reference** ("King James Version + Apocrypha includes Wisdom. Switch to
+  it and go to Wisdom 3:1?") — preferring the one the reference was captured in when a note
+  recorded it. Landing on such a chapter by a deep link or the Back button shows the same "isn't
+  in this translation" note.
+- **added:** A verse added to a note from Verse Tools now remembers the translation it was taken
+  from. Where that differs from what you're reading, the note's reference chip shows it (e.g.
+  "Wisdom 3:1 · DRC"), its hover-preview and its Markdown export are labelled with it, and its
+  preview text loads from that translation even when you're reading another — so a note that
+  gathers verses across canons stays coherent.
+- **changed:** Verse hover-previews inside prose (dictionary and commentary entries, the Timeline
+  card) now resolve against the translation you're reading rather than always the King James
+  Version — so the preview matches your version, and a deuterocanonical citation can preview when
+  your version carries that book. A deuterocanonical book written out by name in prose — "1
+  Maccabees 1:1", "Wisdom 3:1", "Sirach 2:4" — is now recognised and previewable too, not only its
+  short code.
+- **changed:** Citations in a note's own text and title now preview against the note's translation,
+  not whatever you're currently reading — so a reference you typed into a note written against a
+  Catholic version (e.g. "Daniel 14:1", or "1 Maccabees 1:1") stays previewable after you've
+  switched to a 66-book version. New notes record the translation in play when they're created.
+  Very long notes now have their references detected all the way through, not only in the first
+  several thousand characters.
+- **changed:** A full-text search whose words include a term the index can't match — a very short
+  word, or a common stop-word like "the", "is", "of" — now says so, and an exact-phrase search
+  still holds the exact wording rather than quietly matching on only some of the words.
+
 ## [1.11.0] - 2026-08-30
 - **added:** Study Tools ▸ Dictionary — look up any word or name across all five Bible dictionaries
   (Easton's, Smith's, Hastings', Hitchcock's, Schaff's) at once, without having to find it already

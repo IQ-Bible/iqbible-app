@@ -47,7 +47,15 @@ function getActiveNote() {
 }
 
 function ndBlankNote() {
-  return { id: newNoteId(), title: "", text: "", tags: [], notebookId: null, anchors: [], createdAt: Date.now(), updatedAt: Date.now() };
+  // Stamp the translation in play at creation so a citation typed straight
+  // into the body ("Daniel 14:1", "1MA 1:1") previews against the right
+  // canon even if the reader later moves to a 66-book version. addSelectionToNote
+  // still sets it too (first verse added), for notes made via Verse Tools.
+  return {
+    id: newNoteId(), title: "", text: "", tags: [], notebookId: null, anchors: [],
+    version: current.version, versionTitle: current.versionTitle,
+    createdAt: Date.now(), updatedAt: Date.now(),
+  };
 }
 
 /* ── open / close ── */
@@ -223,7 +231,7 @@ function ndEnterRead() {
   pv.hidden = false;
   ed.hidden = true;
   if (cached == null) {
-    renderNoteMarkdown(text).then(html => {
+    renderNoteMarkdown(text, ndCurrentNote()).then(html => {
       ndPreviewHtmlCache.set(text, html);
       if (!ndEditing && ed.value === text && !pv.hidden) pv.innerHTML = html;
     });
@@ -420,21 +428,43 @@ async function ndRenderAnchors() {
   const anchors = (note && note.anchors) || [];
   if (!anchors.length || ndEditing) { wrap.hidden = true; wrap.innerHTML = ""; return; }
   wrap.hidden = false;
+  // Each anchor's own captured version (a.version), falling back to the
+  // note's, then to what's being read — so a verse gathered from another
+  // translation keeps previewing, and jumps back to, that one.
+  const anchorVersion = a => a.version || (note && note.version) || current.version;
   wrap.innerHTML = anchors.map(a => {
     const label = `${notesBookName(a.book)} ${a.chapter}:${a.verse}`;
-    return `<span class="nd-anchor" data-book="${escAttr(a.book)}" data-ch="${a.chapter}" data-v="${a.verse}"><span class="nd-anchor-go">${escHtml(label)}</span><button type="button" class="nd-anchor-x" aria-label="Remove ${escAttr(label)} from this note" title="Remove reference">&times;</button></span>`;
+    const ver = anchorVersion(a);
+    // Name the translation only when it isn't the one on screen — quiet in
+    // the common single-version note, informative when it matters.
+    const verTag = ver && ver !== current.version ? ndShortVersionLabel(ver) : "";
+    return `<span class="nd-anchor" data-book="${escAttr(a.book)}" data-ch="${a.chapter}" data-v="${a.verse}" data-version="${escAttr(ver || "")}"><span class="nd-anchor-go">${escHtml(label)}${verTag ? ` <span class="nd-anchor-ver">· ${escHtml(verTag)}</span>` : ""}</span><button type="button" class="nd-anchor-x" aria-label="Remove ${escAttr(label)} from this note" title="Remove reference">&times;</button></span>`;
   }).join("");
-  const previewByRef = await fetchVersePreviews(anchors);
+  // One batched preview call per distinct version the anchors span.
+  const byVersion = {};
+  anchors.forEach(a => { (byVersion[anchorVersion(a)] = byVersion[anchorVersion(a)] || []).push(a); });
+  const previewByRef = {};
+  await Promise.all(Object.entries(byVersion).map(async ([ver, list]) => {
+    Object.assign(previewByRef, await fetchVersePreviews(list, ver));
+  }));
   const still = ndCurrentNote();
   if (!still || still.id !== note.id || ndEditing) return;
   wrap.querySelectorAll(".nd-anchor").forEach(el => {
     const key = `${el.dataset.book}.${el.dataset.ch}.${el.dataset.v}`;
     const txt = previewByRef[key];
     if (txt) {
-      const id = registerCiteId(`${notesBookName(el.dataset.book)} ${el.dataset.ch}:${el.dataset.v}`, txt);
+      const verTag = el.dataset.version && el.dataset.version !== current.version ? ` (${ndShortVersionLabel(el.dataset.version)})` : "";
+      const id = registerCiteId(`${notesBookName(el.dataset.book)} ${el.dataset.ch}:${el.dataset.v}${verTag}`, txt);
       el.setAttribute("data-cite-id", id);
     }
   });
+}
+// Short acronym label for a version id (e.g. "eng_kjva" -> "KJVA"), via the
+// catalog title — reuses reader.js's shortVersionLabel, which takes the title.
+function ndShortVersionLabel(versionId) {
+  if (!versionId) return "";
+  const v = (catalog || []).find(x => x.version_id === versionId);
+  return shortVersionLabel(v ? (v.title || versionId) : versionId);
 }
 function ndDetachAnchor(book, chapter, verse) {
   const notes = getNotes();
@@ -593,10 +623,11 @@ async function ndRenderSwitcherList() {
   notes.forEach(async n => {
     const titleEl = list.querySelector(`[data-li-title="${n.id}"]`);
     const tSrc = titleEl && titleEl.textContent.trim();
-    if (titleEl && tSrc) { const h = await linkifyCitations(tSrc); if (titleEl.isConnected) titleEl.innerHTML = h; }
+    const ver = notePreviewVersion(n);
+    if (titleEl && tSrc) { const h = await linkifyCitations(tSrc, ver); if (titleEl.isConnected) titleEl.innerHTML = h; }
     const snip = list.querySelector(`[data-snip="${n.id}"]`);
     const src = snip && snip.textContent.trim();
-    if (snip && src) { const h = await linkifyCitations(src); if (snip.isConnected) snip.innerHTML = h; }
+    if (snip && src) { const h = await linkifyCitations(src, ver); if (snip.isConnected) snip.innerHTML = h; }
     const refEl = list.querySelector(`[data-refs="${n.id}"]`);
     const c = await ndCountRefs(n);
     if (refEl && refEl.isConnected && c > 0) { refEl.hidden = false; refEl.textContent = c === 1 ? "1 ref" : c + " refs"; }
@@ -633,8 +664,13 @@ function addSelectionToNote(target) {
   n.text = n.text.trim() ? `${n.text.replace(/\s+$/, "")}\n\n${line}\n` : `${line}\n`;
   n.anchors = n.anchors || [];
   selectedVerses.forEach(v => {
+    // Each anchor records the translation it was captured in — the note-level
+    // n.version is only "the version the note was started in" (first writer
+    // wins), so it's wrong for a note that later gathers a verse from another
+    // canon. Following a deuterocanonical anchor from a 66-book version uses
+    // this to offer a switch to the right translation (see jumpToVerse).
     if (!n.anchors.some(a => a.book === current.book && a.chapter === current.chapter && a.verse === v))
-      n.anchors.push({ book: current.book, chapter: current.chapter, verse: v });
+      n.anchors.push({ book: current.book, chapter: current.chapter, verse: v, version: current.version });
   });
   if (!n.version && current.version) { n.version = current.version; n.versionTitle = current.versionTitle; }
   n.updatedAt = Date.now();
@@ -870,7 +906,7 @@ function initNotesDrawer() {
       // covering the passage you asked to see (the launcher pill still holds
       // the note, one tap to reopen).
       closeNotesDrawer();
-      jumpToVerse(chip.dataset.book, Number(chip.dataset.ch), Number(chip.dataset.v));
+      jumpToVerse(chip.dataset.book, Number(chip.dataset.ch), Number(chip.dataset.v), null, { preferVersion: chip.dataset.version || null });
     }
   });
 

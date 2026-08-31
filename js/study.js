@@ -436,7 +436,7 @@ async function runBookGuideLookup() {
   const usfm = bookGuideSelected;
   const [infoResult, commResult] = await Promise.allSettled([
     apiJSONCached(`/books/${usfm}/info`),
-    apiJSONCached(`/books/${usfm}/commentaries`),
+    apiJSONCached(`/books/${usfm}/commentaries?chapter=0`),
   ]);
   if (token !== bookGuideToken) return;
   if (infoResult.status !== "fulfilled") { area.innerHTML = `<div class="dd-empty">No book guide data on file for this book.</div>`; return; }
@@ -474,17 +474,14 @@ async function runBookGuideLookup() {
   if (commHtml) loadBookCommentary(0);
 }
 
-/* Book-level commentary — a dropdown of every commentary source that covers
-   this book (from the single GET /books/{book}/commentaries call
-   runBookGuideLookup already makes), each loading that source's book
-   introduction (GET /commentaries/{name}/{book}/0 — "chapter 0") on select,
-   cached per source for the life of this Book Guide render. A native <select>
-   was rejected for a 2-col grid: a book like Genesis has dozens of sources
-   and the names run long. There's no bulk way to know which of the covering
-   sources actually carry a chapter-0 entry (see NOTES.md / API issue #231),
-   so the list can't be trimmed to only those — a source with no book intro
-   just says so rather than being hidden behind one probe call per source.
-   mhenry/gill (the two whole-Bible commentaries) sort to the front. */
+/* Book-level commentary — a dropdown of the commentary sources that carry a
+   book introduction for this book: GET /books/{book}/commentaries?chapter=0
+   (API beta-47) returns exactly those, so the list no longer includes
+   sources that cover the book but have no chapter-0 entry. Each loads its
+   introduction (GET /commentaries/{name}/{book}/0) on select, cached per
+   source for the life of this Book Guide render. A native <select> was
+   rejected for a 2-col grid: names run long. mhenry/gill (the two
+   whole-Bible commentaries) sort to the front. */
 let bgCommSources = [];
 let bgCommHtml = {};
 let bgCommBook = null;
@@ -563,8 +560,7 @@ document.addEventListener("click", e => {
 
 /* ── Textual Variants — GET /textual-variants (flat, unscoped list; the
    scoped route requires book AND chapter, so a book-only filter here is
-   plain client-side filtering of the already-fully-fetched flat list, same
-   precedent as Timeline's chronologyForChapter). ── */
+   plain client-side filtering of the already-fully-fetched flat list. ── */
 let allTextualVariants = null;
 let variantsBookFilter = null;
 async function getAllTextualVariants() {

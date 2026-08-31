@@ -28,6 +28,7 @@
   --shadow:rgba(45,27,88,.12); --shadow-lg:rgba(45,27,88,.18);
   --overlay-scrim:rgba(247,246,252,.94);
   --mfn-h:58px; /* #mobileFooterNav's height — referenced by everything below 1180px that needs to clear it */
+  --audio-h:0px; /* height the docked mobile audio bar reserves above #mobileFooterNav — 0 when no narration, set by body.has-audio below */
   --vvh:100vh; /* actual visible height, kept in sync with window.visualViewport by trackVisualViewport (js/main.js) — falls back to 100vh until that runs / on browsers without the API. Needed because a fixed-position element sized in vh doesn't shrink when the on-screen keyboard opens, so content lower in it silently renders behind the keyboard instead of scrolling into view. */
 }
 /* Day/night toggle (toggleTheme, in main.js) sets data-theme on <html>,
@@ -132,12 +133,27 @@ button{ font-family:inherit; cursor:pointer; }
 #moreMenuSheet{ display:none; }
 .rightrail-sheethead{ display:none; }
 @media (max-width:1180px){
-  .iconbtn.cardsheet-trigger{ display:flex; }
+  /* The 2×2 grid button and the ⓘ book-info button are both replaced on
+     mobile by #chapterCtxChips (the labeled chip row under the pickers).
+     (#notesLauncher is hidden further down — after its own base rule, which
+     would otherwise win on source order.) */
+  .iconbtn.cardsheet-trigger,#btnBookInfo{ display:none; }
 
   #mobileFooterNav{ display:flex; position:fixed; left:0; right:0; bottom:0; height:var(--mfn-h); background:var(--surface); border-top:1px solid var(--divider); z-index:410; padding-bottom:env(safe-area-inset-bottom,0); box-shadow:0 -2px 10px var(--shadow); }
   .mfn-item{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; background:none; border:none; color:var(--muted); font-family:var(--font-ui); font-weight:600; font-size:.56rem; letter-spacing:0; }
   .mfn-item svg{ width:19px; height:19px; }
   .mfn-item.active{ color:var(--brand); }
+  /* Notes is a drawer, not a view, so navMenuClick never marks it active. */
+  body.notes-drawer-open #mfnNotesBtn{ color:var(--brand); }
+
+  /* Chapter-context chips — three plain chips (About book, About Ch., Ch.
+     Info) replacing the old grid icon + ⓘ. A wrapped full-width row inside
+     .chhead so it belongs to the sticky header and slides away / returns with
+     the pickers on scroll. */
+  .chhead{ flex-wrap:wrap; row-gap:8px; }
+  #chapterCtxChips{ flex-basis:100%; display:flex; flex-wrap:wrap; gap:7px; padding:8px 16px 10px; margin-bottom:-20px; border-bottom:1px solid var(--divider); }
+  .ctx-chip{ flex:0 0 auto; font-family:var(--font-ui); font-size:.7rem; font-weight:600; color:var(--ink-soft); background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-pill); padding:6px 11px; white-space:nowrap; }
+  .ctx-chip.ctx-about{ color:var(--brand); border-color:var(--brand-line); }
 
   /* Anchored just above the footer bar, not a floating popover like
      #profilePanel/.plan-menu — full-width so it reads as "the rest of the
@@ -160,17 +176,22 @@ button{ font-family:inherit; cursor:pointer; }
   .rightrail-sheethead{ display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--divider); flex-shrink:0; }
   #cardsSheetScrim{ z-index:415; }
   #rightRail .cardstack{ width:100%; max-width:520px; margin:0 auto; padding:16px 16px calc(16px + var(--mfn-h)); overflow-y:auto; }
+  /* The mobile sheet is full-width with room to spare — no squares, no
+     one-line clamps, every card sizes to its content. */
   #rightRail .railcard{ aspect-ratio:auto; }
+  #rightRail .railcard--compact{ padding:14px; gap:8px; }
+  #rightRail .railcard--compact .rc-body{ white-space:normal; }
+  #rightRail .railcard--feature .rc-body{ -webkit-line-clamp:none; line-clamp:none; display:block; }
 }
 
 /* ── auto-hiding chrome (below 1180px) — the topbar, the sticky chapter
-   header, the footer nav, the audio bar and the notes pull-tab all slide
-   off-screen while the reader scrolls down, and slide back on scroll-up or a
-   tap on empty reading space (initChromeAutoHide + the tap handler in
-   js/reader.js). #topbar goes position:fixed so it can translate away without
-   leaving a 64px flex gap; #app's padding-top (which reserved its space)
-   animates to 0 in step so the text takes it over. The sticky .chhead slides
-   away in the same beat by pushing its own `top` offset off-screen. ── */
+   header, the footer nav and the docked audio bar all slide off-screen while
+   the reader scrolls down, and slide back on scroll-up or a tap on empty
+   reading space (initChromeAutoHide + the tap handler in js/reader.js).
+   #topbar goes position:fixed so it can translate away without leaving a 64px
+   flex gap; #app's padding-top (which reserved its space) animates to 0 in
+   step so the text takes it over. The sticky .chhead slides away in the same
+   beat by pushing its own `top` offset off-screen. ── */
 @media (max-width:1180px){
   #app{ padding-top:64px; transition:padding-top .28s ease; }
   #topbar{ position:fixed; top:0; left:0; right:0; transition:transform .28s ease; }
@@ -186,8 +207,9 @@ button{ font-family:inherit; cursor:pointer; }
   body.chrome-hidden #topbar{ transform:translateY(-100%); }
   body.chrome-hidden .chhead{ top:-200px; }
   body.chrome-hidden #mobileFooterNav{ transform:translateY(100%); }
-  body.chrome-hidden #audioPlayer{ transform:translateY(calc(100% + var(--mfn-h) + 32px)); }
-  body.chrome-hidden #notesLauncher{ transform:translateX(-50%) translateY(calc(100% + var(--mfn-h) + 8px)); }
+  /* Docked flush above the (now also hidden) footer — slide it its own height
+     plus the footer's out of view. initChromeAutoHide also collapses it. */
+  body.chrome-hidden #audioPlayer{ transform:translateY(calc(100% + var(--mfn-h))); }
 }
 
 /* ── left nav menu ── */
@@ -202,18 +224,20 @@ button{ font-family:inherit; cursor:pointer; }
 .navfoot-ver{ display:block; margin-top:5px; font-family:var(--font-ui); font-size:.56rem; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); }
 .navfoot-ver a{ color:inherit; }
 
-/* ── right rail cards — per-chapter context (places/people/prophecies)
-   plus an always-shown timeline card; only the ones with real API data for
-   the current chapter render at all, see loadSidebarCards in reader.js. ── */
-.cardstack{ width:150px; flex-shrink:0; display:flex; flex-direction:column; gap:14px; padding-bottom:24px; }
-/* Text-only cards (People/Prophecies/Timeline) size to their content — the
-   old 1:1 square both wasted space on a one-line card and clipped a card with
-   two long Timeline/Prophecy entries (overflow:hidden). Only the Places card,
-   which fills its box with a map/photo thumbnail, keeps the square. */
+/* ── right rail cards — per-chapter context. Two "anchor" cards hold a
+   square (About This Chapter, Places); Timeline / People / Prophecies are
+   one-line teasers, so all five clear the Notes launcher without the rail
+   having to scroll. Only cards with real API data for the chapter render —
+   see loadSidebarCards in reader.js. ── */
+.cardstack{ width:150px; flex-shrink:0; display:flex; flex-direction:column; gap:12px; padding-bottom:24px; }
 /* flex-shrink:0 so an overflowing stack scrolls #rightRail rather than
-   squashing the cards to label-only (the old 1:1 square masked this). */
+   squashing the cards to label-only. */
 .railcard{ flex-shrink:0; border:1px solid var(--divider); border-radius:var(--r-control); background:var(--surface); box-shadow:0 2px 10px var(--shadow); padding:14px; display:flex; flex-direction:column; gap:8px; overflow:hidden; }
-.railcard--media{ aspect-ratio:1/1; }
+.railcard--media,.railcard--feature{ aspect-ratio:1/1; }
+.railcard--feature .rc-body{ display:-webkit-box; -webkit-line-clamp:5; line-clamp:5; -webkit-box-orient:vertical; }
+.railcard--compact{ padding:11px 13px; gap:3px; }
+.railcard--compact .rc-body{ white-space:nowrap; text-overflow:ellipsis; }
+.rc-dim{ opacity:.6; }
 .railcard.clickable{ cursor:pointer; transition:border-color .15s,box-shadow .15s; }
 .railcard.clickable:hover{ border-color:var(--brand-line); box-shadow:0 4px 16px var(--shadow-lg); }
 .railcard .rc-label{ font-family:var(--font-ui); font-size:.6rem; letter-spacing:.12em; text-transform:uppercase; color:var(--brand); }
@@ -329,6 +353,9 @@ button{ font-family:inherit; cursor:pointer; }
 .person-rel-tag{ font-family:var(--font-ui); font-size:.54rem; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); }
 .person-section > .bg-accordion{ margin-bottom:0; }
 .person-acc-count{ display:inline-block; min-width:16px; padding:1px 5px; border-radius:var(--r-pill); background:var(--surface-2); color:var(--muted); font-size:.6rem; text-align:center; }
+.person-dc-badge{ display:inline-block; padding:1px 7px; border-radius:var(--r-pill); background:var(--surface-2); color:var(--muted); font-size:.54rem; letter-spacing:.06em; }
+.person-namesakes{ display:flex; flex-direction:column; gap:6px; align-items:flex-start; }
+.person-namesake{ text-align:left; }
 
 /* ── devotionals modal ── */
 /* Kept visually secondary (small, muted) — "Today's Devotional" below is
@@ -368,13 +395,31 @@ button{ font-family:inherit; cursor:pointer; }
 .timeline-entry.tl-current{ background:var(--brand-soft); border-radius:var(--r-sm); margin:0 -14px; padding:14px; border-bottom-color:transparent; }
 .timeline-date{ font-family:var(--font-ui); font-size:.6rem; letter-spacing:.1em; text-transform:uppercase; color:var(--brand); margin-bottom:5px; }
 .timeline-event{ font-size:.95rem; line-height:1.5; color:var(--ink-soft); }
+/* Secular world-history anchors (kind:"context") — present for a feel of the
+   era, visually secondary to the biblical events. */
+.timeline-entry.tl-context{ opacity:.72; }
+.timeline-entry.tl-context .timeline-date{ color:var(--muted); }
+.tl-context-tag{ font-size:.5rem; letter-spacing:.08em; padding:1px 5px; border-radius:var(--r-pill); background:var(--surface-2); color:var(--muted); }
+.tl-approx{ font-style:italic; }
+/* "You're reading" marker slotted into the timeline at the current chapter. */
+.timeline-entry.tl-here{ background:var(--brand); color:var(--on-brand); border-radius:var(--r-sm); margin:10px -14px; padding:14px; border-bottom-color:transparent; scroll-margin:80px; }
+.timeline-entry.tl-here .timeline-event{ color:var(--on-brand); font-weight:600; }
+.tl-here-pin{ font-family:var(--font-ui); font-size:.55rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; opacity:.85; margin-bottom:4px; }
+.tl-here-sub{ font-family:var(--font-ui); font-size:.68rem; margin-top:5px; opacity:.9; }
+.timeline-entry.tl-current{ scroll-margin:80px; }
+
+/* ── about-this-chapter modal ── */
+.ci-summary{ font-size:.95rem; line-height:1.65; }
+.ci-credit{ margin-top:12px; font-family:var(--font-ui); font-size:.7rem; color:var(--muted); }
+.ci-sources{ margin-top:16px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.ci-sources .person-section-label{ margin-bottom:0; margin-right:2px; }
 
 #readMain{ flex:1; min-width:0; overflow-y:auto; padding:0 32px 100px; display:flex; flex-direction:column; align-items:center; position:relative; }
 /* Extra bottom clearance for #mobileFooterNav below 1180px — placed here
    (not in the mobile-nav rule block further up) since an override with the
    same specificity as this base rule only wins by appearing later in the
    file; a media query alone doesn't beat plain source order. */
-@media (max-width:1180px){ #readMain{ padding-bottom:calc(100px + var(--mfn-h)); } }
+@media (max-width:1180px){ #readMain{ padding-bottom:calc(40px + var(--mfn-h) + var(--audio-h)); } }
 #readCol{ width:100%; max-width:700px; padding-top:40px; }
 
 /* ── no-API-key gate — a full-screen blocking overlay (not a .mainview
@@ -435,6 +480,11 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
    the header height or shift the inline audio player. Positive top margin —
    .chhead is a sticky, opaque, z-index:6 box, so any overlap paints over
    this line's top edge. */
+/* The mobile chapter-context chip row — rendered at every width by
+   renderChapterCtxChips but only shown below 1180px (the desktop right rail
+   carries the same cards). Styled in the max-width:1180px block above; the
+   two width-bounded rules never overlap, so their file order doesn't matter. */
+@media (min-width:1181px){ #chapterCtxChips{ display:none; } }
 #chapterReadStamp{ display:none; align-items:center; gap:6px; margin:6px 0 16px; font-family:var(--font-ui); font-size:.74rem; color:var(--muted); }
 #chapterReadStamp.show{ display:flex; }
 #chapterReadStamp .read-check{ display:flex; align-items:center; justify-content:center; width:15px; height:15px; flex-shrink:0; background:none; border:none; padding:0; cursor:pointer; color:var(--read-check); border-radius:var(--r-sm); transition:background .15s; }
@@ -444,7 +494,7 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 .verpick{ display:flex; align-items:center; gap:4px; padding:4px 8px; border-radius:var(--r-sm); background:none; border:none; font-family:var(--font-ui); font-size:.7rem; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); transition:background .15s,color .15s; }
 .verpick:hover{ background:var(--brand-soft); color:var(--brand); }
 .verpick svg{ width:9px; height:9px; stroke:var(--muted); flex-shrink:0; }
-.verpick.iconcaret{ padding:6px; }
+#btnPickNarration svg{ flex-shrink:0; }
 /* Sits between the book-title and chapter-number .titlepick buttons, which
    share one uniform gap in .chtitlewrap — margin here pulls it visually
    against the book title it belongs to, and pushes the chapter number
@@ -465,25 +515,35 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 @media (max-width:1180px){
   .chapternav{ display:none; }
 
-  /* Audio player: a full-width bar docked just above #mobileFooterNav (and
-     above the notes pull-tab that sits on the footer's top edge). A solid
-     background is required — it overlaps the scrolling reading column, not
-     .chhead's own opaque box. Slides out with the rest of the chrome, see
-     body.chrome-hidden below (initChromeAutoHide, js/reader.js). */
-  #audioPlayer{ position:fixed; left:12px; right:12px; width:auto; transform:none; bottom:calc(var(--mfn-h) + env(safe-area-inset-bottom,0) + 24px); height:40px; margin:0; justify-content:center; z-index:16; background:var(--surface); border:1px solid var(--divider); border-radius:var(--r-pill); box-shadow:0 4px 16px var(--shadow); padding:0 16px; transition:transform .28s ease; }
-  .audio-controls-row{ width:100%; max-width:none; }
-
-  /* The cards-sheet trigger drops back into .chtitlewrap's normal flow so it
-     rides with the auto-hiding chapter header (a right-edge inward swipe
-     opens the same sheet). Smaller and centre-aligned so it sits with the
-     baseline-aligned pickers instead of poking below them. */
-  .chhead .iconbtn.cardsheet-trigger{ align-self:center; width:30px; height:30px; }
-  .chhead .iconbtn.cardsheet-trigger svg{ width:15px; height:15px; }
+  /* Audio player: a full-width bar docked flush above #mobileFooterNav, all
+     controls visible. A solid background is required — it overlaps the
+     scrolling reading column. Slides away with the rest of the chrome on
+     scroll-down (body.chrome-hidden above). */
+  #audioPlayer{ position:fixed; left:8px; right:8px; width:auto; transform:none; margin:0;
+    bottom:calc(var(--mfn-h) + env(safe-area-inset-bottom,0)); z-index:16;
+    background:var(--surface); border:1px solid var(--divider); border-bottom:0;
+    border-radius:var(--r-control) var(--r-control) 0 0;
+    box-shadow:0 -2px 12px var(--shadow); padding:0; transition:transform .28s ease; }
+  /* padding-left lands the play button's centre under the first footer tab
+     ("Read"): one tab is 10vw, minus #audioPlayer's 8px inset and half the
+     34px button. */
+  .audio-controls-row{ width:100%; max-width:none; min-height:47px; padding:0 12px 0 calc(10vw - 25px); }
+  /* The voice button reads as a real control here, not a bare caret. */
+  #btnPickNarration{ flex-shrink:0; gap:3px; padding:5px 8px; border:1px solid var(--divider); border-radius:var(--r-pill); color:var(--ink-soft); background:var(--surface-2); font-size:.62rem; }
+  #btnPickNarration svg{ width:13px; height:13px; }
 }
 
 /* ── audio player — inline in the chapter header, right after the version
    pick, extending to the end of the reading column. Shown whenever the
-   current version has narration for this book; no separate toggle. */
+   current version has narration for this book; no separate toggle. Below
+   1180px it's a full-width bar docked above the footer nav — see the
+   max-width:1180px block above. */
+/* Reserve the docked mobile audio bar's height at the foot of the reading
+   column and above the other bottom-anchored chrome. refreshAudioAvailability
+   (js/reader.js) toggles .has-audio with the player's own visibility. Above
+   1180px --audio-h stays 0 (the player is inline in .chhead). */
+body.has-audio{ --audio-h:49px; }
+@media (min-width:1181px){ body.has-audio{ --audio-h:0px; } }
 .inline-audio{ flex:1; min-width:180px; display:flex; flex-direction:column; gap:5px; }
 .audio-controls-row{ display:flex; align-items:center; gap:10px; width:100%; }
 .playbtn{ width:34px; height:34px; border-radius:var(--r-pill); flex-shrink:0; background:linear-gradient(135deg,var(--brand),var(--brand-2)); display:flex; align-items:center; justify-content:center; color:var(--on-brand); border:none; }
@@ -587,7 +647,7 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
    sit after the base rule" note as #readMain's own mobile padding-bottom
    above; a media query alone doesn't win a same-specificity tie against a
    plain rule that simply comes later in the file. */
-@media (max-width:1180px){ #verseToolsPanel{ bottom:calc(var(--mfn-h) + 12px); } }
+@media (max-width:1180px){ #verseToolsPanel{ bottom:calc(var(--mfn-h) + var(--audio-h) + 12px); } }
 .vtp-head{ display:flex; align-items:center; justify-content:space-between; padding:16px 16px 0 20px; flex-shrink:0; }
 .vtp-head span{ font-family:var(--font-ui); font-weight:800; letter-spacing:-.02em; font-size:1.1rem; color:var(--brand); }
 .panel-close{ width:26px; height:26px; border-radius:var(--r-pill); background:var(--surface-2); border:none; color:var(--muted); font-size:1.1rem; line-height:1; flex-shrink:0; }
@@ -1022,6 +1082,7 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 .overlay-results-area{ flex:1; overflow-y:auto; padding:0 32px 40px; }
 .overlay-results-inner{ max-width:780px; margin:0 auto; }
 .overlay-results-meta{ font-family:var(--font-ui); font-size:.6rem; letter-spacing:.18em; text-transform:uppercase; color:var(--muted); margin-bottom:20px; }
+.overlay-search-notice{ font-size:.8rem; line-height:1.5; color:var(--muted); background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-sm); padding:9px 12px; margin:-8px 0 18px; }
 #overlayLoadMore{ display:none; margin:20px auto 0; font-size:.68rem; letter-spacing:0; padding:10px 28px; font-family:var(--font-ui); font-weight:600; border:1px solid var(--brand-line); background:transparent; color:var(--brand); border-radius:var(--r-pill); }
 #overlayLoadMore:hover{ background:var(--brand); color:var(--on-brand); }
 .result-card{ border:1px solid var(--divider); border-radius:var(--r-sm); padding:18px 22px; margin-bottom:10px; background:var(--surface); box-shadow:0 2px 10px var(--shadow); cursor:pointer; opacity:0; transform:translateY(6px); animation:fadeUp .3s ease forwards; }
@@ -1238,7 +1299,7 @@ details.bg-accordion{ border:1px solid var(--divider); border-radius:var(--r-con
    alone can't just move to clear #mobileFooterNav without also growing that
    offset, or the hidden toast peeks back into view at the new, taller
    bottom (which is exactly what happened here the first time around). */
-@media (max-width:1180px){ #toast{ bottom:calc(var(--mfn-h) + 12px); transform:translateX(-50%) translateY(140px); } }
+@media (max-width:1180px){ #toast{ bottom:calc(var(--mfn-h) + var(--audio-h) + 12px); transform:translateX(-50%) translateY(140px); } }
 #toast.show{ transform:translateX(-50%) translateY(0); }
 
 ::-webkit-scrollbar{ width:6px; }
@@ -1398,6 +1459,7 @@ details.bg-accordion{ border:1px solid var(--divider); border-radius:var(--r-con
 .nd-anchors{ display:flex; gap:6px; flex-wrap:wrap; flex-shrink:0; }
 .nd-anchor{ display:inline-flex; align-items:center; gap:2px; font-family:var(--font-ui); font-size:.68rem; font-weight:600; color:var(--brand); background:var(--brand-soft); border:1px solid var(--brand-line); border-radius:var(--r-pill); padding:2px 3px 2px 9px; }
 .nd-anchor-go{ cursor:pointer; }
+.nd-anchor-ver{ font-weight:600; opacity:.6; letter-spacing:.02em; }
 .nd-anchor:hover{ border-color:var(--brand); }
 .nd-anchor-x{ width:16px; height:16px; display:flex; align-items:center; justify-content:center; border:none; background:none; color:var(--brand); opacity:.5; font-size:.95rem; line-height:1; border-radius:50%; }
 .nd-anchor-x:hover{ opacity:1; background:var(--brand); color:var(--on-brand); }
@@ -1484,21 +1546,13 @@ details.bg-accordion{ border:1px solid var(--divider); border-radius:var(--r-con
 
 /* Mobile: a non-modal bottom sheet above #mobileFooterNav (410) — no scrim, so
    the passage behind it still scrolls and verses can still be selected (→ "Add
-   to Note"). The grip snaps it between two heights (see ndInitResize); the
-   switcher stacks above the editor instead of beside it. */
+   to Note"). Opened from the Notes tab in the footer nav (#mfnNotesBtn); the
+   grip snaps it between two heights (see ndInitResize); the switcher stacks
+   above the editor instead of beside it. */
 @media (max-width:1180px){
-  /* A slim centre pull-tab sitting on #mobileFooterNav's top edge — the
-     mobile stand-in for the launcher pill. Tap or short upward swipe on it
-     opens the drawer (ndInitLauncherSwipe, js/notesdrawer.js). */
-  #notesLauncher{ left:50%; right:auto; transform:translateX(-50%); bottom:calc(var(--mfn-h) + env(safe-area-inset-bottom,0));
-    width:66px; height:22px; min-height:0; padding:0; gap:0; justify-content:center;
-    border-radius:11px 11px 0 0; border-bottom:none; box-shadow:0 -3px 12px var(--shadow);
-    transition:transform .28s ease; }
-  #notesLauncher::before{ content:""; width:26px; height:4px; border-radius:2px; background:var(--muted2); }
-  #notesLauncher .ndl-ic,#notesLauncher .ndl-wrap,#notesLauncher .ndl-up{ display:none; }
-  /* keep the centred transform during the save-nudge pulse */
-  #notesLauncher.pulse{ animation:ndPulseTab .5s ease; }
-  @keyframes ndPulseTab{ 40%{ transform:translateX(-50%) scale(1.08); } }
+  /* The Notes footer tab (#mfnNotesBtn) replaces the pull-tab launcher — this
+     is placed after #notesLauncher's base rule so it wins on source order. */
+  #notesLauncher{ display:none; }
   #notesDrawer{ z-index:430; height:var(--notes-drawer-h); border-radius:20px 20px 0 0; transition:height .24s cubic-bezier(.22,1,.36,1); }
   #notesDrawer.nd-dragging{ transition:none; } /* follow the finger 1:1 while dragging */
   #notesDrawer .nd-body{ flex-direction:column; }

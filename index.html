@@ -126,24 +126,36 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
               <button class="titlepick" id="btnPickChapter" onclick="openChapterPicker()">1 <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
               <button class="verpick" id="btnPickVersion" onclick="openVersionPicker()">KJV <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
               <!-- Below 1180px #rightRail's places/people/prophecies/timeline
-                   cards have nowhere to live (the rail itself is hidden) — this
-                   opens the same #cardStack content as a bottom sheet instead of
-                   duplicating its markup/fetch logic. Hidden above 1180px since
-                   the rail is visible there already. -->
+                   cards have nowhere to live (the rail itself is hidden). This
+                   button is hidden there (see #chapterCtxChips, the labeled
+                   chip row rendered under the pickers) but still exists as the
+                   right-edge inward-swipe target; on desktop the rail is
+                   visible so it stays hidden here too. -->
               <button class="iconbtn cardsheet-trigger" id="btnCardsSheet" title="Chapter info" aria-label="Chapter info" onclick="toggleCardsSheet()">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
               </button>
             </div>
+            <!-- Desktop: shows inline in .chhead after the version pick.
+                 Below 1180px: a full-width bar docked above #mobileFooterNav
+                 that slides away with the rest of the chrome on scroll. The
+                 "Voice" button appears only when the version has >1 narrator. -->
             <div id="audioPlayer" class="inline-audio" style="display:none">
               <div class="audio-controls-row">
                 <button class="playbtn" id="playBtn" onclick="toggleAudio()"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5.5v13l11-6.5-11-6.5Z"/></svg></button>
                 <div class="time" id="audioCur">0:00</div>
                 <div id="scrubTrack" onclick="seekAudio(event)"><div id="scrubFill"></div></div>
                 <div class="time" id="audioDur">0:00</div>
-                <button class="verpick iconcaret" id="btnPickNarration" style="display:none" onclick="openNarrationPicker()" title="Choose narration voice" aria-label="Choose narration voice"><svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+                <button class="verpick" id="btnPickNarration" style="display:none" onclick="openNarrationPicker()" title="Choose narration voice" aria-label="Choose narration voice"><span id="narrationName">Voice</span><svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
                 <audio id="audioEl" preload="none"></audio>
               </div>
             </div>
+            <!-- Mobile only (display:none >1180px, where the right rail carries
+                 the same cards). Three chips: About <book>, About Ch., and
+                 Ch. Info (opens the places/people/timeline/prophecies sheet).
+                 A child of .chhead so it's part of the sticky header block —
+                 it wraps to its own full-width row and slides away / comes
+                 back with the pickers on scroll. renderChapterCtxChips(). -->
+            <div id="chapterCtxChips" hidden></div>
           </div>
 
           <!-- Compact "Read on …" line — its own row below .chhead (not inside
@@ -206,6 +218,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
           <div class="overlay-results-area">
             <div class="overlay-results-inner">
               <div id="overlayResultsMeta" class="overlay-results-meta"></div>
+              <div id="overlaySearchNotice" class="overlay-search-notice" hidden></div>
               <div id="overlayResultList"></div>
               <button id="overlayLoadMore" onclick="overlaySearch(false)">Load More</button>
             </div>
@@ -590,6 +603,11 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
               <div class="help-card-body">Full-text search across the whole Bible, any version.</div>
             </div>
             <div class="help-card">
+              <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="7" height="7" rx="1"/><rect x="14" y="4" width="7" height="7" rx="1"/><rect x="3" y="15" width="7" height="5" rx="1"/><rect x="14" y="15" width="7" height="5" rx="1"/></svg></div>
+              <div class="help-card-title">Context cards</div>
+              <div class="help-card-body">Beside each chapter (or, on a phone, from the “Ch. Info” chip under the chapter title): an overview of what the chapter is about, the places and people it names, prophecies it touches, and where it sits on the biblical timeline.</div>
+            </div>
+            <div class="help-card">
               <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z"/></svg></div>
               <div class="help-card-title">Explore</div>
               <div class="help-card-body">A Gospel harmony, topic browser, Bible atlas, genealogy explorer and curated collections.</div>
@@ -612,7 +630,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
             <div class="help-card">
               <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5V4Z"/><path d="M9 10h6M9 14h6"/></svg></div>
               <div class="help-card-title">Notes drawer</div>
-              <div class="help-card-body">The one place notes are written — a dockable panel you can open from anywhere with the N key, and where My Library's notes open to edit too. It shows a read view with every reference hover-previewable and a light Markdown subset (bold, italic, headings, lists, quotes) rendered; hit Edit (or click the text) for the formatting toolbar and Ctrl/Cmd+B / +I. Verse Tools ▸ Note drops a verse's reference and text into a new note, the current one, or one you pick. Assign a note to a notebook from the footer. On a phone it's a bottom sheet you can drag by its grip to resize — and the passage stays readable behind it.</div>
+              <div class="help-card-body">The one place notes are written — a dockable panel you can open from anywhere with the N key, and where My Library's notes open to edit too. It shows a read view with every reference hover-previewable and a light Markdown subset (bold, italic, headings, lists, quotes) rendered; hit Edit (or click the text) for the formatting toolbar and Ctrl/Cmd+B / +I. Verse Tools ▸ Note drops a verse's reference and text into a new note, the current one, or one you pick. Assign a note to a notebook from the footer. On a phone, open it from the Notes tab in the bottom bar; it's a sheet you can drag by its grip to resize, and the passage stays readable behind it.</div>
             </div>
             <div class="help-card">
               <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg></div>
@@ -647,11 +665,11 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
           </div>
           <div class="help-faq-item">
             <div class="help-faq-q">Does this include audio narration?</div>
-            <div class="help-faq-a">Versions with narration available show an inline player above the reading text — a caret next to it lets you pick a different narrator when a version has more than one recorded.</div>
+            <div class="help-faq-a">Versions with narration available show a player — inline under the chapter title on a wide screen, a bar above the nav on a phone. A "Voice" button lets you pick a different narrator when a version has more than one recorded.</div>
           </div>
           <div class="help-faq-item">
             <div class="help-faq-q">How do I take notes?</div>
-            <div class="help-faq-a">Open the Notes drawer — press N anywhere, or the Notes button (a slim pull-tab centred on the bottom bar on a phone, bottom-right on a wider screen). It autosaves as you type, keeps one note "active", and takes a light Markdown subset (bold, italic, headings, lists, quotes) that renders on the read view. To pull a verse in, select it and use Verse Tools ▸ Note, then choose a new note, the current one, or an existing one — its reference and text get dropped in and the verse shows a note icon in the margin. Group notes into notebooks, and search, tag, filter and export everything from My Library.</div>
+            <div class="help-faq-a">Open the Notes drawer — press N anywhere, or the Notes button (the Notes tab in the bottom bar on a phone, a pill bottom-right on a wider screen). It autosaves as you type, keeps one note "active", and takes a light Markdown subset (bold, italic, headings, lists, quotes) that renders on the read view. To pull a verse in, select it and use Verse Tools ▸ Note, then choose a new note, the current one, or an existing one — its reference and text get dropped in and the verse shows a note icon in the margin. Group notes into notebooks, and search, tag, filter and export everything from My Library.</div>
           </div>
           <div class="help-faq-item">
             <div class="help-faq-q">What are the cards next to the reading pane?</div>
@@ -659,7 +677,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
           </div>
           <div class="help-faq-item">
             <div class="help-faq-q">Can I use this on my phone?</div>
-            <div class="help-faq-a">Yes, the reader is fully responsive; the side rails hide below about 1180px wide. On a phone: swipe the page left or right to turn the chapter (or use the Previous/Next buttons at the end of it), swipe in from the right edge for the chapter-context cards, and the topbar and bars tuck away as you scroll down (scroll back up or tap an empty spot to bring them back).</div>
+            <div class="help-faq-a">Yes, the reader is fully responsive; the side rails hide below about 1180px wide. On a phone: swipe the page left or right to turn the chapter (or use the Previous/Next buttons at the end of it), tap “Ch. Info” under the chapter title (or swipe in from the right edge) for the chapter-context cards, and the topbar and bars tuck away as you scroll down (scroll back up or tap an empty spot to bring them back).</div>
           </div>
           <div class="help-faq-item">
             <div class="help-faq-q">Is my data backed up anywhere?</div>
@@ -745,8 +763,9 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
 
   <!-- Fixed bottom nav — replaces #navrail below 1180px, where the left rail
        is hidden entirely. Search is deliberately left out (already reachable
-       via #searchTrigger in the topbar at every width); "More" opens
-       #moreMenuSheet with the rest of #navMenu's items. -->
+       via #searchTrigger in the topbar at every width); Notes is a tab here
+       (it opens the drawer, not a view); Share Tools and the rest of
+       #navMenu's items live in "More" (#moreMenuSheet). -->
   <nav id="mobileFooterNav" aria-label="Primary">
     <button class="mfn-item" data-nav="read" onclick="navMenuClick('read')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
@@ -760,9 +779,9 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M9 7h6M9 11h6"/></svg>
       <span>Study</span>
     </button>
-    <button class="mfn-item" data-nav="share" onclick="navMenuClick('share')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.8"/><circle cx="6" cy="12" r="2.8"/><circle cx="18" cy="19" r="2.8"/><path d="M8.5 10.5l7-4M8.5 13.5l7 4"/></svg>
-      <span>Share</span>
+    <button class="mfn-item" id="mfnNotesBtn" onclick="openNotesDrawer()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5V4Z"/><path d="M9 10h6M9 14h6"/></svg>
+      <span>Notes</span>
     </button>
     <button class="mfn-item" id="mfnMoreBtn" onclick="toggleMoreMenu()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>
@@ -770,6 +789,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
     </button>
   </nav>
   <div id="moreMenuSheet">
+    <button class="navitem" data-nav="share" onclick="navMenuClick('share');closeMoreMenu()">Share Tools</button>
     <button class="navitem" data-nav="library" onclick="navMenuClick('library');closeMoreMenu()">My Library</button>
     <button class="navitem" data-nav="progress" onclick="navMenuClick('progress');closeMoreMenu()">My Progress</button>
     <button class="navitem" data-nav="plans" onclick="navMenuClick('plans');closeMoreMenu()">Reading Plans</button>
@@ -941,14 +961,25 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
   </div>
 
   <!-- timeline modal — opened from the right rail's always-shown Timeline
-       card. /chronology has no per-chapter filter server-side, so this
-       shows the full curated list (already fetched once and cached) with
-       the current chapter's own entries, if any, highlighted and
-       scrolled-to. -->
+       card. Shows the full canon-aware /chronology list, with a placement
+       banner from GET /chronology/for/{book}/{chapter} and this chapter's
+       own events highlighted and scrolled-to. -->
   <div class="modalscrim" id="timelineScrim">
     <div class="modal" style="width:560px">
       <div class="mhead"><div class="row"><h2>Timeline</h2><button class="closebtn" onclick="closeModal('timelineScrim')">&times;</button></div></div>
       <div class="dictbody" id="timelineBody"></div>
+    </div>
+  </div>
+
+  <!-- about-this-chapter modal — opened from the right rail's "About This
+       Chapter" card. GET /books/{book}/chapters/{chapter}/info: a
+       version-independent chapter "argument" from a public-domain
+       commentary, source picked server-side, switchable via
+       available_sources. 404s (no card shown) for deuterocanon books. -->
+  <div class="modalscrim" id="chapterInfoScrim">
+    <div class="modal" style="width:560px">
+      <div class="mhead"><div class="row"><h2 id="chapterInfoTitle">About This Chapter</h2><button class="closebtn" onclick="closeModal('chapterInfoScrim')">&times;</button></div></div>
+      <div class="dictbody" id="chapterInfoBody"></div>
     </div>
   </div>
 
@@ -963,9 +994,9 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
   <!-- people modal — opened from the right rail's People card. List
        view shows the raw, unfiltered chapter people list (see reader.js's
        loadPeopleCard / NOTES.md — no client-side filtering, per
-       CLAUDE.md's GOLDEN RULE); detail view resolves one name via the
-       exact-match GET /bible-characters/{name} lookup, a real endpoint this
-       app didn't use before (kept under its actual API path — see
+       CLAUDE.md's GOLDEN RULE); detail view resolves a person by their
+       disambiguated ustrong (GET /bible-characters/by-ustrong/{ustrong}),
+       falling back to GET /bible-characters/{name} — see
        reader.js's openPersonDetail). -->
   <div class="modalscrim" id="peopleScrim">
     <div class="modal" style="width:560px">

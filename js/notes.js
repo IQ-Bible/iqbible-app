@@ -199,11 +199,12 @@ async function renderNotesList() {
       // that's a one-liner, in which case there's no separate preview.
       const hasTitle = !!(n.title || "").trim();
       const previewSrc = hasTitle ? n.text : n.text.split("\n").slice(1).join("\n").trim();
-      const previewHtml = previewSrc ? await renderNoteMarkdown(previewSrc) : "";
+      const previewHtml = previewSrc ? await renderNoteMarkdown(previewSrc, n) : "";
       // A citation the visitor typed can land in the title too — a one-line
       // note is all title, no preview — so the title itself is run through
-      // linkifyCitations (the shared helper) to stay hover/tap-previewable.
-      const titleHtml = await linkifyCitations(noteDisplayTitle(n));
+      // linkifyCitations (the shared helper) to stay hover/tap-previewable,
+      // against the note's own translation like the body.
+      const titleHtml = await linkifyCitations(noteDisplayTitle(n), notePreviewVersion(n));
       const tagsHtml = n.tags.slice(0, 4).map(t => `<span class="ncard-tag">${escHtml(t)}</span>`).join("");
       const ref = noteAnchorLabel(n);
       const nb = n.notebookId ? notebookName(n.notebookId) : "";
@@ -430,7 +431,12 @@ function exportNotesMarkdown() {
     md += `## ${gid ? notebookName(gid) : "Unfiled"}\n\n`;
     inGroup.forEach(n => {
       md += `### ${noteRefLabel(n)}\n\n`;
-      const refs = (n.anchors || []).map(a => `${notesBookName(a.book)} ${a.chapter}:${a.verse}`);
+      // Note the translation on an anchor only when it differs from the
+      // note's own — e.g. a deuterocanonical verse gathered from another canon.
+      const refs = (n.anchors || []).map(a => {
+        const tag = a.version && a.version !== n.version ? ` (${ndShortVersionLabel(a.version) || a.version})` : "";
+        return `${notesBookName(a.book)} ${a.chapter}:${a.verse}${tag}`;
+      });
       if (refs.length) md += `Verses: ${refs.join(", ")}\n\n`;
       if (n.tags.length) md += `Tags: ${n.tags.join(", ")}\n\n`;
       md += `${n.text}\n\n`;
@@ -466,7 +472,11 @@ function importNotesFile(input) {
       const id = n.id || newNoteId();
       const idx = notes.findIndex(x => x.id === id);
       const anchors = Array.isArray(n.anchors)
-        ? n.anchors.filter(a => a && a.book).map(a => ({ book: a.book, chapter: Number(a.chapter), verse: Number(a.verse) }))
+        ? n.anchors.filter(a => a && a.book).map(a => {
+            const c = { book: a.book, chapter: Number(a.chapter), verse: Number(a.verse) };
+            if (a.version) c.version = a.version; // translation the verse was captured in
+            return c;
+          })
         : (n.book && Array.isArray(n.verses) ? n.verses.map(v => ({ book: n.book, chapter: Number(n.chapter), verse: Number(v) })) : []);
       const clean = {
         id, title: n.title || "", text: n.text, tags: Array.isArray(n.tags) ? n.tags : [],
