@@ -218,7 +218,8 @@ button{ font-family:inherit; cursor:pointer; }
 .navitem:hover{ background:var(--brand-soft); color:var(--brand); }
 .navitem.active{ color:var(--brand); border-left-color:var(--brand); background:var(--brand-soft); font-weight:600; }
 .navdivider{ border:none; border-top:1px solid var(--divider); margin:10px 12px; }
-.navfooter{ margin-top:auto; padding:16px 12px 0; font-size:.56rem; line-height:1.6; color:var(--muted); opacity:.85; }
+.navfooter{ margin-top:auto; padding:16px 12px 0; font-size:.64rem; line-height:1.6; color:var(--muted); opacity:.85; }
+.wm-link{ color:inherit; text-decoration:none; }
 /* Version line as a small tracked-caps kicker (à la .ndl-k) — sits under the
    credit line, static, not a control. */
 .navfoot-ver{ display:block; margin-top:5px; font-family:var(--font-ui); font-size:.56rem; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); }
@@ -771,6 +772,8 @@ body.has-audio{ --audio-h:49px; }
 .msearch .mclear{ width:18px; height:18px; font-size:1rem; line-height:1; }
 .overlay-input-wrap .mclear{ width:28px; height:28px; font-size:1.3rem; line-height:1; }
 .mfilters{ display:flex; gap:8px; margin-top:12px; }
+.mfilter-check{ display:inline-flex; align-items:center; gap:8px; font-family:var(--font-ui); font-size:.8rem; color:var(--ink-soft); cursor:pointer; user-select:none; }
+.mfilter-check input{ width:15px; height:15px; margin:0; accent-color:var(--brand); cursor:pointer; }
 /* flex-shrink:0 keeps this row at its content height — without it, a flex
    column parent can compress it toward zero once the sibling list below
    grows tall, which read as the language row being "hidden underneath" the
@@ -968,6 +971,8 @@ body.has-audio{ --audio-h:49px; }
 .about-hero-logo{ width:56px; height:56px; border-radius:var(--r-card); box-shadow:0 8px 24px var(--shadow); }
 .about-hero h1{ font-family:var(--font-ui); font-weight:800; letter-spacing:-.02em; font-size:1.9rem; color:var(--ink); }
 .about-hero p{ max-width:480px; font-size:.95rem; line-height:1.7; color:var(--ink-soft); }
+.about-hero-cta{ display:inline-flex; align-items:center; gap:7px; font-family:var(--font-ui); font-weight:600; font-size:.9rem; color:var(--on-brand); background:var(--brand); border-radius:var(--r-pill); padding:11px 22px; text-decoration:none; }
+.about-hero-cta:hover{ background:var(--brand-2); }
 .about-section-label{ font-family:var(--font-ui); font-size:.6rem; letter-spacing:.14em; text-transform:uppercase; color:var(--brand); text-align:center; margin:32px 0 14px; }
 .about-chips{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
 .about-runs{ max-width:560px; margin:28px auto 0; font-size:.9rem; line-height:1.75; color:var(--ink-soft); text-align:center; }

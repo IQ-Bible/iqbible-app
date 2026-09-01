@@ -12,7 +12,7 @@
  *
  * Bump CACHE_VERSION on every deploy so clients pick up new shell assets.
  */
-const CACHE_VERSION = "1.10.0";
+const CACHE_VERSION = "1.13.1";
 const CACHE = `iqbible-shell-${CACHE_VERSION}`;
 
 // Local development: serving from localhost/127.0.0.1 means every edit to a

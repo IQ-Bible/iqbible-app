@@ -95,7 +95,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
         <button class="navitem" data-nav="help" onclick="navMenuClick('help')">Help</button>
         <button class="navitem" data-nav="about" onclick="navMenuClick('about')">About</button>
         <button class="navitem" data-nav="settings" onclick="navMenuClick('settings')">Settings</button>
-        <div class="navfooter">&copy;&nbsp;<span id="navYear" data-app-year></span>&nbsp;<span class="wm">IQ&nbsp;<span>Bible</span></span><span class="navfoot-ver">v<span id="navVersion" data-app-version></span> &middot; <a href="https://api.iqbible.com" target="_blank" rel="noopener">API</a></span></div>
+        <div class="navfooter">&copy;&nbsp;<span id="navYear" data-app-year></span>&nbsp;<a href="https://iqbible.com" target="_blank" rel="noopener" class="wm-link"><span class="wm">IQ&nbsp;<span>Bible</span></span></a><span class="navfoot-ver">v<span id="navVersion" data-app-version></span> &middot; <a href="https://api.iqbible.com" target="_blank" rel="noopener">API</a></span></div>
       </div>
     </nav>
 
@@ -503,6 +503,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
             <img src="img/logo.png" alt="" class="about-hero-logo">
             <h1>About <span class="wm">IQ <span>Bible</span></span></h1>
             <p>A free, open-source Bible reader — and a worked example of building a real app on the <a href="https://api.iqbible.com" target="_blank" rel="noopener">IQ Bible API</a>. Every feature here comes from a real API call.</p>
+            <a class="about-hero-cta" href="https://iqbible.com" target="_blank" rel="noopener">Learn more about what IQ Bible is &rarr;</a>
           </div>
 
           <div class="about-section-label">What It Demonstrates</div>
@@ -540,7 +541,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
             </div>
           </div>
 
-          <p class="hint about-version"><span class="wm">IQ <span>Bible</span></span> App v<span id="aboutVersion" data-app-version></span></p>
+          <p class="hint about-version"><a href="https://iqbible.com" target="_blank" rel="noopener" class="wm-link"><span class="wm">IQ <span>Bible</span></span></a> App v<span id="aboutVersion" data-app-version></span></p>
         </div>
       </div>
 
@@ -798,7 +799,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
     <button class="navitem" data-nav="help" onclick="navMenuClick('help');closeMoreMenu()">Help</button>
     <button class="navitem" data-nav="about" onclick="navMenuClick('about');closeMoreMenu()">About</button>
     <button class="navitem" data-nav="settings" onclick="navMenuClick('settings');closeMoreMenu()">Settings</button>
-    <div class="navfooter navfooter-sheet">&copy;&nbsp;<span data-app-year></span>&nbsp;<span class="wm">IQ&nbsp;<span>Bible</span></span><span class="navfoot-ver">v<span data-app-version></span> &middot; <a href="https://api.iqbible.com" target="_blank" rel="noopener">API</a></span></div>
+    <div class="navfooter navfooter-sheet">&copy;&nbsp;<span data-app-year></span>&nbsp;<a href="https://iqbible.com" target="_blank" rel="noopener" class="wm-link"><span class="wm">IQ&nbsp;<span>Bible</span></span></a><span class="navfoot-ver">v<span data-app-version></span> &middot; <a href="https://api.iqbible.com" target="_blank" rel="noopener">API</a></span></div>
   </div>
 
   <!-- API key gate — shown whenever no key is set (first load, or after
@@ -822,10 +823,10 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
         <div class="row"><h2 id="versionPickerTitle">Choose a translation</h2><button class="closebtn" onclick="closeModal('versionPickerScrim')">&times;</button></div>
         <div class="msearch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8"/></svg><input type="text" id="versionSearchInput" placeholder="Search 1,000+ languages or a version name…" oninput="onVersionSearch()" autocomplete="off"></div>
         <div class="mfilters">
-          <button class="filter-chip" id="audioFilterChip" onclick="toggleAudioFilter()">
-            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 5V4L8 9H4Z"/><path d="M17 8a5 5 0 0 1 0 8"/></svg>
-            Has audio
-          </button>
+          <label class="mfilter-check">
+            <input type="checkbox" id="audioFilterCheck" onchange="toggleAudioFilter()">
+            Only translations with audio narration
+          </label>
         </div>
       </div>
       <div class="langrow" id="langRow"></div>

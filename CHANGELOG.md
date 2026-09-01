@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file. This CHANGE
 
 ## [Unreleased]
 
+## [1.14.0] - 2026-08-31
+- **added:** About page now has a prominent "Learn more about what IQ Bible is" button linking
+  out to iqbible.com, under the top description.
+- **changed:** The "IQ Bible" wordmark in the left-rail footer, the mobile "More" menu footer, and
+  the About page version line is now a link to iqbible.com (no underline, to keep the wordmark
+  clean). The left-rail footer's "© <year> IQ Bible" line is also slightly larger.
+- **changed:** The translation picker's audio filter is now a labelled checkbox ("Only
+  translations with audio narration") instead of a "Has audio" chip that didn't read as a toggle.
+
 ## [1.13.1] - 2026-08-31
 - **fixed:** On the hosted instance, running a search fired the "set your API key in Settings"
   gate — the one gate that checked only for a missing key without the `IS_HOSTED_INSTANCE`

@@ -101,7 +101,7 @@ async function openVersionPicker(mode) {
   await loadCatalog();
   versionPickerLang = getLastLang();
   versionPickerAudioOnly = false;
-  document.getElementById("audioFilterChip").classList.remove("active");
+  document.getElementById("audioFilterCheck").checked = false;
   renderLangRow();
   renderVersionList("");
   // Skip autofocus below the mobile breakpoint (1180px, matching every other
@@ -131,7 +131,7 @@ function renderLangRow() {
 function pickLang(l) { versionPickerLang = l; setLastLang(l); renderLangRow(); renderVersionList(document.getElementById("versionSearchInput").value); }
 function toggleAudioFilter() {
   versionPickerAudioOnly = !versionPickerAudioOnly;
-  document.getElementById("audioFilterChip").classList.toggle("active", versionPickerAudioOnly);
+  document.getElementById("audioFilterCheck").checked = versionPickerAudioOnly;
   renderVersionList(document.getElementById("versionSearchInput").value);
 }
 function onVersionSearch() { renderVersionList(document.getElementById("versionSearchInput").value); }
