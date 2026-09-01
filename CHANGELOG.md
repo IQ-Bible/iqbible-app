@@ -3,7 +3,13 @@
 All notable changes to this project will be documented in this file. This CHANGELOG follows SemVer, see https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
-- n/a
+
+## [1.13.1] - 2026-08-31
+- **fixed:** On the hosted instance, running a search fired the "set your API key in Settings"
+  gate — the one gate that checked only for a missing key without the `IS_HOSTED_INSTANCE`
+  exemption every other gate has. Because the gate's lockdown only lifts on a fresh load after a
+  key is saved, and there's no key to save there, the app stayed blocked. Search now honours the
+  hosted-instance exemption like the rest of the app.
 
 ## [1.13.0] - 2026-08-31
 - **changed:** The mobile bottom bar is reworked (issue #247). **Notes** is now one of the five

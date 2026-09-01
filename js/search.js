@@ -29,7 +29,8 @@ function onOverlayType() {
   document.getElementById("overlayLoadMore").style.display = "none";
 }
 async function overlaySearch(reset = true) {
-  if (!getApiKey()) { closeSearch(); showKeyBanner(); return; }
+  // Hosted instance proxies a key server-side, so "no key set" is fine there.
+  if (!IS_HOSTED_INSTANCE && !getApiKey()) { closeSearch(); showKeyBanner(); return; }
   let query = document.getElementById("overlaySearchInput").value.trim();
   if (!query) return;
   // match=all/phrase tells the API how to combine multiple words (AND vs.
