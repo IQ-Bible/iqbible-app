@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file. This CHANGELOG follows SemVer, see https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
+- n/a
+
+## [1.15.0] - 2026-09-03
+- **added:** Open Graph / Twitter card metadata in `index.html` and `404.html`, so a
+  shared `app.iqbible.com` link unfurls as a real 1,200×630 card (the IQ Bible lockup, the
+  "Raise your Bible IQ" line, and the study feature set) instead of a bare favicon. New asset
+  `img/iqbible-og-card.png`. The `?v=` on the image URL is a manual cache-buster — bump it when
+  the card art changes, since social scrapers cache by URL and ignore `ETag`.
 
 ## [1.14.0] - 2026-08-31
 - **added:** About page now has a prominent "Learn more about what IQ Bible is" button linking

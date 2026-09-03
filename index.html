@@ -22,6 +22,21 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="IQ Bible">
+<!-- Open Graph / Twitter card. Absolute URLs — scrapers don't run the app's JS
+     or resolve <base>. Bump ?v= whenever img/iqbible-og-card.png changes so
+     cached unfurls refresh (scrapers key on the URL and ignore ETag). -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="IQ Bible">
+<meta property="og:title" content="IQ Bible">
+<meta property="og:description" content="A free, open-source Bible study app — Scripture in 1,400+ translations, original Hebrew and Greek, Strong's lexicons, commentary, cross-references, and audio narration.">
+<meta property="og:url" content="https://app.iqbible.com/">
+<meta property="og:image" content="https://app.iqbible.com/img/iqbible-og-card.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="IQ Bible">
+<meta name="twitter:description" content="A free, open-source Bible study app — Scripture in 1,400+ translations, original Hebrew and Greek, Strong's lexicons, commentary, cross-references, and audio narration.">
+<meta name="twitter:image" content="https://app.iqbible.com/img/iqbible-og-card.png?v=1">
 <!-- Leaflet — the app's one runtime dependency, added specifically so place
      maps can use English-labeled (Esri World Street Map) tiles for the
      interactive lightbox view; OpenStreetMap's own embeddable page has no
