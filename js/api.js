@@ -144,14 +144,22 @@ async function apiFetch(url, opts = {}) {
 // The API's own error envelope ({status,error:{code,message,detail,hint,...}}
 // — see the private backend's apierror.go, never linked publicly) is
 // genuinely descriptive; this app just wasn't reading past `.error.code`
-// before. 429/5xx now surface everything it sends — message, detail, hint,
-// and (for a 429) the full X-RateLimit-*/Retry-After picture — in a modal
-// that has to be dismissed, so a developer testing against a free-tier key
-// actually sees what happened and why instead of a feature just quietly not
-// rendering. A routine 404 (this app relies on those constantly — "no
+// before. 429/5xx and 401/403 now surface everything it sends — message,
+// detail, hint, and (for a 429) the full X-RateLimit-*/Retry-After picture —
+// in a modal that has to be dismissed, so a developer testing against a
+// free-tier key actually sees what happened and why instead of a feature
+// just quietly not rendering. 401/403 is the case that reads worst without
+// this: the API returns `api_key_required` for an *unrecognized* key, not
+// only a missing one, so a stale/mistyped key otherwise shows up as a bare
+// "api_key_required" errnote that looks like "no key set" when a key very
+// much is set — the modal's Message/Hint rows make "your key was refused"
+// unambiguous. A routine 404 (this app relies on those constantly — "no
 // illustrations/places/people for this chapter" is a normal response,
 // not a problem) still just toasts; a blocking modal on every one of those
 // would make ordinary browsing unusable.
+// A bad key at boot fails 5-6 catalog/chapter calls in a row — the modal is
+// shown once per page load (authErrorShown) so it doesn't thrash.
+let authErrorShown = false;
 const RATE_LIMIT_HEADER_SCOPES = [
   { suffix: "", label: "Per-minute" },
   { suffix: "-Month", label: "Monthly" },
@@ -199,6 +207,10 @@ async function apiJSON(path) {
     try { body = await res.clone().json(); } catch (_) { }
     const code = (body && body.error && body.error.code) || "http_" + res.status;
     if (res.status === 429 || res.status >= 500) showApiErrorModal(res.status, body, res.headers, path);
+    else if ((res.status === 401 || res.status === 403) && !authErrorShown) {
+      authErrorShown = true;
+      showApiErrorModal(res.status, body, res.headers, path);
+    }
     // A 404 is routine, expected control flow throughout this app — "no
     // illustrations/places/people/dictionary entry/genealogy record for
     // this" happens dozens of times per chapter by design, not a problem

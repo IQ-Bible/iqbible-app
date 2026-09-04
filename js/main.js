@@ -179,7 +179,15 @@ function closeImageView() {
 }
 document.addEventListener("click", e => {
   const img = e.target.closest(".inline-illust img, .place-thumb");
-  if (img) { openImageView(img.src, img.alt || "", { grayscale: !!img.closest(".inline-illust") }); return; }
+  if (img) {
+    const inline = img.closest(".inline-illust");
+    // Inline plates paint from a small srcset rung (see loadInlineIllustrations);
+    // the zoomed lightbox is the one place the full master is worth pulling, and
+    // data-full carries its URL. (Falls back to img.src for older markup.)
+    const url = inline ? (img.dataset.full || img.src) : img.src;
+    openImageView(url, img.alt || "", { grayscale: !!inline });
+    return;
+  }
   const mapWrap = e.target.closest(".place-map-wrap");
   if (mapWrap) openMapView(parseFloat(mapWrap.dataset.lat), parseFloat(mapWrap.dataset.lon), mapWrap.dataset.label || "");
 });

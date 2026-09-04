@@ -10,14 +10,21 @@ The hosted instance runs at **[app.iqbible.com](https://app.iqbible.com)** — n
 
 ## Running it locally
 
-No build step, no dependencies. Any of these work:
+No build step, no dependencies — but you do need to serve it over HTTP from the project root. Any static file server works:
 
-- Double-click `index.html` and open it directly in your browser.
-- Or serve it locally with any static file server, e.g. `npx serve .` or `python -m http.server`.
+```sh
+npx serve .            # Node — http://localhost:3000
+python -m http.server  # Python 3 — http://localhost:8000
+php -S localhost:8000  # PHP
+```
+
+Or use VS Code's **Live Server** extension (right-click `index.html` → "Open with Live Server").
+
+**Opening `index.html` directly via `file://` (double-clicking it) does not work** — the page uses `<base href="/">` for its client-side routing, so under `file://` the browser looks for the CSS and JS at your filesystem root and loads none of it. You'll get bare, unstyled HTML.
 
 Run locally (or self-hosted anywhere that isn't `app.iqbible.com`) and you'll see a banner asking for an API key the first time you open it — see below.
 
-Deep links (`/gen/1`, `/gen/1/1`, etc.) are resolved client-side by `js/router.js`, so they only work on a fresh page load if the server falls back to `index.html` for unmatched paths — the same thing `404.html`/`_redirects` do in production (see "Deploying your own copy" below). Plain `npx serve .` and VS Code's Live Server extension don't do this, so loading a deep link directly (rather than navigating to it from within the app) 404s. Use `npx serve . -s` (the `-s`/`--single` flag enables that fallback) if you need to test deep links locally.
+Deep links (`/gen/1`, `/gen/1/1`, etc.) are resolved client-side by `js/router.js`, so they only work on a fresh page load if the server falls back to `index.html` for unmatched paths — the same thing `404.html`/`_redirects` do in production (see "Deploying your own copy" below). Plain `npx serve .`, `python -m http.server`, and VS Code's Live Server don't do this, so loading a deep link directly (rather than navigating to it from within the app) 404s. Use `npx serve . -s` (the `-s`/`--single` flag enables that fallback) if you need to test deep links locally.
 
 ## Get an API key
 

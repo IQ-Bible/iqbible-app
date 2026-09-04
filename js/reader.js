@@ -52,6 +52,11 @@ async function loadChapter(chapter, refreshMeta, verse, verseEnd) {
       // switch offer; this is the backstop for a direct load.
       const what = e.message === "book_not_found" ? escHtml(current.bookName) : `${escHtml(current.bookName)} ${chapter}`;
       document.getElementById("readingText").innerHTML = `<div class="errnote">${what} isn't in ${escHtml(current.versionTitle)}. Switch to a translation that includes it to read it.</div>`;
+    } else if (e.status === 401 || e.status === 403) {
+      // The API returns api_key_required for an unrecognized key too, not just
+      // a missing one — so this is "the key you have is being refused," not
+      // "add a key." The full message/hint is in the error modal apiJSON opened.
+      document.getElementById("readingText").innerHTML = `<div class="errnote">Could not load ${escHtml(current.bookName)} ${chapter} — the API key in <a href="#" onclick="openSettings();return false">Settings</a> was refused. Check that it's current and entered correctly.</div>`;
     } else if (e.message !== "no_api_key") {
       document.getElementById("readingText").innerHTML = `<div class="errnote">Could not load ${escHtml(current.bookName)} ${chapter}. ${escHtml(e.message)}</div>`;
     }
@@ -1081,6 +1086,11 @@ async function loadInlineIllustrations() {
   const pack = getIllustPack();
   if (pack === "off") return;
   try {
+    // Each data[] entry carries an `image` object with a pre-formatted srcset
+    // ladder (320/640/960/1280/1920w, WebP or JPEG per Accept) plus `full` (the
+    // untouched master, for the zoom lightbox). The inline figure is size-
+    // independent — the browser picks 320/640 off srcset+sizes — so there's no
+    // ?size= on the request anymore.
     const d = await apiJSONCached(`/illustrations/${current.book}/${current.chapter}?artist=${pack}`);
     const raw = d.data || [];
     // Past this many plates in one chapter (a Matthew 17-style chapter under
@@ -1137,7 +1147,16 @@ function insertInlineIllust(target, img, index, afterTarget) {
   // landed in storage yet — onerror removes the whole figure rather than
   // leaving a broken-image icon and an orphaned caption sitting in the
   // reading column.
-  fig.innerHTML = `<img src="${escHtml(img.url)}" alt="${escHtml(img.caption || "")}" onerror="this.closest('.inline-illust').remove()"><div class="cap">${escHtml(img.caption || "")}${img.artist ? ` — ${escHtml(img.artist)}` : ""}</div>`;
+  // lazy/async: a long chapter can carry a dozen plates, most below the fold —
+  // only decode the ones near the viewport. srcset+sizes let the browser pull
+  // the 320w/640w rung (WebP-negotiated) for the ~260px figure instead of the
+  // multi-MB master; data-full is the untouched master, loaded only if the
+  // lightbox opens (see js/main.js). Older API responses without `image` fall
+  // back to the master URL.
+  const src = img.image ? img.image.src : img.url;
+  const srcsetAttr = img.image && img.image.srcset ? ` srcset="${escHtml(img.image.srcset.join(", "))}" sizes="(max-width: 640px) 92vw, 260px"` : "";
+  const fullAttr = ` data-full="${escHtml((img.image && img.image.full) || img.url)}"`;
+  fig.innerHTML = `<img src="${escHtml(src)}"${srcsetAttr}${fullAttr} alt="${escHtml(img.caption || "")}" loading="lazy" decoding="async" onerror="this.closest('.inline-illust').remove()"><div class="cap">${escHtml(img.caption || "")}${img.artist ? ` — ${escHtml(img.artist)}` : ""}</div>`;
   // A plate tagged to the chapter's first verse would otherwise land above
   // the dropcap, before any text has rendered at all — insert it after that
   // verse instead so the opening sentence reads before the image does.

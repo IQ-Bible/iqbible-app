@@ -3,7 +3,30 @@
 All notable changes to this project will be documented in this file. This CHANGELOG follows SemVer, see https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
-- n/a
+
+## [1.16.0] - 2026-09-04
+- **changed:** A `401`/`403` from the API now opens the same descriptive error modal that `429`
+  and `5xx` already did (code, message, hint), instead of a bare toast + an errnote showing only
+  the raw error code. This matters most for a refused API key: the API returns `api_key_required`
+  for an *unrecognized* key, not only a missing one, so a stale or mistyped key used to surface as
+  "Could not load Genesis 1. api_key_required" — which reads like "no key set" when a key is in
+  fact set. The modal's Message/Hint rows now make "your key was refused" unambiguous. Shown once
+  per page load so a bad key failing several calls in a row doesn't stack modals. The reader's
+  own inline error for a refused key now says so in plain language, with a link to Settings,
+  instead of echoing the raw `api_key_required` code.
+- **docs:** `README.md`'s "Running it locally" section no longer claims you can double-click
+  `index.html` and open it via `file://` — that stopped working when `<base href="/">` was added
+  (assets resolve against the filesystem root and don't load). It now lists concrete static-server
+  commands (`npx serve .`, `python -m http.server`, `php -S`, VS Code Live Server) instead.
+- **changed:** Inline chapter illustrations now use the API's responsive image bundle. Every
+  `/illustrations` entry carries an `image` object with a pre-formatted `srcset` ladder
+  (320–1920w, served as WebP or JPEG per the request's `Accept`) plus `full`, the untouched
+  master. The inline `<img>` now ships `srcset` + `sizes` so the browser paints the 320w/640w rung
+  (WebP-negotiated) for the ~260px figure instead of the 1–3 MB master it pulled before, and keeps
+  `loading="lazy"` + `decoding="async"` so below-the-fold plates don't load or decode on first
+  paint. The full-view lightbox loads `image.full` only when a plate is tapped to zoom. The
+  `?size=` request param (and the earlier client-side `/medium/`→`/high/` URL swap) are gone.
+  Falls back to the old master URL if `image` is absent.
 
 ## [1.15.0] - 2026-09-03
 - **added:** Open Graph / Twitter card metadata in `index.html` and `404.html`, so a
