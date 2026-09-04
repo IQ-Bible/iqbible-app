@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file. This CHANGE
 
 ## [Unreleased]
 
+## [1.16.2] - 2026-09-04
+- **fixed:** Inline chapter illustrations no longer make the reading column jump around as they
+  load. Two causes: the plate data came from a second API call fired *after* the chapter text had
+  already painted, and each `<img>` reserved no height so it snapped from nothing to full size on
+  load — several plates doing that at staggered times read as choppy. Now the illustrations fetch
+  runs concurrently with the chapter-text fetch, and the figures are held hidden until their
+  images have decoded, then revealed together — so the column settles once instead of once per
+  plate. Off-screen plates still reveal immediately (the reader isn't looking, and scroll
+  anchoring holds their place). Exact space reservation needs per-image dimensions the API doesn't
+  return yet — logged as an API gap (`NOTES.md`); until then a single small settle remains.
+
 ## [1.16.1] - 2026-09-04
 - **fixed:** The full-view illustration lightbox pulled `image.full` — the untouched 1–3 MB JPEG
   master — on every zoom tap. It now reuses the inline figure's own `srcset` ladder at

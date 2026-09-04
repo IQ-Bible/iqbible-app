@@ -24,6 +24,10 @@ async function loadChapter(chapter, refreshMeta, verse, verseEnd) {
   if (refreshMeta) await loadChapterMeta();
 
   try {
+    // Kick the illustrations fetch off now so it runs alongside the chapter-text
+    // request rather than after render — loadInlineIllustrations() below picks up
+    // the shared in-flight promise.
+    prefetchInlineIllustrations();
     const data = await apiJSONCached(`/bibles/${current.version}/${current.book}/${chapter}?include=words_of_jesus`);
     if (!(data.data || []).length) {
       // A verse range that overshoots a real chapter still 200s with the
@@ -1082,6 +1086,16 @@ function renderChapterCtxChips() {
    plates carry a real reference.verse (the start of their tagged range),
    so each one is inserted right before that verse. Which artist pack (or
    none) is a Settings pref — see getIllustPack/setIllustPack in api.js. */
+// Fired concurrently with the chapter-text fetch (in loadChapter), not after
+// render — so the plate data is usually in hand by the time the text paints and
+// the figures insert in one pass instead of arriving a few hundred ms late and
+// reflowing the column. apiJSONCached shares the in-flight promise, so the
+// loadInlineIllustrations() call after render gets this same request for free.
+function prefetchInlineIllustrations() {
+  const pack = getIllustPack();
+  if (pack === "off") return;
+  apiJSONCached(`/illustrations/${current.book}/${current.chapter}?artist=${pack}`).catch(() => {});
+}
 async function loadInlineIllustrations() {
   const pack = getIllustPack();
   if (pack === "off") return;
@@ -1117,6 +1131,7 @@ async function loadInlineIllustrations() {
     // an exact one.
     const unresolvedCount = all.filter(img => !(img.reference && img.reference.verse)).length;
     let unresolvedIdx = 0;
+    const figs = [];
     all.forEach((img, i) => {
       const verse = img.reference && img.reference.verse;
       let target;
@@ -1127,9 +1142,34 @@ async function loadInlineIllustrations() {
         target = spans[slot];
         unresolvedIdx++;
       }
-      insertInlineIllust(target, img, i, target === spans[0]);
+      const fig = insertInlineIllust(target, img, i, target === spans[0]);
+      if (fig) figs.push(fig);
     });
+    revealIllustBatch(figs);
   } catch (e) { /* no illustrations on file for this chapter — fine, nothing to show */ }
+}
+// The API's `image` object carries no dimensions, so a figure can't reserve its
+// exact height before the plate loads — every plate landing at its own time
+// would reflow the column N times, choppily. Instead each figure is inserted
+// hidden (.illust-loading) and the ones in/near the viewport are revealed
+// together in one frame once their images have decoded — one settle, not a
+// cascade. Off-screen figures are shown straight away: they can pop without the
+// reader seeing it, and scroll anchoring keeps their position. Exact
+// reservation needs per-image width/height from the API — flagged in NOTES.md.
+function revealIllustBatch(figs) {
+  if (!figs.length) return;
+  const vh = window.innerHeight || 800;
+  const show = f => f.classList.remove("illust-loading");
+  const near = figs.filter(f => {
+    const r = f.getBoundingClientRect();
+    return r.top < vh * 1.5 && r.bottom > -vh * 0.5;
+  });
+  figs.forEach(f => { if (!near.includes(f)) show(f); });
+  if (!near.length) return;
+  const imgs = near.map(f => f.querySelector("img")).filter(im => im && im.decode);
+  Promise.allSettled(imgs.map(im => im.decode())).then(() => near.forEach(show));
+  // decode() can hang on a slow connection — never leave a figure hidden.
+  setTimeout(() => near.forEach(show), 2500);
 }
 // Re-renders inline illustrations for the chapter already on screen, for
 // when the illustration-pack Settings pref changes mid-view (a fresh
@@ -1139,20 +1179,22 @@ function refreshInlineIllustrations() {
   loadInlineIllustrations();
 }
 function insertInlineIllust(target, img, index, afterTarget) {
-  if (!target) return;
+  if (!target) return null;
   const fig = document.createElement("div");
-  fig.className = "inline-illust" + (index % 2 === 0 ? " illust-left" : "");
+  // illust-loading (visibility:hidden) until revealIllustBatch shows it — see
+  // there for why the reveal is batched rather than per-image.
+  fig.className = "inline-illust illust-loading" + (index % 2 === 0 ? " illust-left" : "");
   // A staged work can have a DB row (so it passes the API's own "any
   // illustrations here?" check) without its image object actually having
   // landed in storage yet — onerror removes the whole figure rather than
   // leaving a broken-image icon and an orphaned caption sitting in the
   // reading column.
-  // lazy/async: a long chapter can carry a dozen plates, most below the fold —
-  // only decode the ones near the viewport. srcset+sizes let the browser pull
-  // the 320w/640w rung (WebP-negotiated) for the ~260px figure instead of the
-  // multi-MB master; the lightbox reuses this same srcset at sizes="100vw" to
-  // land on a large WebP rung rather than re-fetching the master (see
-  // js/main.js). Older API responses without `image` fall back to the master.
+  // lazy/async: a long chapter can carry a dozen plates, most below the fold.
+  // srcset+sizes let the browser pull the 320w/640w rung (WebP-negotiated) for
+  // the ~260px figure instead of the multi-MB master; the lightbox reuses this
+  // same srcset at sizes="100vw" to land on a large WebP rung rather than
+  // re-fetching the master (see js/main.js). Older API responses without `image`
+  // fall back to the master. Reveal timing is handled in revealIllustBatch.
   const src = img.image ? img.image.src : img.url;
   const srcsetAttr = img.image && img.image.srcset ? ` srcset="${escHtml(img.image.srcset.join(", "))}" sizes="(max-width: 640px) 92vw, 260px"` : "";
   fig.innerHTML = `<img src="${escHtml(src)}"${srcsetAttr} alt="${escHtml(img.caption || "")}" loading="lazy" decoding="async" onerror="this.closest('.inline-illust').remove()"><div class="cap">${escHtml(img.caption || "")}${img.artist ? ` — ${escHtml(img.artist)}` : ""}</div>`;
@@ -1161,6 +1203,7 @@ function insertInlineIllust(target, img, index, afterTarget) {
   // verse instead so the opening sentence reads before the image does.
   if (afterTarget) target.parentNode.insertBefore(fig, target.nextSibling);
   else target.parentNode.insertBefore(fig, target);
+  return fig;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
