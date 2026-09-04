@@ -1087,10 +1087,10 @@ async function loadInlineIllustrations() {
   if (pack === "off") return;
   try {
     // Each data[] entry carries an `image` object with a pre-formatted srcset
-    // ladder (320/640/960/1280/1920w, WebP or JPEG per Accept) plus `full` (the
-    // untouched master, for the zoom lightbox). The inline figure is size-
-    // independent — the browser picks 320/640 off srcset+sizes — so there's no
-    // ?size= on the request anymore.
+    // ladder (320/640/960/1280/1920w, WebP or JPEG per Accept). The figure is
+    // size-independent — the browser picks a rung off srcset+sizes — so there's
+    // no ?size= on the request anymore. (`image.full`, the untouched master, is
+    // not used: the lightbox reads the top of this same ladder instead.)
     const d = await apiJSONCached(`/illustrations/${current.book}/${current.chapter}?artist=${pack}`);
     const raw = d.data || [];
     // Past this many plates in one chapter (a Matthew 17-style chapter under
@@ -1150,13 +1150,12 @@ function insertInlineIllust(target, img, index, afterTarget) {
   // lazy/async: a long chapter can carry a dozen plates, most below the fold —
   // only decode the ones near the viewport. srcset+sizes let the browser pull
   // the 320w/640w rung (WebP-negotiated) for the ~260px figure instead of the
-  // multi-MB master; data-full is the untouched master, loaded only if the
-  // lightbox opens (see js/main.js). Older API responses without `image` fall
-  // back to the master URL.
+  // multi-MB master; the lightbox reuses this same srcset at sizes="100vw" to
+  // land on a large WebP rung rather than re-fetching the master (see
+  // js/main.js). Older API responses without `image` fall back to the master.
   const src = img.image ? img.image.src : img.url;
   const srcsetAttr = img.image && img.image.srcset ? ` srcset="${escHtml(img.image.srcset.join(", "))}" sizes="(max-width: 640px) 92vw, 260px"` : "";
-  const fullAttr = ` data-full="${escHtml((img.image && img.image.full) || img.url)}"`;
-  fig.innerHTML = `<img src="${escHtml(src)}"${srcsetAttr}${fullAttr} alt="${escHtml(img.caption || "")}" loading="lazy" decoding="async" onerror="this.closest('.inline-illust').remove()"><div class="cap">${escHtml(img.caption || "")}${img.artist ? ` — ${escHtml(img.artist)}` : ""}</div>`;
+  fig.innerHTML = `<img src="${escHtml(src)}"${srcsetAttr} alt="${escHtml(img.caption || "")}" loading="lazy" decoding="async" onerror="this.closest('.inline-illust').remove()"><div class="cap">${escHtml(img.caption || "")}${img.artist ? ` — ${escHtml(img.artist)}` : ""}</div>`;
   // A plate tagged to the chapter's first verse would otherwise land above
   // the dropcap, before any text has rendered at all — insert it after that
   // verse instead so the opening sentence reads before the image does.

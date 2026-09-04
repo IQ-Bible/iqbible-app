@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file. This CHANGE
 
 ## [Unreleased]
 
+## [1.16.1] - 2026-09-04
+- **fixed:** The full-view illustration lightbox pulled `image.full` — the untouched 1–3 MB JPEG
+  master — on every zoom tap. It now reuses the inline figure's own `srcset` ladder at
+  `sizes="100vw"`, so a zoom tap lands on a large WebP rung (~200–400 KB, browser-picked for the
+  device) instead. Indistinguishable on screen; `image.full` stays the right source only for a
+  future "download this plate" affordance.
+
 ## [1.16.0] - 2026-09-04
 - **changed:** A `401`/`403` from the API now opens the same descriptive error modal that `429`
   and `5xx` already did (code, message, hint), instead of a bare toast + an errnote showing only
@@ -24,9 +31,9 @@ All notable changes to this project will be documented in this file. This CHANGE
   master. The inline `<img>` now ships `srcset` + `sizes` so the browser paints the 320w/640w rung
   (WebP-negotiated) for the ~260px figure instead of the 1–3 MB master it pulled before, and keeps
   `loading="lazy"` + `decoding="async"` so below-the-fold plates don't load or decode on first
-  paint. The full-view lightbox loads `image.full` only when a plate is tapped to zoom. The
-  `?size=` request param (and the earlier client-side `/medium/`→`/high/` URL swap) are gone.
-  Falls back to the old master URL if `image` is absent.
+  paint. The full-view lightbox loads `image.full` when a plate is tapped to zoom. The `?size=`
+  request param (and the earlier client-side `/medium/`→`/high/` URL swap) are gone. Falls back to
+  the old master URL if `image` is absent.
 
 ## [1.15.0] - 2026-09-03
 - **added:** Open Graph / Twitter card metadata in `index.html` and `404.html`, so a

@@ -134,6 +134,12 @@ function openImageView(url, caption, opts) {
   document.getElementById("imageViewMap").style.display = "none";
   const img = document.getElementById("imageViewImg");
   img.style.display = "";
+  // An inline illustration passes its srcset ladder through so the zoomed view
+  // lands on a large WebP rung (sizes:100vw) rather than triggering a separate
+  // fetch of the multi-MB JPEG master. Place photos pass no srcset — clear any
+  // left over from a previous open.
+  if (opts && opts.srcset) { img.srcset = opts.srcset; img.sizes = "100vw"; }
+  else { img.removeAttribute("srcset"); img.removeAttribute("sizes"); }
   img.src = url;
   img.alt = caption || "";
   img.classList.toggle("illust-view", !!(opts && opts.grayscale));
@@ -181,11 +187,14 @@ document.addEventListener("click", e => {
   const img = e.target.closest(".inline-illust img, .place-thumb");
   if (img) {
     const inline = img.closest(".inline-illust");
-    // Inline plates paint from a small srcset rung (see loadInlineIllustrations);
-    // the zoomed lightbox is the one place the full master is worth pulling, and
-    // data-full carries its URL. (Falls back to img.src for older markup.)
-    const url = inline ? (img.dataset.full || img.src) : img.src;
-    openImageView(url, img.alt || "", { grayscale: !!inline });
+    // Inline plates carry the full srcset ladder; hand it to the lightbox so the
+    // zoomed view uses a large WebP rung at sizes:100vw instead of the JPEG
+    // master. currentSrc is whichever rung the inline figure already loaded — a
+    // fine src fallback while the browser re-picks for the bigger sizes.
+    openImageView(inline ? img.currentSrc : img.src, img.alt || "", {
+      grayscale: !!inline,
+      srcset: inline ? img.getAttribute("srcset") : null,
+    });
     return;
   }
   const mapWrap = e.target.closest(".place-map-wrap");
