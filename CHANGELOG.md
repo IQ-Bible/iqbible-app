@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file. This CHANGE
 
 ## [Unreleased]
 
+## [1.18.0] - 2026-09-05
+- **added:** "Choose a translation" picker can now favorite a version (★ toggle on each row) — a
+  small chip row above the language filter gives one-tap access to your favorites regardless of
+  whatever language/audio/search filter is currently active in the list below, so a favorite never
+  goes missing just because an unrelated filter is still on. Client-side only, shared across every
+  picker mode (reading, search, plans, compare).
+- **fixed:** Search's Verses/People tab row had no gap from the search input above it (`.lib-tabs`
+  elsewhere always relies on its parent's padding for that, since it's normally the first thing in
+  the overlay — here it isn't). The Mode chip row also had no `flex-wrap`, so on a narrow viewport
+  "Starts with"/"Advanced" ran off-canvas with no way to reach them.
+- **fixed:** The no-results "Search other versions" fallback checked candidate versions without the
+  active Testament/Book/Chapter/Verse filters, so it could report a version as a match purely
+  because the *unfiltered* phrase existed there, then re-run the real search with the filter still
+  on and (correctly, but confusingly) find nothing. The fallback now checks under the same scope as
+  the search that just missed.
+
 ## [1.17.0] - 2026-09-05
 - **added:** Search overhaul (issue #290). The Verses search overlay now exposes all five match
   modes (All/Any/Exact phrase/Starts with/Advanced boolean), an Exclude-words field, Testament and

@@ -910,6 +910,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
       <div class="mhead">
         <div class="row"><h2 id="versionPickerTitle">Choose a translation</h2><button class="closebtn" onclick="closeModal('versionPickerScrim')">&times;</button></div>
         <div class="msearch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8"/></svg><input type="text" id="versionSearchInput" placeholder="Search 1,000+ languages or a version name…" oninput="onVersionSearch()" autocomplete="off"></div>
+        <div class="favrow" id="favRow" style="display:none"></div>
         <div class="mfilters">
           <label class="mfilter-check">
             <input type="checkbox" id="audioFilterCheck" onchange="toggleAudioFilter()">

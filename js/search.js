@@ -188,6 +188,26 @@ function onOverlayType() {
   document.getElementById("overlayLoadMore").style.display = "none";
 }
 
+// Shared by the main search and the no-results fallback below — the fallback
+// has to check other versions under the *same* scope (testament/book/chapter/
+// verse/exclude), or it can report a false "found in 4 other versions" for a
+// phrase that only exists outside the current filter in every version, not
+// just this one (e.g. an NT-only phrase with Testament set to OT).
+function buildSearchScopeParams(mode) {
+  const p = new URLSearchParams();
+  if (mode !== "boolean") {
+    const exclude = document.getElementById("searchExcludeInput").value.trim();
+    if (exclude) p.set("exclude", exclude);
+  }
+  if (overlaySelectedBooks.size) p.set("book", Array.from(overlaySelectedBooks).join(","));
+  else if (overlayTestament) p.set("testament", overlayTestament);
+  const chapter = document.getElementById("searchChapterInput").value.trim();
+  if (chapter) p.set("chapter", chapter);
+  const verse = document.getElementById("searchVerseInput").value.trim();
+  if (verse) p.set("verse", verse);
+  return p;
+}
+
 /* ── Verses tab search ── */
 async function overlaySearch(reset = true) {
   hideSearchHistory();
@@ -200,19 +220,9 @@ async function overlaySearch(reset = true) {
   if (reset) _searchToken++;
   const token = _searchToken;
 
-  const params = new URLSearchParams();
+  const params = buildSearchScopeParams(mode);
   params.set("q", query);
   params.set("match", mode);
-  if (mode !== "boolean") {
-    const exclude = document.getElementById("searchExcludeInput").value.trim();
-    if (exclude) params.set("exclude", exclude);
-  }
-  if (overlaySelectedBooks.size) params.set("book", Array.from(overlaySelectedBooks).join(","));
-  else if (overlayTestament) params.set("testament", overlayTestament);
-  const chapter = document.getElementById("searchChapterInput").value.trim();
-  if (chapter) params.set("chapter", chapter);
-  const verse = document.getElementById("searchVerseInput").value.trim();
-  if (verse) params.set("verse", verse);
   params.set("sort", overlaySort);
   params.set("highlight", "1");
   params.set("limit", "15");
@@ -341,10 +351,13 @@ async function showNoResultsFallback(query, mode, version, token) {
 async function runFallbackVersionSearch(query, mode, candidates, btn) {
   btn.disabled = true; btn.textContent = "Searching…";
   const area = document.getElementById("fallbackResultsArea");
+  const scopeParams = buildSearchScopeParams(mode); // same testament/book/chapter/verse/exclude as the search that just missed
   const hits = [];
   await Promise.all(candidates.map(async id => {
     try {
-      const res = await apiFetch(`${API_BASE}/bibles/${id}/search?q=${encodeURIComponent(query)}&match=${mode}&count=1&limit=1`);
+      const p = new URLSearchParams(scopeParams);
+      p.set("q", query); p.set("match", mode); p.set("count", "1"); p.set("limit", "1");
+      const res = await apiFetch(`${API_BASE}/bibles/${id}/search?${p.toString()}`);
       const data = await res.json();
       if (data.total_matches) {
         const v = (catalog || []).find(x => x.version_id === id);

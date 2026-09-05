@@ -104,6 +104,7 @@ async function openVersionPicker(mode) {
   versionPickerLang = getLastLang();
   versionPickerAudioOnly = false;
   document.getElementById("audioFilterCheck").checked = false;
+  renderFavRow();
   renderLangRow();
   renderVersionList("");
   // Skip autofocus below the mobile breakpoint (1180px, matching every other
@@ -138,6 +139,54 @@ function toggleAudioFilter() {
   renderVersionList(document.getElementById("versionSearchInput").value);
 }
 function onVersionSearch() { renderVersionList(document.getElementById("versionSearchInput").value); }
+
+/* ── favorite translations — a star per row in the picker to favorite/
+   unfavorite, plus a small standalone chip row (#favRow, styled like the
+   existing #langRow) above the list for one-tap access — not a section
+   mixed into the scrollable list itself. Pure client-side (localStorage),
+   global across every picker mode — a favorite translation is a favorite
+   regardless of why you opened the picker. */
+const LS_FAV_VERSIONS = "iqb_fav_versions";
+function getFavoriteVersions() {
+  try { return new Set(JSON.parse(localStorage.getItem(LS_FAV_VERSIONS) || "[]")); }
+  catch (e) { return new Set(); }
+}
+function toggleFavoriteVersion(id) {
+  const favs = getFavoriteVersions();
+  if (favs.has(id)) favs.delete(id); else favs.add(id);
+  localStorage.setItem(LS_FAV_VERSIONS, JSON.stringify(Array.from(favs)));
+  renderFavRow();
+  renderVersionList(document.getElementById("versionSearchInput").value);
+}
+function renderFavRow() {
+  const row = document.getElementById("favRow");
+  if (!row) return;
+  const favs = getFavoriteVersions();
+  const favVersions = (catalog || []).filter(v => favs.has(v.version_id))
+    .sort((a, b) => (a.title || "").localeCompare(b.title || ""));
+  if (!favVersions.length) { row.innerHTML = ""; row.style.display = "none"; return; }
+  row.style.display = "flex";
+  row.innerHTML = `<span class="filter-label favrow-label">Favorites</span>` + favVersions.map(v =>
+    `<button type="button" class="favchip" onclick="pickVersionRow('${v.version_id}')" title="${escHtml(v.title || v.version_id)}">★ ${escHtml(shortVersionLabel(v.title) || v.version_id)}</button>`
+  ).join("");
+}
+function versionRowHtml(v, favs) {
+  const on = versionPickerMode === "navigate"
+    ? v.version_id === current.version
+    : versionPickerMode === "plan"
+    ? v.version_id === planTargetVersion().id
+    : versionPickerMode === "search"
+    ? v.version_id === overlaySearchVersion
+    : compareTargetList(versionPickerMode).includes(v.version_id);
+  const audioBit = v.audio_count > 0
+    ? `<span class="audiobadge" title="${v.audio_count > 1 ? v.audio_count + ' narrations available' : 'Audio narration available'}">${AUDIO_ICON}${v.audio_count > 1 ? ` ×${v.audio_count}` : ""}</span>`
+    : "";
+  const isFav = favs.has(v.version_id);
+  return `<div class="vrow ${on ? 'on' : ''}" onclick="pickVersionRow('${v.version_id}')">
+      <div><div class="vt">${escHtml(v.title || v.version_id)}</div><div class="vd">${escHtml(v.language_name || "")}${audioBit}</div></div>
+      <button type="button" class="fav-star ${isFav ? 'on' : ''}" onclick="event.stopPropagation(); toggleFavoriteVersion('${v.version_id}')" aria-label="${isFav ? 'Remove from favorites' : 'Add to favorites'}" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">${isFav ? '★' : '☆'}</button>
+    </div>`;
+}
 function renderVersionList(q) {
   q = (q || "").trim().toLowerCase();
   let rows = (catalog || []);
@@ -154,6 +203,7 @@ function renderVersionList(q) {
   const list = document.getElementById("versionList");
   if (!rows.length) { list.innerHTML = `<div class="emptynote" style="padding:24px">No matching translation. Try a language name, code (e.g. "spa"), or version title.</div>`; return; }
 
+  const favs = getFavoriteVersions();
   let html = "";
   let lastLang = null;
   rows.sort((a, b) => (a.language_name || "").localeCompare(b.language_name || "") || (a.title || "").localeCompare(b.title || ""));
@@ -162,19 +212,7 @@ function renderVersionList(q) {
       lastLang = v.language_name;
       html += `<div class="glabel">${escHtml(lastLang || "Other")}</div>`;
     }
-    const on = versionPickerMode === "navigate"
-      ? v.version_id === current.version
-      : versionPickerMode === "plan"
-      ? v.version_id === planTargetVersion().id
-      : versionPickerMode === "search"
-      ? v.version_id === overlaySearchVersion
-      : compareTargetList(versionPickerMode).includes(v.version_id);
-    const audioBit = v.audio_count > 0
-      ? `<span class="audiobadge" title="${v.audio_count > 1 ? v.audio_count + ' narrations available' : 'Audio narration available'}">${AUDIO_ICON}${v.audio_count > 1 ? ` ×${v.audio_count}` : ""}</span>`
-      : "";
-    html += `<div class="vrow ${on ? 'on' : ''}" onclick="pickVersionRow('${v.version_id}')">
-      <div><div class="vt">${escHtml(v.title || v.version_id)}</div><div class="vd">${escHtml(v.language_name || "")}${audioBit}</div></div>
-    </div>`;
+    html += versionRowHtml(v, favs);
   });
   list.innerHTML = html;
 }
