@@ -7,7 +7,9 @@ async function loadChapter(chapter, refreshMeta, verse, verseEnd) {
   logHistoryVisit();
   clearVerseSelection();
   document.getElementById("btnPickChapter").firstChild.textContent = chapter + " ";
-  document.getElementById("btnPickVersion").firstChild.textContent = shortVersionLabel(current.versionTitle) + " ";
+  const btnVersion = document.getElementById("btnPickVersion");
+  btnVersion.firstChild.textContent = shortVersionLabel(current.versionTitle) + " ";
+  btnVersion.title = current.versionTitle; // the abbreviation alone can't tell KJV from KJV 1611, KJVA, etc.
   document.getElementById("btnPickBook").firstChild.textContent = current.bookName + " ";
   document.getElementById("readingText").innerHTML = `<div class="spin"></div>`;
   // A fresh navigation (no target verse) always starts at the top — a cached
@@ -180,9 +182,9 @@ function alignChapterNavButtons() {
   const next = document.getElementById("btnNextChapter");
   const col = document.getElementById("readCol");
   if (!prev || !next || !col || window.innerWidth <= 1180) {
-    // Below 1180px .chapternav is CSS-docked to the bottom corners
-    // (css/styles.css) instead — clear any leftover inline position so that
-    // rule isn't beaten by inline style specificity.
+    // Below 1180px .chapternav is CSS-docked to the screen edges instead
+    // (css/styles.css) — clear any leftover inline position so that rule
+    // isn't beaten by inline style specificity.
     if (prev) prev.style.left = ""; if (next) next.style.right = "";
     return;
   }
@@ -195,9 +197,10 @@ window.addEventListener("resize", alignChapterNavButtons);
 
 // Touch gestures for the reader (all below 1180px, where the on-screen
 // chrome is deliberately sparse):
-//   • a horizontal swipe on the reading column turns the chapter — the
-//     .chapternav arrows are gone at this width (css/styles.css), so this is
-//     the primary way between adjacent chapters, not a nicety;
+//   • a horizontal swipe on the reading column turns the chapter — .chapternav's
+//     edge-docked arrows (css/styles.css) cover the same action, but a swipe
+//     works mid-scroll without waiting for chrome to reappear, so it stays
+//     the primary way between adjacent chapters here, not just a nicety;
 //   • an inward swipe from the right screen edge opens the Chapter Info sheet
 //     (its docked button is gone on mobile too);
 //   • a tap on empty reading space toggles the auto-hiding chrome — the only
@@ -1023,9 +1026,9 @@ async function handleRefNotInVersion(bookUsfm, chapter, verse, verseEnd, preferV
     const has = await versionsContainingRef(bookUsfm, chapter, verse);
     // A widely-recognised English translation-with-apocrypha first (KJVA is
     // the natural companion for the common KJV reader), then any version in
-    // the reader's own language, then any English one.
-    const PREF = ["eng_kja", "eng_kjva", "eng_dra", "eng_web", "eng_cpdv"];
-    target = PREF.map(id => has.find(v => v.version_id === id)).find(Boolean)
+    // the reader's own language, then any English one. WELL_KNOWN_ENGLISH_VERSIONS
+    // (js/api.js) is shared with search.js's own version-fallback prompt.
+    target = WELL_KNOWN_ENGLISH_VERSIONS.map(id => has.find(v => v.version_id === id)).find(Boolean)
       || has.find(v => v.language_name === curLang)
       || has.find(v => v.language_code === "eng")
       || has[0] || null;
@@ -1068,18 +1071,20 @@ async function loadSidebarCards() {
   ]);
   stack.innerHTML = [chapterInfoCard, places, timeline, people, prophecies].filter(Boolean).join("");
 }
-// Mobile only (#chapterCtxChips is display:none above 1180px). Three plain
+// Mobile only (#chapterCtxChips is display:none above 1180px). Two plain
 // chips under the pickers, replacing the old unlabeled grid icon + ⓘ button:
-// About <book> (book intro), About Ch. (chapter overview), Ch. Info (the
-// places/people/prophecies/timeline sheet — #cardStack, same content the
-// desktop right rail shows).
+// About <book> (book intro) and Chapter Info (the places/people/prophecies/
+// timeline sheet — #cardStack, same content the desktop right rail shows).
+// A third "About Ch." chip used to jump straight to the chapter-overview
+// modal, but that's just a shortcut to a shortcut — Chapter Info's own first
+// card is already "About This Chapter", opening that exact same modal — so
+// it was pure duplication cluttering the row for no added reach.
 function renderChapterCtxChips() {
   const el = document.getElementById("chapterCtxChips");
   if (!el) return;
   el.innerHTML =
     `<button class="ctx-chip ctx-about" onclick="openBookInfoModal('${current.book}')">About ${escHtml(current.bookName)}</button>`
-    + `<button class="ctx-chip" onclick="openChapterInfoModal()">About Ch.</button>`
-    + `<button class="ctx-chip" onclick="openCardsSheet()">Ch. Info</button>`;
+    + `<button class="ctx-chip" onclick="openCardsSheet()">Chapter Info</button>`;
   el.hidden = false;
 }
 
@@ -2407,7 +2412,7 @@ function renderSettingsCompareChips() {
   if (!row) return;
   row.innerHTML = getCompareVersions().map(id => {
     const v = (catalog || []).find(x => x.version_id === id);
-    return `<button class="filter-chip active" onclick="removeCompareVersion('${id}')">${escHtml(v ? shortVersionLabel(v.title) : id)} ×</button>`;
+    return `<button class="filter-chip active" title="${escAttr(v ? (v.title || id) : id)}" onclick="removeCompareVersion('${id}')">${escHtml(v ? shortVersionLabel(v.title) : id)} ×</button>`;
   }).join("");
 }
 async function showCompareTool() {
@@ -2422,7 +2427,7 @@ async function showCompareTool() {
     if (!rows.length) { body.innerHTML = `<div class="dd-empty">Could not load a comparison for this verse.</div>`; return; }
     body.innerHTML = rows.map(r => {
       const v = (catalog || []).find(x => x.version_id === r.version);
-      return `<div class="compare-row"><div class="compare-label">${escHtml(v ? shortVersionLabel(v.title) : r.version)}</div><div class="compare-text">${escHtml(r.text)}</div></div>`;
+      return `<div class="compare-row"><div class="compare-label" title="${escAttr(v ? (v.title || r.version) : r.version)}">${escHtml(v ? shortVersionLabel(v.title) : r.version)}</div><div class="compare-text">${escHtml(r.text)}</div></div>`;
     }).join("") + `<button class="setsave" style="margin-top:12px" onclick="openVersionPicker('compare-session')">+ Add Version</button>`;
   } catch (e) { body.innerHTML = `<div class="dd-empty">Could not load a comparison for this verse.</div>`; }
 }

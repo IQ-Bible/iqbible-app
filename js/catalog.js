@@ -66,10 +66,20 @@ function setLastVersion(id) { localStorage.setItem("iqb_last_version", id); }
 
 function shortVersionLabel(title) {
   if (!title) return "";
-  // Strip any "(…)" source/qualifier (e.g. "Amharic Bible (wordproject.org)")
-  // before abbreviating — otherwise its opening "(" becomes the first letter
-  // of the acronym ("AB(").
-  const t = title.replace(/\s*\([^)]*\)/g, "").replace(/\s+/g, " ").trim();
+  // No longer blanket-strips "(…)" content before abbreviating. That was
+  // meant to stop a source citation like "(wordproject.org)" from
+  // contributing its leading "(" as a fake initial ("AB(") — but the per-word
+  // filter below already excludes any token that doesn't start with a letter
+  // or digit, which handles exactly that case on its own (the whole
+  // "(wordproject.org)" token starts with "(", so it's dropped either way).
+  // Stripping unconditionally instead swallowed real, distinguishing edition
+  // text too — "King James Version (1611 Original)" collapsed to the same
+  // "KJV" as plain "King James Version", making the two indistinguishable
+  // everywhere this label is used (the reading-page version button, Compare
+  // Versions chips, the favorites row, search's results meta line). Leaving
+  // parens in place lets a word *inside* them (e.g. "Original)") still count
+  // normally, since only its own first character matters to the filter.
+  const t = title.replace(/\s+/g, " ").trim();
   if (!t) return "";
   const colon = t.indexOf(":");
   if (colon > 1 && colon <= 10) return t.slice(0, colon).trim();

@@ -11,6 +11,17 @@ let catalog = null;
 let bookList = [];
 let chapterMeta = [];
 
+// Well-known English editions worth trying as a fallback when the reader's
+// current/searched version comes up short — shared by js/reader.js
+// (handleRefNotInVersion, offering a version that contains a reference the
+// current one doesn't) and js/search.js (the no-results "search other
+// versions" prompt). Deuterocanon-carrying editions (KJVA, DRA, CPDV) matter
+// here as much as plain modern ones — a name like "Tobias" (Tobit) only
+// exists in those, and a 66-book-only fallback list would never find it.
+// KJV 1611 covers the reverse case: archaic spellings ("sonne") a modern
+// edition normalized away. One shared list so the two features can't drift.
+const WELL_KNOWN_ENGLISH_VERSIONS = ["eng_kja", "eng_kjva", "eng_dra", "eng_cpdv", "eng_kjv1611", "eng_web", "eng_bbe", "eng_ylt", "eng_asv"];
+
 // The 27 canonical NT USFM codes, per GET /bibles/{version}/books?testament=
 // — matched by USFM membership rather than a numeric cutoff, same rule the
 // API itself documents, so traditions with extra OT-side books still split

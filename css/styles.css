@@ -125,9 +125,11 @@ button{ font-family:inherit; cursor:pointer; }
 
 /* ── mobile nav (footer bar + "More" dropup + #rightRail as a bottom sheet)
    — replaces #navrail/#rightRail below 1180px, where both are hidden above.
-   Prev/next chapter (.chapternav, further down) is dropped entirely at this
-   width — a horizontal swipe on the reading column turns the chapter
-   (initReaderGestures, js/reader.js). ── */
+   Prev/next chapter (.chapternav, further down) stays visible at this width
+   too — docked to the screen edges instead of alignChapterNavButtons()'s
+   column-relative math, and riding the same scroll-hide chrome as the
+   topbar/footer (body.chrome-hidden below) — a horizontal swipe on the
+   reading column still works too (initReaderGestures, js/reader.js). ── */
 .iconbtn.cardsheet-trigger{ display:none; }
 #mobileFooterNav{ display:none; }
 #moreMenuSheet{ display:none; }
@@ -510,11 +512,25 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 .chapternav{ position:fixed; top:50%; transform:translateY(-50%); width:44px; height:44px; border-radius:var(--r-pill); display:flex; align-items:center; justify-content:center; background:var(--surface); border:1px solid var(--divider); color:var(--brand); z-index:16; transition:border-color .15s,color .15s; box-shadow:0 4px 16px var(--shadow); }
 .chapternav:hover{ border-color:var(--brand); color:var(--brand-2); }
 .chapternav svg{ width:20px; height:20px; }
-/* Below 1180px the fixed side arrows are dropped — a horizontal swipe on the
-   reading column (initReaderGestures, js/reader.js) or the Previous/Next
-   buttons at the foot of the chapter (#chapterEndNav) turn the page instead. */
 @media (max-width:1180px){
-  .chapternav{ display:none; }
+  /* alignChapterNavButtons() (js/reader.js) only computes left/right against
+     #readCol's own edges above 1180px — below it there's no side margin to
+     float outside of, so these dock to the screen edges instead, same 8px
+     inset #audioPlayer already uses. A horizontal swipe on the reading
+     column (initReaderGestures) or #chapterEndNav's Previous/Next buttons
+     at the foot of the chapter still work too — this is a third way in,
+     not a replacement for either. */
+  .chapternav{ transition:transform .28s ease,border-color .15s,color .15s; }
+  .chapternav.prev{ left:8px; }
+  .chapternav.next{ right:8px; }
+  /* Slides out past its own width plus the edge inset so it fully clears the
+     viewport instead of stopping at the edge — same idea as #audioPlayer's
+     translateY(calc(100% + var(--mfn-h))) above, just sideways. Riding
+     body.chrome-hidden (scroll-down hides, scroll-up brings it back) keeps
+     this consistent with every other piece of mobile chrome instead of
+     inventing its own scroll listener. */
+  body.chrome-hidden .chapternav.prev{ transform:translateY(-50%) translateX(-150%); }
+  body.chrome-hidden .chapternav.next{ transform:translateY(-50%) translateX(150%); }
 
   /* Audio player: a full-width bar docked flush above #mobileFooterNav, all
      controls visible. A solid background is required — it overlaps the
@@ -945,13 +961,13 @@ body.has-audio{ --audio-h:49px; }
 .dd-drawer-label{ font-family:var(--font-ui); font-size:.58rem; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); min-width:52px; padding-top:2px; flex-shrink:0; }
 
 /* ── end-of-chapter prev / next (#chapterEndNav, renderChapterEndNav in
-   js/reader.js) — an in-flow pair at the foot of the reading column. Shown
-   only below 1180px, where the fixed center-edge arrows are gone; on desktop
-   those arrows already cover chapter turning (mid-scroll, which this can't),
-   so it stays hidden there. ── */
-.chapter-end-nav{ display:none; grid-template-columns:1fr 1fr; gap:12px; margin:36px 0 4px; padding-top:24px; border-top:1px solid var(--divider); }
-@media (max-width:1180px){ .chapter-end-nav{ display:grid; } }
-.chapter-end-nav[hidden]{ display:none; } /* higher specificity than the media rule — keeps JS's pre-render/error hidden state winning */
+   js/reader.js) — an in-flow pair at the foot of the reading column, telling
+   you by name what's next rather than just an arrow. Shown at every width
+   now (desktop included) — the fixed center-edge arrows are a mid-scroll
+   shortcut, this is the "you've reached the end, here's where to go"
+   moment, and the two aren't redundant even where both are visible. ── */
+.chapter-end-nav{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:36px 0 4px; padding-top:24px; border-top:1px solid var(--divider); }
+.chapter-end-nav[hidden]{ display:none; } /* JS's pre-render/error hidden state */
 .cen-btn{ display:flex; align-items:center; gap:10px; padding:12px 14px; background:var(--surface); border:1px solid var(--divider); border-radius:var(--r-control); color:var(--ink); text-align:left; transition:border-color .15s,background .15s; }
 .cen-btn:hover:not(:disabled){ border-color:var(--brand-line); background:var(--brand-soft); }
 .cen-btn:disabled{ opacity:.4; }
@@ -1106,7 +1122,7 @@ body.has-audio{ --audio-h:49px; }
 .result-card:hover{ border-color:var(--brand-line); background:var(--surface-2); }
 @keyframes fadeUp{ to{ opacity:1; transform:translateY(0); } }
 .result-ref{ font-family:var(--font-ui); font-size:.65rem; letter-spacing:.18em; text-transform:uppercase; color:var(--brand); margin-bottom:8px; display:flex; align-items:center; gap:10px; }
-.result-num{ color:var(--muted); font-size:.58rem; }
+.result-num{ display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px; border-radius:var(--r-pill); background:var(--surface-2); color:var(--muted); font-size:.58rem; font-weight:600; letter-spacing:normal; text-transform:none; flex-shrink:0; }
 .result-text{ font-size:1.05rem; line-height:1.65; color:var(--ink-soft); font-weight:300; }
 .result-text mark{ background:rgba(109,40,217,.18); color:var(--brand); border-radius:2px; padding:0 2px; }
 
@@ -1170,6 +1186,7 @@ body.has-audio{ --audio-h:49px; }
 .miss-go:disabled{ opacity:.6; cursor:default; }
 .fallback-results{ margin-top:22px; text-align:left; }
 .fallback-lede{ font-size:.82rem; color:var(--muted); margin-bottom:14px; }
+.fallback-progress{ font-family:var(--font-ui); font-size:.7rem; letter-spacing:.06em; color:var(--muted); margin-top:14px; }
 .fallback-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 16px; border:1px solid var(--divider); border-radius:var(--r-sm); background:var(--surface); margin-bottom:8px; cursor:pointer; }
 .fallback-row:hover{ border-color:var(--brand-line); background:var(--surface-2); }
 .fallback-row .fv-name{ font-size:.88rem; font-weight:600; color:var(--ink); }

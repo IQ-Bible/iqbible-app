@@ -31,6 +31,17 @@ const API_PUBLIC_BASE = API_ORIGIN + "/api/v2";
 // has one line to change (and see the <base> tag in index.html/404.html).
 const BASE_PATH = "";
 
+// Search's no-results state can offer to fan out and check every other
+// version sharing the searched version's language (up to ~60 for English) —
+// throttled and opt-in (js/search.js's showNoResultsFallback), but still a
+// real multi-request cost against whatever key is in use. On the hosted
+// instance that's a shared key covering every visitor; a self-hoster running
+// their own proxy/shared key for their audience may want this off entirely
+// rather than trust visitors not to trigger it repeatedly. Set to false to
+// hide the "Search all N other versions" button — a miss then just shows
+// the plain no-results message, nothing more.
+const FEATURE_SEARCH_ALL_VERSIONS = true;
+
 // Offline fallback for the left nav footer / About page version display —
 // js/main.js's refreshAppVersionFromChangelog() reads the real, current
 // version out of CHANGELOG.md at load time and overwrites this whenever that

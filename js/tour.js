@@ -46,7 +46,7 @@ const TOUR_STEPS = [
   // mobile stand-in — the chip row under the pickers) — never both at once.
   // Not auto-opened the way #moreMenuSheet steps are: the chips are already
   // visible in the header, and opening the sheet would cover them.
-  { selector: "#cardStack, #chapterCtxChips", title: "Chapter Context", body: "Places (with maps), people, prophecy fulfillments and a timeline for whatever chapter you're reading. On a phone, tap “Ch. Info” below the pickers (or swipe in from the right edge); “About <book>” and “About Ch.” next to it open a book and a chapter overview.", before: () => switchMainView("read") },
+  { selector: "#cardStack, #chapterCtxChips", title: "Chapter Context", body: "Places (with maps), people, prophecy fulfillments, a timeline, and a chapter overview for whatever chapter you're reading. On a phone, tap “Chapter Info” below the pickers (or swipe in from the right edge); “About <book>” next to it opens the book's own overview.", before: () => switchMainView("read") },
   { selector: "#searchTrigger", title: "Search", body: "Tap here any time to search the whole Bible instantly." },
   // Bare [data-nav] (not .navitem) — below 1180px Explore/Study are
   // #mobileFooterNav's .mfn-item instead of #navrail's (hidden) .navitem, a

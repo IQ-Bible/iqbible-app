@@ -43,6 +43,14 @@ step. **Bump `CACHE_VERSION` in `sw.js` whenever you deploy** so visitors pick u
 
 The hosted instance also runs a Cloudflare Worker (`cloudflare/`) in front of the API — see the next section.
 
+`js/config.js` has the handful of constants a fork actually needs to touch — `BASE_PATH` for a
+GitHub Pages project-site subpath (see above), and `FEATURE_SEARCH_ALL_VERSIONS`: the Search
+overlay's zero-result state can offer to check every other version sharing the searched version's
+language (up to ~60 for English), throttled but still a real multi-request cost against whatever
+key is in use. If you're running your own shared/proxied key for an audience (see the next
+section) and would rather visitors not be able to trigger that many-request fan-out, set it to
+`false` — a miss then just shows the plain no-results message, no fallback button.
+
 ### If you're deploying for other people to use, not just yourself
 
 **Do not put your own API key in this app's source code.** This app is entirely client-side — anything in its JavaScript is visible to anyone who opens their browser's dev tools or views the page source. A GitHub Actions secret written into the deployed files is no different: it's downloaded verbatim by every visitor. If you deploy a public copy with your key reachable from the browser, every visitor can read it and use it as their own.
@@ -53,11 +61,24 @@ If you want anonymous end users to skip that step (a consumer app rather than a 
 
 ## What it demonstrates
 
-- Version/book/chapter navigation, including a search-first translation picker across 1,000+ languages
+- Version/book/chapter navigation, including a search-first translation picker across 1,000+
+  languages with one-tap favoriting (a small chip row above the language filter, independent of
+  whatever language/audio filter is currently active in the list)
 - Full chapter reading with paragraph markers, a drop cap, and inline Schnorr illustrations
 - Inline story titles (e.g. "The Flood") resolved from free-text references
 - Inline audio narration playback where available, with a narrator picker when a version has more than one recorded
-- Full-text search with pagination
+- **Search**: full-text verse search with all five match modes (all/any words, exact phrase, prefix,
+  raw boolean), Testament/Book/Chapter/Verse-range filters, an Exclude-words field, canonical or
+  relevance sort, and a "Searching in" translation selector independent of your reading version
+  (opening a result from a different version offers to switch and jump, same prompt used elsewhere
+  in the app for a reference outside the current translation). A **People** tab searches the API's
+  disambiguated Bible-person index by name instead of verse text, with a "Looking for a person?"
+  nudge when a Verses search exactly matches a known name (full-text matching is case-insensitive,
+  so "Lot" the man and "lot" the noun can't be told apart inside verse search itself). Saved/Recent
+  search history. A zero-result search can optionally fan out and check every other version sharing
+  the searched version's language (throttled, with a live progress line) — self-hosters can disable
+  this in `js/config.js` if they'd rather not have visitors trigger a many-request search on a
+  shared/proxied key
 - Shareable deep links (`/gen/1/1`) with browser back/forward support
 - Per-chapter context: places (with maps), a raw people list with per-person detail lookups,
   prophecy fulfillment pairs, and a curated biblical timeline

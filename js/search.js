@@ -276,10 +276,7 @@ async function overlaySearch(reset = true) {
       card.innerHTML = `
         <div class="result-ref"><span class="result-num">${from + i}</span>${ref}</div>
         <div class="result-text">${text}</div>`;
-      card.onclick = () => {
-        closeSearch();
-        jumpToVerse(r.book_usfm, r.chapter_number, r.verse_number, null, { preferVersion: version });
-      };
+      card.onclick = () => openSearchResult(r.book_usfm, r.chapter_number, r.verse_number, version);
       container.appendChild(card);
     });
 
@@ -296,6 +293,33 @@ async function overlaySearch(reset = true) {
   } catch (e) {
     document.getElementById("overlayResultsMeta").textContent = "Search failed — please try again";
   }
+}
+
+// A search result's text belongs specifically to `version` — jumpToVerse's
+// normal "can the current reading version show this reference at all" check
+// is the right call for a citation link (any version containing the passage
+// is fine), but not here: a book both versions share (Nehemiah is in both
+// KJV and Translation for Translators, say) would pass that check and just
+// navigate within the current version, silently landing on a verse that may
+// not even contain the searched text. Always offer the switch when the
+// result's version differs from the current one, regardless of whether the
+// current version also happens to have that reference.
+async function openSearchResult(bookUsfm, chapter, verse, version) {
+  closeSearch();
+  if (version === current.version) {
+    await jumpToVerse(bookUsfm, chapter, verse);
+    return;
+  }
+  const v = (catalog || []).find(x => x.version_id === version);
+  const versionLabel = v ? (v.title || version) : version;
+  const name = bookNameByUsfm[bookUsfm] || bookUsfm;
+  const refLabel = `${name} ${chapter}:${verse}`;
+  const ok = await uiConfirm({
+    title: `Switch to ${versionLabel}?`,
+    message: `This result is from ${versionLabel}. Switch to it and go to ${refLabel}?`,
+    okLabel: "Switch & read", cancelLabel: "Cancel",
+  });
+  if (ok) await switchVersionAndJump(version, bookUsfm, chapter, verse);
 }
 
 /* ── "Did you mean a person?" nudge — cross-links to the People tab on an
@@ -322,20 +346,27 @@ async function checkPersonNudge(query, token) {
   } catch (e) { /* non-fatal */ }
 }
 
-/* ── no-results fallback: an opt-in "Search other versions" button, not an
-   automatic fan-out — checking every catalog translation on a free-tier key
-   for what's often just a typo would burn quota for little benefit. Checks a
-   short list (same language as the searched version first, then a handful of
-   well-known English editions) instead of the whole ~1,000-version catalog. */
-const FALLBACK_VERSION_PREF = ["eng_kjv", "eng_kja", "eng_asv", "eng_web", "eng_bbe", "eng_ylt"];
+/* ── no-results fallback: an opt-in "Search all N other-language versions"
+   button, not an automatic fan-out — checking every version on a free-tier
+   key for what's often just a typo would burn quota with no ask. No curated
+   shortlist (deliberately dropped — deciding which handful of ~60 English
+   editions count as "common enough" is an arbitrary editorial call, and it
+   already proved wrong: it missed CPDV/eng_kjv1611, which is exactly where a
+   Deuterocanon name or an archaic spelling actually lives). Offers every
+   other version sharing the searched version's language instead, run at a
+   capped concurrency so a big language (English: ~60) doesn't fire 60
+   requests at once, with a live progress line and honest reporting if the
+   API starts rate-limiting partway through — silently under-reporting hits
+   because of a 429 would be worse than not offering this at all. */
 async function showNoResultsFallback(query, mode, version, token) {
+  if (!FEATURE_SEARCH_ALL_VERSIONS) return;
   await loadCatalog();
   if (token !== _searchToken) return;
   const searched = (catalog || []).find(v => v.version_id === version);
   const lang = searched && searched.language_name;
-  let candidates = (catalog || []).filter(v => v.version_id !== version && v.language_name === lang).map(v => v.version_id);
-  FALLBACK_VERSION_PREF.forEach(id => { if (id !== version && !candidates.includes(id)) candidates.push(id); });
-  candidates = candidates.slice(0, 5);
+  const candidates = (catalog || [])
+    .filter(v => v.version_id !== version && v.language_name === lang)
+    .map(v => v.version_id);
   if (!candidates.length) return;
 
   const container = document.getElementById("overlayResultList");
@@ -343,37 +374,60 @@ async function showNoResultsFallback(query, mode, version, token) {
   banner.className = "miss-banner";
   banner.innerHTML = `
     <div class="mb-icon">⌕</div>
-    <button class="miss-go">Search other versions</button>
+    <button class="miss-go">Search all ${candidates.length} other ${escHtml(lang || "")} version${candidates.length === 1 ? "" : "s"}</button>
+    <div class="fallback-progress" id="fallbackProgress" hidden></div>
     <div class="fallback-results" id="fallbackResultsArea"></div>`;
   banner.querySelector(".miss-go").onclick = (e) => runFallbackVersionSearch(query, mode, candidates, e.target);
   container.appendChild(banner);
 }
+const FALLBACK_CONCURRENCY = 8;
 async function runFallbackVersionSearch(query, mode, candidates, btn) {
   btn.disabled = true; btn.textContent = "Searching…";
   const area = document.getElementById("fallbackResultsArea");
+  const progress = document.getElementById("fallbackProgress");
+  progress.hidden = false;
   const scopeParams = buildSearchScopeParams(mode); // same testament/book/chapter/verse/exclude as the search that just missed
   const hits = [];
-  await Promise.all(candidates.map(async id => {
-    try {
-      const p = new URLSearchParams(scopeParams);
-      p.set("q", query); p.set("match", mode); p.set("count", "1"); p.set("limit", "1");
-      const res = await apiFetch(`${API_BASE}/bibles/${id}/search?${p.toString()}`);
-      const data = await res.json();
-      if (data.total_matches) {
-        const v = (catalog || []).find(x => x.version_id === id);
-        hits.push({ id, title: (v && v.title) || id, count: data.total_matches });
-      }
-    } catch (e) { /* skip */ }
-  }));
+  const queue = candidates.slice();
+  const total = candidates.length;
+  let checked = 0;
+  let rateLimited = false;
+
+  async function worker() {
+    while (queue.length && !rateLimited) {
+      const id = queue.shift();
+      try {
+        const p = new URLSearchParams(scopeParams);
+        p.set("q", query); p.set("match", mode); p.set("count", "1"); p.set("limit", "1");
+        const res = await apiFetch(`${API_BASE}/bibles/${id}/search?${p.toString()}`);
+        if (res.status === 429) { rateLimited = true; break; }
+        const data = await res.json();
+        if (data.total_matches) {
+          const v = (catalog || []).find(x => x.version_id === id);
+          hits.push({ id, title: (v && v.title) || id, count: data.total_matches });
+        }
+      } catch (e) { /* one version failing shouldn't stop the rest */ }
+      checked++;
+      progress.textContent = `Checked ${checked} of ${total}…`;
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(FALLBACK_CONCURRENCY, total) }, worker));
+
   btn.style.display = "none";
-  if (!hits.length) { area.innerHTML = `<div class="fallback-lede">Not found in other common translations either.</div>`; return; }
+  progress.hidden = true;
   hits.sort((a, b) => b.count - a.count);
-  area.innerHTML = `<div class="fallback-lede">Found in ${hits.length} other version${hits.length > 1 ? "s" : ""}:</div>` +
-    hits.map(h => `
+  const rows = hits.map(h => `
       <div class="fallback-row" onclick="setSearchVersion('${h.id}')">
         <span class="fv-name">${escHtml(h.title)}</span>
         <span class="fv-count">${h.count} result${h.count > 1 ? "s" : ""}</span>
       </div>`).join("");
+  if (rateLimited) {
+    area.innerHTML = `<div class="fallback-lede">Stopped after checking ${checked} of ${total} — the API started rate-limiting this key. ${hits.length ? "Showing what was found so far:" : "Try again in a moment."}</div>` + rows;
+  } else if (!hits.length) {
+    area.innerHTML = `<div class="fallback-lede">Not found in any of the ${total} other version${total > 1 ? "s" : ""} checked.</div>`;
+  } else {
+    area.innerHTML = `<div class="fallback-lede">Found in ${hits.length} other version${hits.length > 1 ? "s" : ""}:</div>` + rows;
+  }
 }
 
 /* ── People tab: searches the API's own disambiguated Bible-person index

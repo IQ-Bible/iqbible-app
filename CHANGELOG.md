@@ -4,6 +4,57 @@ All notable changes to this project will be documented in this file. This CHANGE
 
 ## [Unreleased]
 
+## [1.19.0] - 2026-09-05
+- **added:** Chapter navigation is now consistent across breakpoints instead of each having only
+  half of it. The fixed, vertically-centered prev/next arrows (desktop-only before) now also show
+  on mobile, docked to the screen edges and riding the same scroll-hide chrome as the topbar/footer
+  (hidden on scroll-down, back on scroll-up). The descriptive end-of-chapter buttons — "Previous" /
+  "Next [book/chapter name]" (mobile-only before) — now also show on desktop, at the foot of the
+  chapter alongside "Mark as read". Neither is a replacement for the other: the fixed arrows work
+  mid-scroll, the end-of-chapter pair tells you by name where you're headed.
+- **changed:** The mobile chip row under the chapter pickers dropped its "About Ch." chip — it was
+  a shortcut to a shortcut, opening the same chapter-overview modal that's already the first card
+  inside "Ch. Info" (now relabeled "Chapter Info"). Two chips instead of three, no functionality
+  lost. Updated the Take a Tour step and two Help page mentions that referenced the old chip/label.
+- **fixed:** The PWA's maskable icon (`img/icon-maskable-512.png`, what Android actually uses for
+  the home-screen icon, cropped into a circle/squircle) had a solid `--brand` purple background
+  with the flower mark drawn in a barely-different purple on top — low contrast, and inconsistent
+  with every other icon/favicon in the app, which use a light background (matching
+  `apple-touch-icon.png`'s `#f7f6fc`) with the mark in its normal vivid purple. Regenerated from
+  `icon-512.png`, scaled into the safe zone so it survives OS mask-cropping. Bumped `sw.js`'s
+  `CACHE_VERSION` so installed visitors actually pick up the new icon.
+- **added:** The reading page's version button, Compare Versions chips, and the compare-row labels
+  now carry a native tooltip with the full version title — `shortVersionLabel`'s abbreviation is
+  necessarily lossy (KJV/KJVO/KJVA all look similar at a glance), so hovering shows exactly which
+  edition it is.
+- **changed:** The no-results fallback dropped its curated ~5-version shortlist (deciding which
+  handful of a language's editions count as "common enough" is an arbitrary call, and it already
+  missed real hits — an archaic-spelling word only in the Geneva/1611/Tyndale editions, a
+  Deuterocanon name only in CPDV/Douay-Rheims) in favor of an explicit "Search all N other
+  [language] versions" button that checks every version sharing the searched version's language,
+  throttled to 8 concurrent requests with a live "Checked X of N…" progress line, and honest
+  reporting if the API starts rate-limiting partway through instead of silently under-reporting
+  hits. New `FEATURE_SEARCH_ALL_VERSIONS` constant in `js/config.js` lets a self-hoster running a
+  shared/proxied key disable this fan-out entirely.
+- **fixed:** Clicking a search result from a version other than your current reading version
+  (via the "Searching in" selector or the version-fallback prompt) could silently open the
+  reference in your *current* version instead — `jumpToVerse`'s "does the current version have
+  this reference at all" check is correct for a citation link (any version showing the passage is
+  fine), but not for a search result, whose text belongs specifically to the version it was found
+  in. A book both versions share (e.g. Nehemiah) passed that check and navigated in the wrong
+  version with no prompt at all. Search results now always offer to switch when the result's
+  version differs from the current one, regardless of whether the current version also happens to
+  contain that reference.
+- **fixed:** `shortVersionLabel` (the abbreviated version label used on the reading page's version
+  button, Compare Versions, the favorites row, and search's results meta line) stripped *any*
+  parenthetical content before abbreviating, meant to stop a source citation like
+  "(wordproject.org)" from contributing a stray "(" to the acronym — but the per-word filter
+  already handles that case on its own, and the blanket strip also swallowed real distinguishing
+  edition text, collapsing "King James Version (1611 Original)" to the same "KJV" as plain KJV.
+  Removed the blanket strip; both cases now resolve correctly ("KJVO" vs "KJV").
+- **fixed:** A search result's number badge sat directly against the reference with no visual
+  separation, reading like part of the reference itself. Now a distinct small pill.
+
 ## [1.18.0] - 2026-09-05
 - **added:** "Choose a translation" picker can now favorite a version (★ toggle on each row) — a
   small chip row above the language filter gives one-tap access to your favorites regardless of
