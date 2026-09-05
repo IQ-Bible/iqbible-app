@@ -80,23 +80,24 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
         <button id="profileTrigger" onclick="toggleProfilePanel()" title="Reading dashboard">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c1.4-3.6 4.4-5.5 7.5-5.5s6.1 1.9 7.5 5.5"/></svg>
         </button>
-        <!-- Reading dashboard popover — replaces the old bare "open Settings"
-             shortcut. Everything here (streak/counts/continue-reading) is
-             derived from data this app already tracks locally (History/Notes/
-             Bookmarks/Highlights); the one live API call is a cached today's-
-             devotional teaser. See js/profile.js. -->
-        <div id="profilePanel">
-          <div class="pp-head">Your Reading</div>
-          <div class="pp-stats" id="ppStats"></div>
-          <div class="pp-continue" id="ppContinue"></div>
-          <div class="pp-devo" id="ppDevo"></div>
-          <div class="pp-actions">
-            <button onclick="closeProfilePanel();openMyProgress()">Progress</button>
-            <button onclick="closeProfilePanel();openLibrary()">My Library</button>
-            <button onclick="closeProfilePanel();openSettings()">Settings</button>
-          </div>
-        </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Reading dashboard (streak/counts/continue-reading, all from local data +
+       one cached devotional teaser — js/profile.js). A sibling of #topbar, not
+       a child: #topbar's backdrop-filter would otherwise trap this fixed panel
+       inside the 64px bar. Desktop: anchored top-right under #profileTrigger.
+       Mobile: a bottom sheet opened from the "More" sheet's row. -->
+  <div id="profilePanel">
+    <div class="pp-head">Your Reading</div>
+    <div class="pp-stats" id="ppStats"></div>
+    <div class="pp-continue" id="ppContinue"></div>
+    <div class="pp-devo" id="ppDevo"></div>
+    <div class="pp-actions">
+      <button onclick="closeProfilePanel();openMyProgress()">Progress</button>
+      <button onclick="closeProfilePanel();openLibrary()">My Library</button>
+      <button onclick="closeProfilePanel();openSettings()">Settings</button>
     </div>
   </div>
 

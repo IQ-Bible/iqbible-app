@@ -107,7 +107,9 @@ button{ font-family:inherit; cursor:pointer; }
    "open Settings" shortcut. Non-blocking (no scrim), anchored under the
    profile icon; #profileWrap is the positioning context. ── */
 #profileWrap{ position:relative; }
-#profilePanel{ position:absolute; top:calc(100% + 10px); right:0; width:280px; background:var(--surface); border:1px solid var(--divider); border-radius:var(--r-control); box-shadow:0 20px 50px var(--shadow-lg); z-index:110; opacity:0; transform:translateY(6px); pointer-events:none; transition:opacity .16s ease,transform .16s ease; padding:18px; }
+/* Fixed, anchored just under #profileTrigger (top-right) — it's a sibling of
+   #topbar now, not a descendant, so #topbar's backdrop-filter can't trap it. */
+#profilePanel{ position:fixed; top:58px; right:20px; width:280px; background:var(--surface); border:1px solid var(--divider); border-radius:var(--r-control); box-shadow:0 20px 50px var(--shadow-lg); z-index:110; opacity:0; transform:translateY(6px); pointer-events:none; transition:opacity .16s ease,transform .16s ease; padding:18px; }
 #profilePanel.show{ opacity:1; transform:translateY(0); pointer-events:auto; }
 .pp-head{ font-family:var(--font-ui); font-size:.6rem; letter-spacing:.16em; text-transform:uppercase; color:var(--brand); margin-bottom:12px; }
 .pp-stats{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:14px; }
@@ -225,10 +227,18 @@ button{ font-family:inherit; cursor:pointer; }
      off the bar (profile → the "More" sheet's #mm-profile row). */
   #topVersionBtn,#displayBtn{ display:flex; }
   #fontSizeTrigger,#themeTrigger,#profileTrigger{ display:none; }
-  /* #profileWrap stays (0-size relative box); the panel it holds re-centers as
-     a sheet since there's no longer a topbar anchor for it. */
-  #profilePanel{ position:fixed; left:50%; top:50%; right:auto; bottom:auto; transform:translate(-50%,-46%); width:min(360px,92vw); z-index:135; }
-  #profilePanel.show{ transform:translate(-50%,-50%); }
+  /* #profileWrap stays (0-size relative box); the panel it holds becomes a
+     bottom sheet (opened from the "More" sheet's row) rather than a topbar
+     popover — it can be taller than the viewport, so bottom-anchored + capped +
+     scrollable is the only layout that can't clip off the top. z-index above
+     the footer nav (410) and the "More"/rightRail sheets. */
+  #profilePanel{ position:fixed; left:0; right:0; bottom:0; top:auto; width:auto; max-width:none;
+    max-height:82vh; overflow-y:auto; border:none; border-top:1px solid var(--divider);
+    border-radius:var(--r-card) var(--r-card) 0 0; box-shadow:0 -8px 24px var(--shadow-lg);
+    padding:8px 18px calc(20px + env(safe-area-inset-bottom,0)); z-index:435;
+    transform:translateY(100%); transition:transform .22s ease,opacity .16s ease; }
+  #profilePanel::before{ content:""; display:block; width:34px; height:4px; border-radius:999px; background:var(--divider); margin:2px auto 12px; }
+  #profilePanel.show{ transform:translateY(0); }
 
   /* #rightRail becomes a slide-up sheet with the same #cardStack content/
      fetch logic as the desktop rail — see the HTML comment above it. Scrim

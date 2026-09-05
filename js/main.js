@@ -287,11 +287,12 @@ document.addEventListener("keydown", e => {
   }
 });
 document.addEventListener("click", e => {
-  const wrap = document.getElementById("profileWrap");
-  // .mm-profile (the "More" sheet's dashboard row, < 1180px) opens the panel
-  // from outside #profileWrap — exclude it so its own opening click doesn't
-  // immediately count as an outside click and close it again.
-  if (wrap && !wrap.contains(e.target) && !e.target.closest(".mm-profile")) closeProfilePanel();
+  // #profilePanel is a sibling of #topbar now (not inside #profileWrap), so the
+  // "outside" test checks the panel itself, its topbar trigger, and the "More"
+  // sheet's row that opens it on mobile.
+  const panel = document.getElementById("profilePanel");
+  if (!panel.classList.contains("show")) return;
+  if (!panel.contains(e.target) && !e.target.closest("#profileTrigger") && !e.target.closest(".mm-profile")) closeProfilePanel();
 });
 
 // Reads the live version straight out of CHANGELOG.md's newest `## [x.y.z]`
