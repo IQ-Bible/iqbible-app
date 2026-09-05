@@ -37,4 +37,4 @@ const BASE_PATH = "";
 // fetch succeeds, so this constant only shows if the fetch fails (e.g. no
 // network). Bump alongside a CHANGELOG.md version cut anyway, so the offline
 // case doesn't drift too far.
-const APP_VERSION = "1.13.0";
+const APP_VERSION = "1.16.3";

@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file. This CHANGE
 
 ## [Unreleased]
 
+## [1.16.3] - 2026-09-05
+- **fixed:** Inline chapter illustrations (and their lightbox) now use the API's per-image
+  `width`/`height` to reserve their exact box via computed `aspect-ratio` before the plate loads —
+  zero reading-column shift on any connection, superseding the 1.16.2 hidden-then-batch-reveal
+  mitigation (removed). Falls back to today's small residual shift for a plate the API hasn't
+  backfilled dimensions for yet.
+
 ## [1.16.2] - 2026-09-04
 - **fixed:** Inline chapter illustrations no longer make the reading column jump around as they
   load. Two causes: the plate data came from a second API call fired *after* the chapter text had

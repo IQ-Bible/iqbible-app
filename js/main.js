@@ -140,6 +140,11 @@ function openImageView(url, caption, opts) {
   // left over from a previous open.
   if (opts && opts.srcset) { img.srcset = opts.srcset; img.sizes = "100vw"; }
   else { img.removeAttribute("srcset"); img.removeAttribute("sizes"); }
+  // Reserves the lightbox's box the same way the inline figure does — see
+  // insertInlineIllust (js/reader.js). Absent for place photos and for
+  // illustrations the API hasn't backfilled dimensions for yet.
+  if (opts && opts.width && opts.height) { img.width = opts.width; img.height = opts.height; }
+  else { img.removeAttribute("width"); img.removeAttribute("height"); }
   img.src = url;
   img.alt = caption || "";
   img.classList.toggle("illust-view", !!(opts && opts.grayscale));
@@ -194,6 +199,8 @@ document.addEventListener("click", e => {
     openImageView(inline ? img.currentSrc : img.src, img.alt || "", {
       grayscale: !!inline,
       srcset: inline ? img.getAttribute("srcset") : null,
+      width: inline ? img.getAttribute("width") : null,
+      height: inline ? img.getAttribute("height") : null,
     });
     return;
   }

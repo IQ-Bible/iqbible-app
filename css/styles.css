@@ -574,11 +574,7 @@ body.has-audio{ --audio-h:49px; }
 
 .inline-illust{ float:right; width:38%; max-width:260px; margin:4px 0 14px 22px; }
 .inline-illust.illust-left{ float:left; margin:4px 22px 14px 0; }
-/* Held hidden between insert and decode so the column reflows once when a
-   batch of plates reveals together, not once per plate — see revealIllustBatch
-   (js/reader.js). */
-.inline-illust.illust-loading{ visibility:hidden; }
-.inline-illust img{ width:100%; border-radius:var(--r-sm); display:block; box-shadow:0 12px 28px var(--shadow); cursor:zoom-in; border:1px solid var(--divider); }
+.inline-illust img{ width:100%; height:auto; border-radius:var(--r-sm); display:block; box-shadow:0 12px 28px var(--shadow); cursor:zoom-in; border:1px solid var(--divider); }
 /* Settings > Black & White Illustrations — a plain CSS grayscale filter, no
    re-fetch of a different image variant. #imageViewImg only picks it up when
    opened from an inline illustration (the .illust-view class openImageView
