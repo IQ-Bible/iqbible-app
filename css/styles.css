@@ -640,11 +640,16 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
     background:var(--surface); border:0; border-radius:0; box-shadow:none; padding:0;
     flex-direction:row; align-items:center; display:none !important; transition:transform .28s ease; }
   body.audio-playing #audioPlayer{ display:flex !important; }
-  #audioPlayer .audio-controls-row{ flex:1; width:auto; max-width:none; min-height:0; padding:0; gap:9px; }
+  #audioPlayer .audio-controls-row{ flex:1; width:auto; max-width:none; min-height:0; padding:0; gap:7px; }
   #audioPlayer .playbtn{ width:30px; height:30px; }
-  #audioPlayer .time{ font-size:.62rem; }
-  #btnPickNarration{ flex-shrink:0; gap:3px; padding:5px 8px; border:1px solid var(--divider); border-radius:var(--r-pill); color:var(--ink-soft); background:var(--surface-2); font-size:.62rem; }
-  #btnPickNarration svg{ width:12px; height:12px; }
+  #audioPlayer .time{ font-size:.6rem; }
+  /* The tight in-row player drops the trailing duration (the scrubber conveys
+     it) so the voice + sleep-timer buttons fit. */
+  #audioPlayer #audioDur{ display:none; }
+  #btnPickNarration{ flex-shrink:0; gap:3px; padding:4px 7px; border:1px solid var(--divider); border-radius:var(--r-pill); color:var(--ink-soft); background:var(--surface-2); font-size:.58rem; max-width:74px; overflow:hidden; }
+  #btnPickNarration svg{ width:11px; height:11px; }
+  .audio-sleep{ padding:4px 6px; font-size:.56rem; }
+  .audio-sleep svg{ width:12px; height:12px; }
 }
 
 /* ── audio player — inline in the chapter header, right after the version
@@ -662,6 +667,19 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 .inline-audio .time{ font-family:var(--font-ui); font-size:.65rem; color:var(--muted); flex-shrink:0; }
 #scrubTrack{ flex:1; height:4px; border-radius:var(--r-pill); background:var(--divider); position:relative; cursor:pointer; }
 #scrubFill{ position:absolute; left:0; top:0; bottom:0; width:0%; border-radius:var(--r-pill); background:var(--brand); pointer-events:none; }
+
+/* Sleep-timer button in the audio player. Idle: a plain clock. Running: filled,
+   with the MM:SS (or "Ch") remaining next to it. */
+.audio-sleep{ display:inline-flex; align-items:center; gap:4px; flex-shrink:0; padding:4px 7px; border:1px solid var(--divider); border-radius:var(--r-pill); background:var(--surface-2); color:var(--muted); font-family:var(--font-ui); font-weight:700; font-size:.6rem; letter-spacing:.02em; font-variant-numeric:tabular-nums; }
+.audio-sleep svg{ width:13px; height:13px; }
+.audio-sleep .st-label:empty{ display:none; }
+.audio-sleep.on{ border-color:var(--brand); background:var(--brand); color:#fff; }
+.audio-sleep:hover{ border-color:var(--brand-line); color:var(--brand); }
+.audio-sleep.on:hover{ color:#fff; }
+.stlist{ display:flex; flex-direction:column; padding:8px; }
+.stopt{ text-align:left; font-family:var(--font-ui); font-weight:600; font-size:.9rem; color:var(--ink); background:none; border:none; border-radius:var(--r-sm); padding:12px 12px; }
+.stopt:hover{ background:var(--surface-2); }
+.stopt.on{ color:var(--brand); background:var(--brand-soft); }
 
 /* ── reading text ── */
 #readingText{ font-family:var(--font-reading); font-size:var(--reading-font-size,20px); line-height:1.85; color:var(--ink-soft); font-weight:300; }

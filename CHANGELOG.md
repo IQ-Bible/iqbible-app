@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file. This CHANGE
 ## [Unreleased]
 
 ## [1.20.0] - 2026-09-05
+- **changed:** The reading header is the same on desktop and mobile now — book and chapter read as
+  one flush "Book Chapter" title (still two separate click targets, just no caret chevrons), and the
+  translation pick moved out of the header into the top bar next to Search at every width.
+- **added:** Continuous play — a Settings toggle ("Keep playing narration into the next chapter").
+  When a chapter's narration ends it loads the next chapter and keeps playing; stops at the end of
+  the book. Off by default.
+- **added:** A sleep timer in the audio player (the clock button) — Off / 15 / 30 / 45 / 60 minutes
+  / End of chapter. While it runs the button shows the time remaining; at zero it eases the volume
+  down over a few seconds and pauses. Per session, not saved.
 - **changed:** The book picker and chapter picker are now one navigator — pick a book and its
   chapters appear in the same panel, with a back arrow to the book list. Choosing a book no longer
   drops you straight onto chapter 1 (single-chapter books — Obadiah, Philemon, Jude, 2–3 John —

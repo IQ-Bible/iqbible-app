@@ -190,6 +190,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
                 <div id="scrubTrack" onclick="seekAudio(event)"><div id="scrubFill"></div></div>
                 <div class="time" id="audioDur">0:00</div>
                 <button class="verpick" id="btnPickNarration" style="display:none" onclick="openNarrationPicker()" title="Choose narration voice" aria-label="Choose narration voice"><span id="narrationName">Voice</span><svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+                <button class="audio-sleep" id="btnSleepTimer" onclick="openSleepTimer()" title="Sleep timer" aria-label="Sleep timer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6M18.5 5.5 20 4"/></svg><span class="st-label"></span></button>
                 <audio id="audioEl" preload="none"></audio>
               </div>
             </div>
@@ -588,6 +589,10 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
               <div class="setfield-check">
                 <input type="checkbox" id="settingsReadStamp" onchange="setReadStampEnabled(this.checked)">
                 <label for="settingsReadStamp">Show when I read a chapter, under the title</label>
+              </div>
+              <div class="setfield-check">
+                <input type="checkbox" id="settingsAudioContinuous" onchange="setAudioContinuous(this.checked)">
+                <label for="settingsAudioContinuous">Keep playing narration into the next chapter</label>
               </div>
               <div class="setfield">
                 <label>Compare Versions <span class="hint" style="display:inline">— used in Verse Tools &gt; Compare</span></label>
@@ -1011,6 +1016,22 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
     <div class="modal narrow" style="width:400px">
       <div class="mhead"><div class="row"><h2>Choose a voice</h2><button class="closebtn" onclick="closeModal('narrationPickerScrim')">&times;</button></div></div>
       <div class="mlist" id="narrationList"></div>
+    </div>
+  </div>
+
+  <!-- sleep timer — a per-session control opened from the audio player's clock
+       button. setSleepTimer() (js/reader.js) fades playback out at zero. -->
+  <div class="modalscrim" id="sleepTimerScrim">
+    <div class="modal narrow" style="width:300px">
+      <div class="mhead"><div class="row"><h2>Sleep timer</h2><button class="closebtn" onclick="closeModal('sleepTimerScrim')">&times;</button></div></div>
+      <div class="stlist" id="sleepTimerList">
+        <button class="stopt" onclick="setSleepTimer('off')">Off</button>
+        <button class="stopt" onclick="setSleepTimer(15)">15 minutes</button>
+        <button class="stopt" onclick="setSleepTimer(30)">30 minutes</button>
+        <button class="stopt" onclick="setSleepTimer(45)">45 minutes</button>
+        <button class="stopt" onclick="setSleepTimer(60)">1 hour</button>
+        <button class="stopt" onclick="setSleepTimer('eoc')">End of chapter</button>
+      </div>
     </div>
   </div>
 

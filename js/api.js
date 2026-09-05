@@ -292,6 +292,7 @@ function openSettings() {
   document.getElementById("settingsUiFontSlider").value = getUiFontSize();
   document.getElementById("settingsExportReminder").checked = getExportReminderEnabled();
   document.getElementById("settingsReadStamp").checked = getReadStampEnabled();
+  document.getElementById("settingsAudioContinuous").checked = getAudioContinuous();
   renderSettingsCompareChips();
   switchMainView("settings");
 }
@@ -347,6 +348,11 @@ function setExportReminderEnabled(v) { localStorage.setItem("iqb_export_reminder
 // turned off). Off falls back to the end-of-chapter "Marked as read" box.
 function getReadStampEnabled() { return localStorage.getItem("iqb_read_stamp_enabled") !== "0"; }
 function setReadStampEnabled(v) { localStorage.setItem("iqb_read_stamp_enabled", v ? "1" : "0"); renderChapterReadPrompt(); }
+// Continuous audio play — when a chapter's narration ends, advance and keep
+// playing. Default-off. Stops at the end of the book; a running sleep timer
+// (js/reader.js) overrides it.
+function getAudioContinuous() { return localStorage.getItem("iqb_audio_continuous") === "1"; }
+function setAudioContinuous(v) { localStorage.setItem("iqb_audio_continuous", v ? "1" : "0"); }
 function getIconStyle() { return localStorage.getItem("iqb_icon_style") || "bw"; }
 function setIconStyle(v) { localStorage.setItem("iqb_icon_style", v); loadTopBookIcon(); }
 function getFontSize() { return parseInt(localStorage.getItem("iqb_font_size"), 10) || 20; }

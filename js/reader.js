@@ -1321,8 +1321,12 @@ async function refreshAudioAvailability() {
   const v = (catalog || []).find(x => x.version_id === current.version);
   const hasAudio = v && v.audio_count > 0;
   wrap.style.display = hasAudio ? "flex" : "none";
-  document.body.classList.toggle("has-audio", !!hasAudio); // reserves --audio-h below the reading column (mobile)
-  if (!hasAudio) return;
+  document.body.classList.toggle("has-audio", !!hasAudio); // < 1180px: gates whether #audioDot shows in #readNavRow
+  syncSleepTimerBtn();
+  if (!hasAudio) { audioAutoresume = false; return; }
+  // Continuous play (handleAudioEnded) advances the chapter with this flag set —
+  // start the new chapter's narration once we know it has audio.
+  if (audioAutoresume) { audioAutoresume = false; setTimeout(toggleAudio, 120); }
   current.audioId = current.version;
   try {
     const d = await apiJSONCached(`/audio?version_id=${current.version}`);
@@ -1376,7 +1380,7 @@ async function toggleAudio() {
         setAudioProgressUI(el.duration ? el.currentTime / el.duration : 0);
       };
       el.onloadedmetadata = () => { document.getElementById("audioDur").textContent = fmtTime(el.duration); };
-      el.onended = () => setAudioPlayingUI(false);
+      el.onended = handleAudioEnded;
     } catch (e) {
       if (e.message !== "no_api_key") toast("No narration available for this version/chapter");
       return;
@@ -1390,6 +1394,74 @@ function seekAudio(e) {
   if (!el.duration) return;
   const rect = document.getElementById("scrubTrack").getBoundingClientRect();
   el.currentTime = ((e.clientX - rect.left) / rect.width) * el.duration;
+}
+
+/* ── continuous play + sleep timer ──
+   Continuous play is a saved pref (getAudioContinuous, js/api.js); the sleep
+   timer is per-session state living here. A firing sleep timer overrides
+   continuous play. */
+let audioAutoresume = false;
+let sleepTimer = { mode: null, endAt: 0, tick: null }; // mode: null | "eoc" | "timed"
+function handleAudioEnded() {
+  if (sleepTimer.mode === "eoc") { clearSleepTimer(); setAudioPlayingUI(false); toast("Sleep timer — stopped"); return; }
+  const maxCh = chapterMeta.length ? chapterMeta[chapterMeta.length - 1].chapter : current.chapter;
+  if (getAudioContinuous() && current.chapter < maxCh) { audioAutoresume = true; goAdjacentChapter(1); return; }
+  setAudioPlayingUI(false);
+}
+function openSleepTimer() {
+  [...document.querySelectorAll("#sleepTimerList .stopt")].forEach(btn => {
+    const on = (btn.getAttribute("onclick").includes("'off'") && !sleepTimer.mode)
+      || (btn.getAttribute("onclick").includes("'eoc'") && sleepTimer.mode === "eoc")
+      || (sleepTimer.mode === "timed" && sleepTimer.min && btn.getAttribute("onclick").includes("(" + sleepTimer.min + ")"));
+    btn.classList.toggle("on", !!on);
+  });
+  openModal("sleepTimerScrim");
+}
+function setSleepTimer(opt) {
+  closeModal("sleepTimerScrim");
+  clearInterval(sleepTimer.tick); sleepTimer.tick = null;
+  if (opt === "off") { sleepTimer.mode = null; sleepTimer.min = 0; syncSleepTimerBtn(); return; }
+  if (opt === "eoc") { sleepTimer.mode = "eoc"; sleepTimer.min = 0; syncSleepTimerBtn(); return; }
+  sleepTimer.mode = "timed"; sleepTimer.min = opt; sleepTimer.endAt = Date.now() + opt * 60000;
+  sleepTimer.tick = setInterval(() => {
+    const left = sleepTimer.endAt - Date.now();
+    if (left <= 0) { fireSleepTimer(); return; }
+    syncSleepTimerBtn(left);
+  }, 1000);
+  syncSleepTimerBtn(opt * 60000);
+}
+function clearSleepTimer() {
+  clearInterval(sleepTimer.tick);
+  sleepTimer = { mode: null, endAt: 0, tick: null, min: 0 };
+  syncSleepTimerBtn();
+}
+// At zero: ease the volume down over ~4s rather than a hard cut, then pause.
+function fireSleepTimer() {
+  clearInterval(sleepTimer.tick); sleepTimer.tick = null; sleepTimer.mode = null; sleepTimer.min = 0;
+  syncSleepTimerBtn();
+  const el = document.getElementById("audioEl");
+  if (el.paused) return;
+  const v0 = el.volume, steps = 16;
+  let i = 0;
+  const fade = setInterval(() => {
+    i++;
+    el.volume = Math.max(0, v0 * (1 - i / steps));
+    if (i >= steps) { clearInterval(fade); el.pause(); el.volume = v0; setAudioPlayingUI(false); toast("Sleep timer — paused"); }
+  }, 250);
+}
+function syncSleepTimerBtn(msLeft) {
+  const btn = document.getElementById("btnSleepTimer");
+  if (!btn) return;
+  const lbl = btn.querySelector(".st-label");
+  if (sleepTimer.mode === "timed") {
+    const s = Math.max(0, Math.ceil((msLeft != null ? msLeft : sleepTimer.endAt - Date.now()) / 1000));
+    btn.classList.add("on");
+    lbl.textContent = Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+  } else if (sleepTimer.mode === "eoc") {
+    btn.classList.add("on"); lbl.textContent = "Ch";
+  } else {
+    btn.classList.remove("on"); lbl.textContent = "";
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════

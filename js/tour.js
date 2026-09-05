@@ -44,7 +44,7 @@ const TOUR_STEPS = [
   // down by the thumb, the translation pill in the top bar. renderTourStep picks
   // whichever candidate is visible.
   { selector: "#readNavRow, #readCol .chhead", title: "Reading", body: "Pick your translation, book and chapter, then just start reading. On a phone the book/chapter picker and the prev/next arrows sit in the bar just above the nav; the translation is the pill in the top bar." },
-  { selector: "#audioDot, #audioPlayer", title: "Audio Narration", body: "When a chapter has narration a round play button appears (on a phone, in the bar above the nav; on desktop, a player in the reading header). Press it to listen — on a phone the bar becomes the full player while it's playing, with a voice picker if more than one narrator was recorded." },
+  { selector: "#audioDot, #audioPlayer", title: "Audio Narration", body: "When a chapter has narration a round play button appears (on a phone, in the bar above the nav; on desktop, a player in the reading header). Press it to listen — on a phone the bar becomes the full player while it's playing. It has a voice picker (if more than one narrator was recorded), a clock button for a sleep timer, and there's a Settings option to keep playing into the next chapter." },
   // #cardStack (desktop's always-visible rail) or #btnChapterCtx (mobile's ⓘ in
   // the slim header) — never both at once. Not auto-opened: both are already
   // visible, and opening the sheet would cover the spotlight.
