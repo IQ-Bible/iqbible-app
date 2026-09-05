@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file. This CHANGE
 
 ## [Unreleased]
 
+## [1.17.0] - 2026-09-05
+- **added:** Search overhaul (issue #290). The Verses search overlay now exposes all five match
+  modes (All/Any/Exact phrase/Starts with/Advanced boolean), an Exclude-words field, Testament and
+  multi-select Book filters, Chapter/Verse-range filters, and a Verse-order/Best-match sort — all
+  of it wired to `GET /bibles/{version}/search` params the app wasn't using yet. Highlighting now
+  uses the API's own `highlight=1` field instead of a client-side regex reimplementation. A new
+  "Searching in" version selector lets a search target a different translation than the one you're
+  reading, reusing the existing translation picker and the existing "switch & read" prompt when you
+  open a result that isn't in your current version. A new **People** tab searches the API's
+  disambiguated Bible-person index (`GET /bible-people`) instead of verse text — the actual fix for
+  "'Lot' (person) brings up 'lot' (noun)", with a "Looking for a person?" nudge on an exact name
+  match from the Verses tab. Also added: Saved/Recent search history, and an opt-in "Search other
+  versions" prompt on a zero-result search.
+
 ## [1.16.4] - 2026-09-05
 - **fixed:** The 1.16.3 lightbox fix set the `<img>`'s `width`/`height` attributes but the
   `#imageViewScrim img` rule only had `max-width`/`max-height` — with no `width:auto; height:auto`

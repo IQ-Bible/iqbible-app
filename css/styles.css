@@ -1098,6 +1098,69 @@ body.has-audio{ --audio-h:49px; }
 .result-text{ font-size:1.05rem; line-height:1.65; color:var(--ink-soft); font-weight:300; }
 .result-text mark{ background:rgba(109,40,217,.18); color:var(--brand); border-radius:2px; padding:0 2px; }
 
+/* ── Search: version selector, filters panel, book-filter modal, history,
+   the person/word nudge, and the no-results cross-version fallback (#290) ── */
+.version-row{ max-width:780px; margin:16px auto 0; display:flex; align-items:center; justify-content:center; gap:10px; }
+.version-trigger{ font-family:var(--font-ui); font-size:.78rem; font-weight:600; color:var(--ink); background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-pill); padding:7px 8px 7px 14px; display:inline-flex; align-items:center; gap:8px; cursor:pointer; }
+.version-trigger:hover{ border-color:var(--brand-line); color:var(--brand); }
+.version-trigger span{ color:var(--muted); font-size:.7rem; }
+
+.adv-hint{ max-width:780px; margin:14px auto 0; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.72rem; color:var(--muted); background:var(--surface-2); border:1px dashed var(--divider); border-radius:var(--r-sm); padding:8px 12px; }
+.adv-hint b{ color:var(--brand); font-weight:600; }
+
+/* Filters panel: always visible (desktop) — the toggle only exists to
+   reclaim vertical space at the same <=700px breakpoint .overlay-search-area
+   itself already switches on above; see the max-width:700px block below. */
+.filters-toggle-row{ display:none; max-width:780px; margin:14px auto 0; justify-content:center; }
+.filters-toggle{ font-family:var(--font-ui); font-size:.68rem; font-weight:600; color:var(--muted); background:none; border:none; cursor:pointer; display:flex; align-items:center; gap:5px; padding:4px; }
+.filters-toggle:hover{ color:var(--brand); }
+.filters-toggle svg{ width:11px; height:11px; transition:transform .15s; }
+.filters-toggle.expanded svg{ transform:rotate(180deg); }
+.filters-panel{ max-width:780px; margin:14px auto 0; background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-card); padding:20px 22px; display:flex; flex-direction:column; gap:16px; }
+.filters-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:16px; }
+.filter-field label{ display:block; font-family:var(--font-ui); font-size:.58rem; letter-spacing:.15em; text-transform:uppercase; color:var(--muted); margin-bottom:7px; }
+.filter-field input,.field-trigger{ width:100%; font-family:var(--font-ui); font-size:.85rem; background:var(--surface); border:1px solid var(--divider); border-radius:var(--r-control); padding:9px 12px; color:var(--ink); }
+.filter-field input::placeholder{ color:var(--muted2); }
+.filter-field input:disabled{ opacity:.5; cursor:not-allowed; }
+.field-trigger{ display:flex; align-items:center; justify-content:space-between; cursor:pointer; background:var(--surface); }
+.field-trigger:hover{ border-color:var(--brand-line); }
+.field-trigger b{ font-weight:600; color:var(--brand); }
+.chip-row{ display:flex; gap:8px; }
+
+.bp-actions{ display:flex; gap:14px; padding:0 12px 6px; }
+.bp-actions button{ background:none; border:none; font-family:var(--font-ui); font-size:.65rem; letter-spacing:.08em; text-transform:uppercase; font-weight:700; color:var(--brand); cursor:pointer; padding:0; }
+.bp-version-note{ font-size:.72rem; color:var(--muted); padding:0 12px 8px; }
+
+.history-row{ max-width:780px; margin:0 auto; display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+.history-section{ margin-top:18px; }
+.history-section:first-child{ margin-top:0; }
+.history-section-label{ max-width:780px; margin:0 auto 9px; font-family:var(--font-ui); font-size:.58rem; letter-spacing:.15em; text-transform:uppercase; color:var(--muted); }
+.history-chip{ display:inline-flex; align-items:center; gap:7px; font-family:var(--font-ui); font-size:.78rem; font-weight:500; color:var(--ink-soft); background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-pill); padding:6px 8px 6px 14px; cursor:pointer; }
+.history-chip:hover{ border-color:var(--brand-line); color:var(--brand); }
+.history-star{ color:var(--muted2); font-size:.9rem; line-height:1; padding:2px; border-radius:50%; }
+.history-chip:hover .history-star{ color:var(--brand); }
+.history-chip.saved .history-star{ color:#e8a838; }
+.history-clear{ font-family:var(--font-ui); font-size:.68rem; font-weight:600; color:var(--muted); background:none; border:none; cursor:pointer; margin-left:auto; }
+.history-clear:hover{ color:var(--brand); }
+
+.nudge-banner{ display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:.82rem; background:var(--brand-soft); border:1px solid var(--brand-line); border-radius:var(--r-sm); padding:11px 16px; margin-bottom:16px; color:var(--ink-soft); }
+.nudge-banner b{ color:var(--brand); }
+.nudge-go{ font-family:var(--font-ui); font-size:.68rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; background:var(--brand); color:var(--on-brand); border:none; border-radius:var(--r-pill); padding:7px 16px; cursor:pointer; white-space:nowrap; flex-shrink:0; }
+
+.miss-banner{ text-align:center; padding:34px 20px 10px; }
+.miss-banner .mb-icon{ font-size:1.6rem; opacity:.5; margin-bottom:14px; }
+.miss-go{ font-family:var(--font-ui); font-size:.7rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; background:var(--brand); color:var(--on-brand); border:none; border-radius:var(--r-pill); padding:10px 22px; cursor:pointer; }
+.miss-go:disabled{ opacity:.6; cursor:default; }
+.fallback-results{ margin-top:22px; text-align:left; }
+.fallback-lede{ font-size:.82rem; color:var(--muted); margin-bottom:14px; }
+.fallback-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 16px; border:1px solid var(--divider); border-radius:var(--r-sm); background:var(--surface); margin-bottom:8px; cursor:pointer; }
+.fallback-row:hover{ border-color:var(--brand-line); background:var(--surface-2); }
+.fallback-row .fv-name{ font-size:.88rem; font-weight:600; color:var(--ink); }
+.fallback-row .fv-count{ font-family:var(--font-ui); font-size:.65rem; letter-spacing:.1em; text-transform:uppercase; color:var(--brand); background:var(--brand-soft); border-radius:var(--r-pill); padding:4px 11px; white-space:nowrap; }
+
+.person-avatar{ width:38px; height:38px; border-radius:50%; background:var(--brand-soft); color:var(--brand); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.9rem; flex-shrink:0; }
+.person-main{ flex:1; min-width:0; }
+
 /* ── My Library: tab row + card extras + export/import toolbar ── */
 .lib-tabs{ max-width:780px; margin:0 auto 16px; display:flex; align-items:center; justify-content:center; gap:8px; }
 .lib-tab{ font-family:var(--font-ui); font-size:.62rem; letter-spacing:.12em; text-transform:uppercase; background:rgba(109,40,217,.08); border:1px solid rgba(109,40,217,.2); color:var(--ink); padding:6px 16px; border-radius:var(--r-pill); }
@@ -1334,6 +1397,12 @@ details.bg-accordion{ border:1px solid var(--divider); border-radius:var(--r-con
   .overlay-results-area{ padding:0 16px 32px; }
   .lib-tabs{ justify-content:flex-start; flex-wrap:nowrap; overflow-x:auto; padding-bottom:4px; }
   .lib-tab{ flex-shrink:0; }
+
+  /* Filters panel collapses behind a tap on narrow viewports — six fields
+     otherwise push the results down before a one-word search even runs. */
+  .filters-toggle-row{ display:flex; }
+  .filters-panel{ display:none; }
+  .filters-panel.open{ display:flex; }
 
   .cal-daycell{ min-height:0; aspect-ratio:1/1; }
 

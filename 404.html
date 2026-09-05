@@ -224,20 +224,91 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
                 onkeydown="if(event.key==='Enter') overlaySearch(true); if(event.key==='Escape') closeSearch()" autocomplete="off">
               <button type="button" class="mclear" aria-label="Clear" onclick="clearSearchInput('overlaySearchInput')">&times;</button>
             </div>
-            <div class="overlay-filters">
+            <div class="lib-tabs" id="searchTabs">
+              <button class="lib-tab active" data-tab="verses" onclick="setSearchTab('verses')">Verses</button>
+              <button class="lib-tab" data-tab="people" onclick="setSearchTab('people')">People</button>
+            </div>
+            <div class="version-row" id="searchVersionRow">
+              <span class="filter-label">Searching in</span>
+              <button type="button" class="version-trigger" id="searchVersionTrigger" onclick="openVersionPicker('search')">
+                <span id="searchVersionLabel"></span><span>▾</span>
+              </button>
+            </div>
+            <div class="overlay-filters" id="searchModeRow">
               <span class="filter-label">Mode:</span>
-              <button class="filter-chip active" data-mode="all" onclick="setMode(this)">All words</button>
-              <button class="filter-chip" data-mode="phrase" onclick="setMode(this)">Exact phrase</button>
+              <button class="filter-chip active" data-mode="all" onclick="setMatchMode(this)">All words</button>
+              <button class="filter-chip" data-mode="any" onclick="setMatchMode(this)">Any word</button>
+              <button class="filter-chip" data-mode="phrase" onclick="setMatchMode(this)">Exact phrase</button>
+              <button class="filter-chip" data-mode="prefix" onclick="setMatchMode(this)">Starts with</button>
+              <button class="filter-chip" data-mode="boolean" onclick="setMatchMode(this)">Advanced</button>
+            </div>
+            <div class="adv-hint" id="searchAdvHint" hidden><b>+</b>required &nbsp; <b>-</b>excluded &nbsp; <b>"</b>phrase<b>"</b> &nbsp; word<b>*</b> prefix</div>
+            <div class="filters-toggle-row" id="searchFiltersToggleRow">
+              <button class="filters-toggle" id="searchFiltersToggle" onclick="toggleSearchFilters()">Filters <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+            </div>
+            <div class="filters-panel" id="searchFiltersPanel">
+              <div class="filters-grid">
+                <div class="filter-field">
+                  <label>Testament</label>
+                  <div class="chip-row" id="searchTestamentRow">
+                    <button class="filter-chip active" data-testament="" onclick="setTestament(this)">All</button>
+                    <button class="filter-chip" data-testament="ot" onclick="setTestament(this)">OT</button>
+                    <button class="filter-chip" data-testament="nt" onclick="setTestament(this)">NT</button>
+                  </div>
+                </div>
+                <div class="filter-field">
+                  <label>Books</label>
+                  <button type="button" class="field-trigger" id="searchBooksTrigger" onclick="openSearchBookPicker()">
+                    <span id="searchBooksLabel">All books</span> <span>▾</span>
+                  </button>
+                </div>
+                <div class="filter-field">
+                  <label>Chapter</label>
+                  <input type="text" inputmode="numeric" id="searchChapterInput" placeholder="Any" oninput="onSearchFilterChange()">
+                </div>
+                <div class="filter-field">
+                  <label>Verse range</label>
+                  <input type="text" id="searchVerseInput" placeholder="e.g. 1-10" oninput="onSearchFilterChange()">
+                </div>
+                <div class="filter-field" id="searchExcludeField">
+                  <label>Exclude words</label>
+                  <input type="text" id="searchExcludeInput" placeholder="e.g. cast" oninput="onSearchFilterChange()">
+                </div>
+                <div class="filter-field">
+                  <label>Sort</label>
+                  <div class="chip-row" id="searchSortRow">
+                    <button class="filter-chip active" data-sort="canonical" onclick="setSearchSort(this)">Verse order</button>
+                    <button class="filter-chip" data-sort="relevance" onclick="setSearchSort(this)">Best match</button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           <div class="overlay-results-area">
             <div class="overlay-results-inner">
               <div id="overlayResultsMeta" class="overlay-results-meta"></div>
               <div id="overlaySearchNotice" class="overlay-search-notice" hidden></div>
+              <div id="overlayHistoryArea" hidden></div>
               <div id="overlayResultList"></div>
               <button id="overlayLoadMore" onclick="overlaySearch(false)">Load More</button>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Book filter for Search's Verses tab — multi-select (unlike the
+           single-select reading #bookPickerScrim above), scoped to whichever
+           version "Searching in" currently points at, since a Catholic/Orthodox
+           edition's canon is genuinely larger than a 66-book Protestant one. -->
+      <div class="modalscrim" id="searchBookFilterScrim">
+        <div class="modal">
+          <div class="mhead">
+            <div class="row"><h2>Choose books</h2><button class="closebtn" onclick="closeSearchBookPicker()">&times;</button></div>
+          </div>
+          <div class="bp-actions"><button onclick="searchBooksSelectAll()">Select all</button><button onclick="searchBooksClearAll()">Clear</button></div>
+          <div class="bp-version-note" id="searchBookFilterNote"></div>
+          <div class="mlist" id="searchBookFilterBody"></div>
+          <div style="padding:0 24px 24px"><button class="setsave" style="margin-bottom:0" onclick="closeSearchBookPicker()">Done</button></div>
         </div>
       </div>
 
@@ -616,7 +687,9 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
             <div class="help-card">
               <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></div>
               <div class="help-card-title">Search</div>
-              <div class="help-card-body">Full-text search across the whole Bible, any version.</div>
+              <div class="help-card-body">Full-text search with match modes, book/testament/chapter filters, a
+                translation selector independent of your reading version, and a People tab that searches Bible
+                characters by name instead of verse text.</div>
             </div>
             <div class="help-card">
               <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="7" height="7" rx="1"/><rect x="14" y="4" width="7" height="7" rx="1"/><rect x="3" y="15" width="7" height="5" rx="1"/><rect x="14" y="15" width="7" height="5" rx="1"/></svg></div>

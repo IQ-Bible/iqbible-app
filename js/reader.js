@@ -546,7 +546,10 @@ function renderPeopleList() {
 }
 async function openPersonDetail(name, ustrong) {
   const token = ++personDetailToken;
-  document.getElementById("peopleBackBtn").style.display = "flex";
+  // Only show "back to this chapter's people" when there's actually a chapter
+  // list to go back to — opened from Search's People tab (no chapter context),
+  // "back" would otherwise show a stale/empty currentChapterPeople list.
+  document.getElementById("peopleBackBtn").style.display = currentChapterPeople.length ? "flex" : "none";
   document.getElementById("peopleTitle").textContent = name;
   const body = document.getElementById("peopleBody");
   body.innerHTML = `<div class="spin"></div>`;

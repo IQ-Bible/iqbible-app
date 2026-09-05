@@ -95,7 +95,9 @@ let versionPickerMode = "navigate";
 async function openVersionPicker(mode) {
   versionPickerMode = mode || "navigate";
   document.getElementById("versionPickerTitle").textContent =
-    (versionPickerMode === "navigate" || versionPickerMode === "plan") ? "Choose a translation" : "Add a Compare version";
+    (versionPickerMode === "navigate" || versionPickerMode === "plan") ? "Choose a translation"
+    : versionPickerMode === "search" ? "Search a translation"
+    : "Add a Compare version";
   openModal("versionPickerScrim");
   document.getElementById("versionSearchInput").value = "";
   await loadCatalog();
@@ -114,6 +116,7 @@ async function openVersionPicker(mode) {
 function pickVersionRow(id) {
   if (versionPickerMode === "navigate") { selectVersion(id); return; }
   if (versionPickerMode === "plan") { setPlanBuilderVersion(id); return; }
+  if (versionPickerMode === "search") { closeModal("versionPickerScrim"); setSearchVersion(id); return; }
   addCompareVersion(id, versionPickerMode);
   closeModal("versionPickerScrim");
 }
@@ -163,6 +166,8 @@ function renderVersionList(q) {
       ? v.version_id === current.version
       : versionPickerMode === "plan"
       ? v.version_id === planTargetVersion().id
+      : versionPickerMode === "search"
+      ? v.version_id === overlaySearchVersion
       : compareTargetList(versionPickerMode).includes(v.version_id);
     const audioBit = v.audio_count > 0
       ? `<span class="audiobadge" title="${v.audio_count > 1 ? v.audio_count + ' narrations available' : 'Audio narration available'}">${AUDIO_ICON}${v.audio_count > 1 ? ` ×${v.audio_count}` : ""}</span>`
