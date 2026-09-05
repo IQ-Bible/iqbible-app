@@ -348,7 +348,7 @@ async function loadChapterMeta() {
 // yet (no chapter loaded) and the old book's chapter must not light up.
 async function openChapterPicker(freshBook) {
   openModal("navPickerScrim"); // no-op if already open (advanced here from selectBook)
-  document.getElementById("navPickerTitle").textContent = `${current.bookName} — choose a chapter`;
+  document.getElementById("navPickerTitle").textContent = current.bookName;
   document.getElementById("navPickerBack").hidden = false;
   document.getElementById("navPickerSearch").hidden = true;
   document.getElementById("bookList").hidden = true;

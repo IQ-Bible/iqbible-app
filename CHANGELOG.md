@@ -31,7 +31,7 @@ All notable changes to this project will be documented in this file. This CHANGE
   book's own overview). The old chip row under the pickers is gone.
 - **changed:** Audio narration on a phone is a round play button at the end of that row, shown only
   when the chapter has narration, with a ring that tracks position. Pressing it turns the row into
-  the full player (scrubber, time, voice picker) in place; a back arrow returns to the picker. The
+  the full player (scrubber, time, voice picker) in place; pausing brings the picker back. The
   separate full-width docked audio bar is gone, and the bar no longer reserves height whether or
   not there's narration — so the reading column is the same length either way.
 - **changed:** Take a Tour and the Help page were updated for the new mobile navigation (Discover,

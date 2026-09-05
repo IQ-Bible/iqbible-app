@@ -30,7 +30,7 @@
   --mfn-h:58px; /* #mobileFooterNav's height — referenced by everything below 1180px that needs to clear it */
   --audio-h:0px; /* legacy — kept 0 everywhere now; the docked mobile audio bar was replaced by #readNavRow's in-row player */
   --readnavrow-h:0px; /* #readNavRow's height (0 above 1180px, ~46px below) — reserved at the foot of the reading column and cleared by every bottom-anchored mobile element */
-  --rnr-arrow-w:88px; /* left inset in #readNavRow reserved for the two re-docked .chapternav arrows */
+  --rnr-arrow-w:94px; /* left inset in #readNavRow reserved for the two re-docked .chapternav arrows + a hairline gap */
   --vvh:100vh; /* actual visible height, kept in sync with window.visualViewport by trackVisualViewport (js/main.js) — falls back to 100vh until that runs / on browsers without the API. Needed because a fixed-position element sized in vh doesn't shrink when the on-screen keyboard opens, so content lower in it silently renders behind the keyboard instead of scrolling into view. */
 }
 /* Day/night toggle (toggleTheme, in main.js) sets data-theme on <html>,
@@ -174,28 +174,39 @@ button{ font-family:inherit; cursor:pointer; }
   /* Notes is a drawer, not a view, so navMenuClick never marks it active. */
   body.notes-drawer-open #mfnNotesBtn{ color:var(--brand); }
 
-  /* Slim reading header — one non-wrapping row: book icon, book + chapter as a
-     compact tappable label, and the single ⓘ (Chapter Info). The version pick
-     is in the topbar, chapter context is the ⓘ / #readNavRow, so nothing wraps
-     to a second row here any more. */
-  .chhead{ flex-wrap:nowrap; gap:10px; align-items:center; }
-  .chtitlewrap{ flex-wrap:nowrap; align-items:center; gap:2px 6px; min-width:0; }
-  .chhead .titlepick{ font-size:1.35rem; padding:2px 4px; margin:0 -4px; }
-  #btnChapterCtx{ align-self:center; }
+  /* Slim reading header — one tight non-wrapping row: book icon, "Book Chapter"
+     as a compact tappable label (carets dropped — the whole thing is tappable,
+     and the bottom #readNavRow is the primary picker anyway), the single ⓘ, and
+     the read stamp. Version pick is in the topbar; nothing wraps here. */
+  .chhead{ flex-wrap:nowrap; gap:8px; align-items:center; padding:20px 0 12px; }
+  /* z-index above #readNavRow (15): .chhead's sticky stacking context would
+     otherwise trap its child #audioPlayer (the fixed in-row player) below the
+     row. Header is at the top, row at the bottom — they never actually overlap;
+     this is purely so the escaped fixed player paints. #readCol scope beats the
+     base `.chhead{ z-index:6 }` regardless of source order. */
+  #readCol .chhead{ z-index:20; }
+  .chtitlewrap{ flex-wrap:nowrap; align-items:baseline; gap:0 5px; min-width:0; overflow:hidden; }
+  .chhead .titlepick{ font-size:1.15rem; font-weight:800; letter-spacing:-.02em; padding:2px 3px; margin:0 -3px; white-space:nowrap; }
+  .chhead .titlepick svg{ display:none; }
+  .bookicon-badge{ width:34px; height:34px; }
+  #btnChapterCtx{ align-self:center; margin-left:3px; }
+  #btnChapterCtx svg{ width:15px; height:15px; }
 
   /* Anchored just above the footer bar, not a floating popover like
      #profilePanel/.plan-menu — full-width so it reads as "the rest of the
      menu" rather than a small contextual submenu. */
-  #moreMenuSheet{ display:block; position:fixed; left:0; right:0; bottom:var(--mfn-h); background:var(--surface); border-top:1px solid var(--divider); padding:6px; max-height:60vh; overflow-y:auto; box-shadow:0 -8px 24px var(--shadow-lg); z-index:420; transform:translateY(100%); opacity:0; pointer-events:none; transition:transform .18s ease,opacity .18s ease; }
+  #moreMenuSheet{ display:block; position:fixed; left:0; right:0; bottom:var(--mfn-h); background:var(--surface); border-top:1px solid var(--divider); border-radius:var(--r-card) var(--r-card) 0 0; padding:6px 6px 8px; max-height:60vh; overflow-y:auto; box-shadow:0 -8px 24px var(--shadow-lg); z-index:420; transform:translateY(100%); opacity:0; pointer-events:none; transition:transform .18s ease,opacity .18s ease; }
   #moreMenuSheet.show{ transform:translateY(0); opacity:1; pointer-events:auto; }
   #moreMenuSheet .navitem{ padding:13px 14px; }
+  /* Grab handle — the "pull down to dismiss" affordance every bottom sheet gets. */
+  #moreMenuSheet::before,#discoverHub::before{ content:""; display:block; width:34px; height:4px; border-radius:999px; background:var(--divider); margin:2px auto 8px; }
   /* The left-nav footer's credit/version line, mirrored here — it's the only
      place the version shows on mobile (the desktop nav rail is display:none). */
   #moreMenuSheet .navfooter-sheet{ margin-top:4px; padding:14px 14px calc(10px + env(safe-area-inset-bottom,0)); border-top:1px solid var(--divider); }
 
   /* Discover hub — same slide-up mechanics as #moreMenuSheet, grouped content.
      z-index in the same band (below .dict-tooltip / #toast at 600). */
-  #discoverHub{ display:block; position:fixed; left:0; right:0; bottom:var(--mfn-h); background:var(--surface); border-top:1px solid var(--divider); padding:14px 14px calc(14px + env(safe-area-inset-bottom,0)); max-height:64vh; overflow-y:auto; box-shadow:0 -8px 24px var(--shadow-lg); z-index:420; transform:translateY(100%); opacity:0; pointer-events:none; transition:transform .18s ease,opacity .18s ease; }
+  #discoverHub{ display:block; position:fixed; left:0; right:0; bottom:var(--mfn-h); background:var(--surface); border-top:1px solid var(--divider); border-radius:var(--r-card) var(--r-card) 0 0; padding:8px 14px calc(16px + env(safe-area-inset-bottom,0)); max-height:64vh; overflow-y:auto; box-shadow:0 -8px 24px var(--shadow-lg); z-index:420; transform:translateY(100%); opacity:0; pointer-events:none; transition:transform .18s ease,opacity .18s ease; }
   #discoverHub.show{ transform:translateY(0); opacity:1; pointer-events:auto; }
   .disc-group + .disc-group{ margin-top:14px; }
   .disc-label{ font-family:var(--font-ui); font-size:.58rem; font-weight:800; letter-spacing:.13em; text-transform:uppercase; color:var(--brand); margin:0 2px 8px; }
@@ -554,31 +565,34 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 .chapternav:hover{ border-color:var(--brand); color:var(--brand-2); }
 .chapternav svg{ width:20px; height:20px; }
 @media (max-width:1180px){
-  :root{ --readnavrow-h:46px; }
+  :root{ --readnavrow-h:54px; }
 
   /* ── #readNavRow — the thumb-zone control row, docked just above the footer.
      Contents: the re-docked prev/next pair (fixed .chapternav, in the reserved
      --rnr-arrow-w inset at the left), the combined "Book Ch ▾" chip
      (#readNavChip → navigator), and #audioDot (only when the chapter has
      narration). On Play, body.audio-playing hides the chip + dot and swaps
-     #audioPlayer in over that space, with a collapse caret to return. The whole
-     row slides down with the rest of the chrome on scroll (body.chrome-hidden). */
+     #audioPlayer in over that space; pausing (its own button, or a chapter
+     change) clears it and the chip returns. The whole row slides down with the
+     rest of the chrome on scroll (body.chrome-hidden). */
   #readNavRow{ display:flex; position:fixed; left:0; right:0; z-index:15;
     bottom:calc(var(--mfn-h) + env(safe-area-inset-bottom,0)); height:var(--readnavrow-h);
-    align-items:center; gap:8px; padding:0 10px 0 var(--rnr-arrow-w);
+    align-items:center; gap:8px; padding:0 12px 0 var(--rnr-arrow-w);
     background:var(--surface); border-top:1px solid var(--divider);
     box-shadow:0 -2px 10px var(--shadow); transition:transform .28s ease; }
+  /* Hairline between the re-docked arrow pair and the chip. */
+  #readNavRow::before{ content:""; position:absolute; left:calc(var(--rnr-arrow-w) - 8px); top:50%; transform:translateY(-50%); width:1px; height:22px; background:var(--divider); }
   body.chrome-hidden #readNavRow{ transform:translateY(calc(100% + var(--mfn-h))); }
   .rnr-arrowspace{ display:none; }
 
   .rnr-chip{ flex:1; min-width:0; display:flex; align-items:center; justify-content:space-between;
-    gap:6px; font-family:var(--font-ui); font-weight:700; font-size:.8rem; letter-spacing:-.01em;
+    gap:6px; font-family:var(--font-ui); font-weight:700; font-size:.86rem; letter-spacing:-.01em;
     color:var(--ink); background:var(--surface-2); border:1px solid var(--divider);
-    border-radius:var(--r-pill); padding:8px 14px; white-space:nowrap; overflow:hidden; }
-  .rnr-chip svg{ width:10px; height:10px; flex-shrink:0; stroke:var(--muted); }
+    border-radius:var(--r-pill); padding:10px 16px; white-space:nowrap; overflow:hidden; }
+  .rnr-chip svg{ width:11px; height:11px; flex-shrink:0; stroke:var(--muted); }
   body.audio-playing .rnr-chip{ display:none; }
 
-  .rnr-dot{ position:relative; width:32px; height:32px; flex-shrink:0; background:none; border:none; padding:0; display:none; }
+  .rnr-dot{ position:relative; width:36px; height:36px; flex-shrink:0; background:none; border:none; padding:0; display:none; }
   body.has-audio .rnr-dot{ display:block; }
   body.audio-playing .rnr-dot{ display:none; }
   .rnr-dot svg{ position:absolute; inset:0; width:100%; height:100%; }
@@ -587,32 +601,28 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
   .rnr-disc{ fill:var(--brand); }
   .rnr-ic{ fill:#fff; }
 
-  .rnr-collapse{ width:30px; height:30px; flex-shrink:0; border-radius:var(--r-pill);
-    background:var(--surface-2); border:1px solid var(--divider); color:var(--muted);
-    display:none; align-items:center; justify-content:center; }
-  .rnr-collapse svg{ width:14px; height:14px; }
-  body.audio-playing .rnr-collapse{ display:flex; }
-
   /* Prev/Next stay position:fixed (a display:none ancestor would kill them, and
      #readNavRow is display:none on desktop) but re-dock as a left-aligned pair
      in the row's reserved inset; slide down with the row on scroll. */
-  .chapternav{ top:auto; transform:none; width:30px; height:30px; box-shadow:none;
-    bottom:calc(var(--mfn-h) + env(safe-area-inset-bottom,0) + (var(--readnavrow-h) - 30px) / 2);
+  .chapternav{ top:auto; transform:none; width:34px; height:34px; box-shadow:none;
+    bottom:calc(var(--mfn-h) + env(safe-area-inset-bottom,0) + (var(--readnavrow-h) - 34px) / 2);
     transition:transform .28s ease,border-color .15s,color .15s; }
   .chapternav.prev{ left:10px; right:auto; }
-  .chapternav.next{ left:46px; right:auto; }
+  .chapternav.next{ left:48px; right:auto; }
   body.chrome-hidden .chapternav{ transform:translateY(calc(100% + var(--mfn-h))); }
 
   /* Audio player: hidden until playback starts (then it fills the chip/dot area
      of #readNavRow). !important beats the inline `display` that
      refreshAudioAvailability sets for the desktop inline player. */
-  #audioPlayer{ position:fixed; left:var(--rnr-arrow-w); right:10px; width:auto; margin:0; transform:none;
+  #audioPlayer{ position:fixed; left:calc(var(--rnr-arrow-w) - 6px); right:14px; width:auto; margin:0; transform:none;
     bottom:calc(var(--mfn-h) + env(safe-area-inset-bottom,0)); height:var(--readnavrow-h); z-index:17;
     background:var(--surface); border:0; border-radius:0; box-shadow:none; padding:0;
-    align-items:center; display:none !important; transition:transform .28s ease; }
+    flex-direction:row; align-items:center; display:none !important; transition:transform .28s ease; }
   body.audio-playing #audioPlayer{ display:flex !important; }
-  .audio-controls-row{ width:100%; max-width:none; min-height:0; padding:0; gap:8px; }
-  #btnPickNarration{ flex-shrink:0; gap:3px; padding:4px 7px; border:1px solid var(--divider); border-radius:var(--r-pill); color:var(--ink-soft); background:var(--surface-2); font-size:.6rem; }
+  #audioPlayer .audio-controls-row{ flex:1; width:auto; max-width:none; min-height:0; padding:0; gap:9px; }
+  #audioPlayer .playbtn{ width:30px; height:30px; }
+  #audioPlayer .time{ font-size:.62rem; }
+  #btnPickNarration{ flex-shrink:0; gap:3px; padding:5px 8px; border:1px solid var(--divider); border-radius:var(--r-pill); color:var(--ink-soft); background:var(--surface-2); font-size:.62rem; }
   #btnPickNarration svg{ width:12px; height:12px; }
 }
 

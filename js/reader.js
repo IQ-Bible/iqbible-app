@@ -1285,7 +1285,8 @@ function setAudioPlayingUI(playing) {
   const pb = document.getElementById("playBtn");
   if (pb) pb.innerHTML = playing ? AUDIO_PAUSE_SVG : AUDIO_PLAY_SVG;
   // < 1180px: body.audio-playing turns #readNavRow into the player (css) —
-  // hides the chip + #audioDot, swaps #audioPlayer in, shows the collapse caret.
+  // hides the chip + #audioDot and swaps #audioPlayer in. Pausing (the player's
+  // own button, or a chapter change) clears it and the chip returns.
   document.body.classList.toggle("audio-playing", !!playing);
 }
 function setAudioProgressUI(frac) {
@@ -1296,13 +1297,6 @@ function setAudioProgressUI(frac) {
   // progress indicator while the row is collapsed to just the dot.
   const ring = document.querySelector("#audioDot .rnr-ring-f");
   if (ring) ring.style.strokeDashoffset = String(88 * (1 - f));
-}
-// The collapse caret in #readNavRow's playing state — pause and drop back to
-// the chip. (Playback position is kept; tapping the dot resumes.)
-function collapseAudioRow() {
-  const el = document.getElementById("audioEl");
-  if (el) el.pause();
-  setAudioPlayingUI(false);
 }
 function resetAudioPlayerUI() {
   const el = document.getElementById("audioEl");
