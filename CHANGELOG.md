@@ -36,6 +36,14 @@ All notable changes to this project will be documented in this file. This CHANGE
   not there's narration — so the reading column is the same length either way.
 - **changed:** Take a Tour and the Help page were updated for the new mobile navigation (Discover,
   the bottom control row, the ⓘ chapter-context button, the profile row in "More").
+- **changed:** On a phone the "Read on …" stamp now sits inline at the right of the chapter header
+  (a condensed "Read MM/DD/YY") instead of on its own line below it.
+- **fixed:** The book overview modal (the ⓘ) no longer scrolls sideways on a phone when the
+  author/date line is long, and — when opened from the mobile Chapter Info sheet's "About this
+  book" card — it now opens on top of that sheet instead of behind it.
+- **fixed:** The round audio button's progress ring is cleared when you move to another chapter,
+  so it no longer briefly shows the previous chapter's position. Changing the narration voice no
+  longer collapses the player back to the picker.
 
 ## [1.19.0] - 2026-09-05
 - **added:** Chapter navigation is now consistent across breakpoints instead of each having only

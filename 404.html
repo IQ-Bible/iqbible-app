@@ -189,9 +189,10 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
             </div>
           </div>
 
-          <!-- Compact "Read on …" line — its own row below .chhead (not inside
-               it) so it never changes the header's height or nudges the audio
-               player. js/plans.js renderChapterReadStamp(); toggle in Settings. -->
+          <!-- Compact "Read on …" line. Desktop: its own row below .chhead (so it
+               never nudges the inline audio player). Mobile: positionReadStamp()
+               (js/plans.js) moves it into .chhead to sit inline at the row's
+               right. renderChapterReadStamp(); toggle in Settings. -->
           <div id="chapterReadStamp"></div>
 
           <div id="readingText"><div class="spin"></div></div>

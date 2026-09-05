@@ -965,17 +965,32 @@ function formatReadStamp(ts) {
   const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).toLowerCase();
   return `Read on ${wd}. ${date} at ${time}`;
 }
+// Mobile keeps this inline at the right of the slim .chhead row; desktop keeps
+// it on its own row below. The element is shared — this just relocates it.
+function positionReadStamp() {
+  const el = document.getElementById("chapterReadStamp");
+  const chhead = document.querySelector("#readCol .chhead");
+  if (!el || !chhead) return;
+  if (window.innerWidth <= 1180) { if (el.parentElement !== chhead) chhead.appendChild(el); }
+  else if (el.parentElement === chhead) { chhead.after(el); }
+}
+window.addEventListener("resize", positionReadStamp);
 function renderChapterReadStamp() {
   const el = document.getElementById("chapterReadStamp");
   if (!el) return;
+  positionReadStamp();
   const ts = getReadStampEnabled() ? getProgress()[`${current.book}.${current.chapter}`] : null;
   if (!ts) { el.className = ""; el.innerHTML = ""; return; }
   const text = typeof ts === "number" ? formatReadStamp(ts) : "Read";
+  const shortText = typeof ts === "number"
+    ? "Read " + new Date(ts).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "2-digit" })
+    : "Read";
   el.className = "show";
   // A light-green check, clickable to undo the read mark (there's no
   // bottom "Undo" while the stamp is showing — see renderChapterReadPrompt).
   el.innerHTML = `<button type="button" class="read-check" onclick="unmarkChapterRead()" title="Mark chapter unread" aria-label="Mark chapter unread"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9.5"/></svg></button>`
-    + `<span class="read-label">${escHtml(text)}</span>`;
+    + `<span class="read-label">${escHtml(text)}</span>`
+    + `<span class="read-label-short">${escHtml(shortText)}</span>`;
 }
 function renderChapterReadPrompt() {
   renderChapterReadStamp();

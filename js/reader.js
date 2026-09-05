@@ -1081,7 +1081,7 @@ async function loadSidebarCards() {
   // sheet instead (opened by the header's ⓘ). Desktop keeps its own #btnBookInfo.
   const aboutCard = window.innerWidth <= 1180
     ? railCard(`About ${current.bookName}`, "Who wrote it, when, and its main themes — plus the full Book Guide.",
-        `openBookInfoModal('${current.book}')`, "railcard--compact")
+        `closeCardsSheet();openBookInfoModal('${current.book}')`, "railcard--compact")
     : "";
   stack.innerHTML = [aboutCard, chapterInfoCard, places, timeline, people, prophecies].filter(Boolean).join("");
 }
@@ -1300,6 +1300,10 @@ function setAudioProgressUI(frac) {
 }
 function resetAudioPlayerUI() {
   const el = document.getElementById("audioEl");
+  // Drop the previous chapter's handlers before pausing — otherwise a trailing
+  // timeupdate from the old media could repaint the #audioDot ring with stale
+  // progress after we've zeroed it. toggleAudio reassigns them on next load.
+  el.ontimeupdate = null; el.onended = null; el.onloadedmetadata = null;
   el.pause(); el.removeAttribute("src");
   document.getElementById("audioPlayer").dataset.loaded = "0";
   setAudioProgressUI(0);
@@ -1352,7 +1356,12 @@ function selectNarration(audioId) {
   selectedNarrations[current.version] = audioId;
   closeModal("narrationPickerScrim");
   syncNarrationName();
+  // Reset the loaded file so the next Play fetches the new voice — but keep the
+  // in-row player open (paused at 0:00) rather than collapsing back to the chip,
+  // so picking a voice doesn't feel like it dismissed the player.
+  const wasOpen = document.body.classList.contains("audio-playing");
   resetAudioPlayerUI();
+  if (wasOpen) document.body.classList.add("audio-playing");
 }
 async function toggleAudio() {
   const el = document.getElementById("audioEl");

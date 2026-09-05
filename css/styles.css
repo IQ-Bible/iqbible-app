@@ -191,6 +191,12 @@ button{ font-family:inherit; cursor:pointer; }
   .bookicon-badge{ width:34px; height:34px; }
   #btnChapterCtx{ align-self:center; margin-left:3px; }
   #btnChapterCtx svg{ width:15px; height:15px; }
+  /* Read stamp: JS (positionReadStamp) moves it into .chhead here so it sits
+     inline at the right of the row instead of on its own line below. Condensed
+     "Read MM/DD/YY" label; the verbose weekday+time form is desktop-only. */
+  .chhead #chapterReadStamp{ margin:0 0 0 auto; flex-shrink:0; font-size:.66rem; }
+  .chhead #chapterReadStamp .read-label{ display:none; }
+  .chhead #chapterReadStamp .read-label-short{ display:inline; }
 
   /* Anchored just above the footer bar, not a floating popover like
      #profilePanel/.plan-menu — full-width so it reads as "the rest of the
@@ -546,6 +552,7 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 #chapterReadStamp .read-check:hover{ background:var(--brand-soft); }
 #chapterReadStamp .read-check svg{ width:15px; height:15px; }
 #chapterReadStamp .read-label{ letter-spacing:.01em; }
+#chapterReadStamp .read-label-short{ display:none; letter-spacing:.01em; }
 .verpick{ display:flex; align-items:center; gap:4px; padding:4px 8px; border-radius:var(--r-sm); background:none; border:none; font-family:var(--font-ui); font-size:.7rem; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); transition:background .15s,color .15s; }
 .verpick:hover{ background:var(--brand-soft); color:var(--brand); }
 .verpick svg{ width:9px; height:9px; stroke:var(--muted); flex-shrink:0; }
@@ -597,7 +604,7 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
   body.audio-playing .rnr-dot{ display:none; }
   .rnr-dot svg{ position:absolute; inset:0; width:100%; height:100%; }
   .rnr-ring-t{ stroke:var(--divider); }
-  .rnr-ring-f{ stroke:var(--brand); stroke-linecap:round; transform:rotate(-90deg); transform-origin:center; transition:stroke-dashoffset .2s linear; }
+  .rnr-ring-f{ stroke:var(--brand); stroke-linecap:round; transform:rotate(-90deg); transform-origin:center; }
   .rnr-disc{ fill:var(--brand); }
   .rnr-ic{ fill:#fff; }
 
@@ -697,7 +704,11 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 .dicttab{ font-family:var(--font-ui); font-size:.6rem; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); background:var(--surface-2); border:1px solid transparent; border-radius:var(--r-pill); padding:6px 12px; }
 .dicttab:hover{ color:var(--brand); }
 .dicttab.on{ color:var(--brand); background:rgba(109,40,217,.14); border-color:var(--brand); }
-.dictbody{ flex:1; min-height:0; padding:20px 24px 24px; overflow-y:auto; }
+.dictbody{ flex:1; min-height:0; padding:20px 24px 24px; overflow-y:auto; overflow-x:hidden; overflow-wrap:anywhere; }
+/* .place-meta defaults to white-space:nowrap (fine for the short Places-modal
+   line); in book info the author/date string can be long enough to force a
+   horizontal scrollbar, so let it wrap here. */
+.dictbody .place-meta{ white-space:normal; }
 .dictbody .dd-def{ font-size:1rem; line-height:1.7; color:var(--ink-soft); }
 .dictbody .dd-meta{ font-family:var(--font-ui); font-size:.62rem; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin-bottom:12px; }
 .dictbody .dd-empty{ color:var(--muted); font-style:italic; }
@@ -816,6 +827,10 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
    modal (Settings, Verse Tools > Compare), so it needs to reliably win over
    a same-class .modalscrim rather than falling back to DOM source order. */
 #versionPickerScrim{ z-index:140; }
+/* Book info can be opened from the mobile Chapter Info sheet (#rightRail, z-425)
+   via its "About <book>" card — that card closes the sheet first, but a bump
+   here also covers the slide-out transition and any other in-sheet path. */
+#bookInfoScrim{ z-index:428; }
 .modalscrim.show{ display:flex; }
 .modal{ width:600px; max-height:80vh; background:var(--surface); border:1px solid var(--divider); border-radius:var(--r-control); box-shadow:0 30px 70px var(--shadow-lg); display:flex; flex-direction:column; overflow:hidden; }
 .modal.narrow{ width:440px; }
