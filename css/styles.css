@@ -1509,7 +1509,10 @@ details.bg-accordion{ border:1px solid var(--divider); border-radius:var(--r-con
    alone can't just move to clear #mobileFooterNav without also growing that
    offset, or the hidden toast peeks back into view at the new, taller
    bottom (which is exactly what happened here the first time around). */
-@media (max-width:1180px){ #toast{ bottom:calc(var(--mfn-h) + var(--readnavrow-h) + 12px); transform:translateX(-50%) translateY(140px); } }
+/* Hidden state translates down by its own full height PLUS the whole bottom
+   offset, so it always clears the viewport regardless of how tall the toast or
+   how big the bottom chrome (footer + #readNavRow) is. */
+@media (max-width:1180px){ #toast{ bottom:calc(var(--mfn-h) + var(--readnavrow-h) + 12px); transform:translateX(-50%) translateY(calc(100% + var(--mfn-h) + var(--readnavrow-h) + 12px)); } }
 #toast.show{ transform:translateX(-50%) translateY(0); }
 
 ::-webkit-scrollbar{ width:6px; }
