@@ -77,9 +77,29 @@ button{ font-family:inherit; cursor:pointer; }
 .wm span{ color:var(--ink); }
 .logo-icon{ width:26px; height:26px; border-radius:var(--r-sm); flex-shrink:0; }
 #topActions{ margin-left:auto; display:flex; align-items:center; gap:10px; }
-#searchTrigger,#fontSizeTrigger,#themeTrigger,#profileTrigger{ display:flex; align-items:center; justify-content:center; width:34px; height:34px; flex-shrink:0; background:none; border:1px solid var(--divider); border-radius:var(--r-sm); color:var(--muted); transition:all .2s; }
-#searchTrigger:hover,#fontSizeTrigger:hover,#themeTrigger:hover,#profileTrigger:hover{ border-color:var(--brand); color:var(--brand); }
+#searchTrigger,#fontSizeTrigger,#themeTrigger,#profileTrigger,#displayBtn{ display:flex; align-items:center; justify-content:center; width:34px; height:34px; flex-shrink:0; background:none; border:1px solid var(--divider); border-radius:var(--r-sm); color:var(--muted); transition:all .2s; }
+#searchTrigger:hover,#fontSizeTrigger:hover,#themeTrigger:hover,#profileTrigger:hover,#displayBtn:hover{ border-color:var(--brand); color:var(--brand); }
 #searchTrigger svg,#fontSizeTrigger svg,#themeTrigger svg,#profileTrigger svg{ opacity:.7; }
+.aa-label{ font-family:var(--font-ui); font-weight:800; letter-spacing:-.03em; font-size:.82rem; line-height:1; }
+.aa-label span{ font-size:.62rem; }
+/* Mobile-only topbar controls — hidden on desktop, where the reading header
+   carries the version pick and the two separate font/theme icons stay. */
+#topVersionBtn,#displayBtn{ display:none; }
+#topVersionBtn{ align-items:center; gap:4px; flex-shrink:0; padding:5px 9px; border:1px solid var(--brand-line); border-radius:var(--r-pill); background:var(--brand-soft); color:var(--brand); font-family:var(--font-ui); font-weight:700; font-size:.64rem; letter-spacing:.08em; text-transform:uppercase; white-space:nowrap; max-width:38vw; overflow:hidden; }
+#topVersionBtn svg{ width:8px; height:8px; flex-shrink:0; stroke:currentColor; }
+
+/* Appearance segmented control inside the Display sheet. */
+.theme-seg{ display:flex; gap:6px; }
+.theme-seg button{ flex:1; font-family:var(--font-ui); font-weight:700; font-size:.8rem; padding:9px 0; border-radius:var(--r-sm); border:1px solid var(--divider); background:var(--surface-2); color:var(--muted); transition:all .15s; }
+.theme-seg button.on{ border-color:var(--brand); background:var(--brand-soft); color:var(--brand); }
+
+/* Reading-dashboard row at the top of the mobile "More" sheet (#profileTrigger
+   is hidden in the topbar < 1180px). */
+.mm-profile{ display:flex; align-items:center; gap:12px; width:100%; text-align:left; background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-control); padding:12px 14px; }
+.mm-profile-av{ width:34px; height:34px; flex-shrink:0; border-radius:var(--r-pill); background:var(--brand-soft); color:var(--brand); display:flex; align-items:center; justify-content:center; }
+.mm-profile-av svg{ width:18px; height:18px; }
+.mm-profile-txt{ display:flex; flex-direction:column; font-family:var(--font-ui); font-weight:700; font-size:.9rem; color:var(--ink); }
+.mm-profile-txt small{ font-weight:500; font-size:.72rem; color:var(--muted); margin-top:2px; }
 
 /* ── profile / reading-dashboard popover — replaces the old bare
    "open Settings" shortcut. Non-blocking (no scrim), anchored under the
@@ -133,6 +153,7 @@ button{ font-family:inherit; cursor:pointer; }
 .iconbtn.cardsheet-trigger{ display:none; }
 #mobileFooterNav{ display:none; }
 #moreMenuSheet{ display:none; }
+#discoverHub{ display:none; }
 .rightrail-sheethead{ display:none; }
 @media (max-width:1180px){
   /* The 2×2 grid button and the ⓘ book-info button are both replaced on
@@ -166,6 +187,26 @@ button{ font-family:inherit; cursor:pointer; }
   /* The left-nav footer's credit/version line, mirrored here — it's the only
      place the version shows on mobile (the desktop nav rail is display:none). */
   #moreMenuSheet .navfooter-sheet{ margin-top:4px; padding:14px 14px calc(10px + env(safe-area-inset-bottom,0)); border-top:1px solid var(--divider); }
+
+  /* Discover hub — same slide-up mechanics as #moreMenuSheet, grouped content.
+     z-index in the same band (below .dict-tooltip / #toast at 600). */
+  #discoverHub{ display:block; position:fixed; left:0; right:0; bottom:var(--mfn-h); background:var(--surface); border-top:1px solid var(--divider); padding:14px 14px calc(14px + env(safe-area-inset-bottom,0)); max-height:64vh; overflow-y:auto; box-shadow:0 -8px 24px var(--shadow-lg); z-index:420; transform:translateY(100%); opacity:0; pointer-events:none; transition:transform .18s ease,opacity .18s ease; }
+  #discoverHub.show{ transform:translateY(0); opacity:1; pointer-events:auto; }
+  .disc-group + .disc-group{ margin-top:14px; }
+  .disc-label{ font-family:var(--font-ui); font-size:.58rem; font-weight:800; letter-spacing:.13em; text-transform:uppercase; color:var(--brand); margin:0 2px 8px; }
+  .disc-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .disc-item{ font-family:var(--font-ui); font-size:.82rem; font-weight:600; color:var(--ink-soft); background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-sm); padding:12px 12px; text-align:left; transition:border-color .15s,color .15s,background .15s; }
+  .disc-item:hover,.disc-item:active{ border-color:var(--brand-line); color:var(--brand); background:var(--brand-soft); }
+
+  /* Topbar consolidation < 1180px: version pill + one "Aa" (font size +
+     day/night); the two separate font/theme icons and the profile icon move
+     off the bar (profile → the "More" sheet's #mm-profile row). */
+  #topVersionBtn,#displayBtn{ display:flex; }
+  #fontSizeTrigger,#themeTrigger,#profileTrigger{ display:none; }
+  /* #profileWrap stays (0-size relative box); the panel it holds re-centers as
+     a sheet since there's no longer a topbar anchor for it. */
+  #profilePanel{ position:fixed; left:50%; top:50%; right:auto; bottom:auto; transform:translate(-50%,-46%); width:min(360px,92vw); z-index:135; }
+  #profilePanel.show{ transform:translate(-50%,-50%); }
 
   /* #rightRail becomes a slide-up sheet with the same #cardStack content/
      fetch logic as the desktop rail — see the HTML comment above it. Scrim
@@ -750,9 +791,16 @@ body.has-audio{ --audio-h:49px; }
    (rather than the old inline style="width:660px" index.html/404.html used
    to carry) so the mobile override below can win on source order alone,
    without needing !important. */
-#bookPickerScrim .modal{ width:660px; }
+#navPickerScrim .modal{ width:660px; }
+/* The navigator's two steps toggle via [hidden]; .chipgrid sets display:grid,
+   which would otherwise beat the attribute. The chapter grid scrolls inside
+   the modal (Psalms has 150). */
+#navPickerScrim [hidden]{ display:none; }
+#navPickerScrim #chapterGrid{ flex:1; min-height:0; overflow-y:auto; align-content:start; }
 .mhead{ padding:20px 24px 16px; border-bottom:1px solid var(--divider); }
 .mhead .row{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+/* Back arrow on the chapter step — same chrome as .closebtn, sits left of the title. */
+.npk-back svg{ width:15px; height:15px; }
 .mhead h2{ font-family:var(--font-ui); font-weight:800; letter-spacing:-.02em; font-size:1.3rem; color:var(--brand); }
 .closebtn{ width:28px; height:28px; border-radius:var(--r-sm); background:var(--surface-2); border:none; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:1.1rem; }
 .closebtn:hover{ color:var(--brand); background:var(--brand-soft); }
@@ -825,6 +873,8 @@ body.has-audio{ --audio-h:49px; }
 .chapchip{ font-family:var(--font-ui); font-size:.8rem; color:var(--ink); background:var(--surface-2); border:1px solid transparent; border-radius:var(--r-sm); padding:9px 0; }
 .chapchip:hover{ border-color:var(--brand-line); }
 .chapchip.on{ color:var(--brand); background:rgba(109,40,217,.16); border-color:var(--brand); }
+/* Full-width row above the numbered chapters — the book's Introduction, not a chapter. */
+.chapchip.introchip{ grid-column:1/-1; font-weight:600; letter-spacing:.04em; color:var(--brand); border-color:var(--brand-line); }
 
 /* Book grid — row-major, a fixed 4 rows per testament with the column count
    derived from book count (Math.ceil(count/4)), so e.g. 39 OT books give 10
@@ -1444,10 +1494,10 @@ details.bg-accordion{ border:1px solid var(--divider); border-radius:var(--r-con
   .help-tour-btn{ justify-content:center; }
 
   .modal,.modal.narrow{ width:92vw; max-height:86vh; }
-  /* Same-selector override of the #bookPickerScrim .modal desktop rule
+  /* Same-selector override of the #navPickerScrim .modal desktop rule
      above — needed because that ID-scoped selector outranks the plain
      .modal one right above on specificity, not just source order. */
-  #bookPickerScrim .modal{ width:92vw; }
+  #navPickerScrim .modal{ width:92vw; }
 
   /* The row-major column count above (Math.ceil(count/4)) gives 10 columns
      for the Old Testament at desktop's 660px modal width — far too tight for
@@ -1466,8 +1516,8 @@ details.bg-accordion{ border:1px solid var(--divider); border-radius:var(--r-con
      too, so the search field + first results dock right under the topbar
      instead of the modal's vertical centering fighting the keyboard for
      which half of the screen it gets. */
-  #versionPickerScrim,#bookPickerScrim{ align-items:flex-start; padding-top:max(16px,env(safe-area-inset-top,0)); }
-  #versionPickerScrim .modal,#bookPickerScrim .modal{ max-height:min(86vh,calc(var(--vvh) - 32px)); }
+  #versionPickerScrim,#navPickerScrim{ align-items:flex-start; padding-top:max(16px,env(safe-area-inset-top,0)); }
+  #versionPickerScrim .modal,#navPickerScrim .modal{ max-height:min(86vh,calc(var(--vvh) - 32px)); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════

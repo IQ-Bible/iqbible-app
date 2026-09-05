@@ -56,6 +56,10 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
   <div id="topbar">
     <div class="wordmark"><img src="img/logo.png" alt="" class="logo-icon"><span class="wm-text">IQ <span>Bible</span></span></div>
     <div id="topActions">
+      <!-- Mobile only (< 1180px): the version pill lives here instead of in the
+           reading header, which collapses to a slim label at that width. Label
+           kept in sync by loadChapter() (js/reader.js). -->
+      <button id="topVersionBtn" class="verpick" onclick="openVersionPicker()" title="Choose a translation" aria-label="Choose a translation">KJV <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
       <button id="searchTrigger" onclick="openSearch()" title="Search" aria-label="Search">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
       </button>
@@ -69,6 +73,9 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
         <svg id="themeIconSun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4l1.4-1.4M18 6l1.4-1.4"/></svg>
         <svg id="themeIconMoon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.8 6.8 0 0 0 10.5 10.5Z"/></svg>
       </button>
+      <!-- Mobile only (< 1180px): folds font size + day/night into one control.
+           Tap opens the Display sheet; long-press flips the theme. -->
+      <button id="displayBtn" onclick="openFontSizeModal()" title="Display options" aria-label="Display options"><span class="aa-label">A<span>a</span></span></button>
       <div id="profileWrap">
         <button id="profileTrigger" onclick="toggleProfilePanel()" title="Reading dashboard">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c1.4-3.6 4.4-5.5 7.5-5.5s6.1 1.9 7.5 5.5"/></svg>
@@ -297,8 +304,8 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
       </div>
 
       <!-- Book filter for Search's Verses tab — multi-select (unlike the
-           single-select reading #bookPickerScrim above), scoped to whichever
-           version "Searching in" currently points at, since a Catholic/Orthodox
+           single-select reading #navPickerScrim), scoped to whichever version
+           "Searching in" currently points at, since a Catholic/Orthodox
            edition's canon is genuinely larger than a 66-book Protestant one. -->
       <div class="modalscrim" id="searchBookFilterScrim">
         <div class="modal">
@@ -851,22 +858,19 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
   <div class="modalscrim" id="cardsSheetScrim"></div>
 
   <!-- Fixed bottom nav — replaces #navrail below 1180px, where the left rail
-       is hidden entirely. Search is deliberately left out (already reachable
-       via #searchTrigger in the topbar at every width); Notes is a tab here
-       (it opens the drawer, not a view); Share Tools and the rest of
-       #navMenu's items live in "More" (#moreMenuSheet). -->
+       is hidden entirely. Four fixed tabs: audio is never a tab (it lives in
+       #readNavRow), so the bar keeps the same shape whether or not a chapter
+       has narration. Search is deliberately left out (already in the topbar);
+       Notes opens the drawer; "Discover" opens #discoverHub (Explore + Study
+       Tools); Share Tools and the rest of #navMenu's items live in "More". -->
   <nav id="mobileFooterNav" aria-label="Primary">
     <button class="mfn-item" data-nav="read" onclick="navMenuClick('read')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
       <span>Read</span>
     </button>
-    <button class="mfn-item" data-nav="explore" onclick="navMenuClick('explore')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m9 15 1.5-4.5L15 9l-1.5 4.5z"/></svg>
-      <span>Explore</span>
-    </button>
-    <button class="mfn-item" data-nav="study" onclick="navMenuClick('study')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M9 7h6M9 11h6"/></svg>
-      <span>Study</span>
+    <button class="mfn-item" data-nav="discover" id="mfnDiscoverBtn" onclick="toggleDiscoverHub()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15 9-2.5 5.5L7 17l2.5-5.5z"/></svg>
+      <span>Discover</span>
     </button>
     <button class="mfn-item" id="mfnNotesBtn" onclick="openNotesDrawer()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5V4Z"/><path d="M9 10h6M9 14h6"/></svg>
@@ -878,6 +882,13 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
     </button>
   </nav>
   <div id="moreMenuSheet">
+    <!-- Mobile home for the reading dashboard — #profileTrigger is hidden in
+         the topbar < 1180px. Opens the same #profilePanel. -->
+    <button class="mm-profile" onclick="closeMoreMenu();toggleProfilePanel()">
+      <span class="mm-profile-av"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c1.4-3.6 4.4-5.5 7.5-5.5s6.1 1.9 7.5 5.5"/></svg></span>
+      <span class="mm-profile-txt">Your Reading<small>Streak, counts, continue reading</small></span>
+    </button>
+    <hr class="navdivider">
     <button class="navitem" data-nav="share" onclick="navMenuClick('share');closeMoreMenu()">Share Tools</button>
     <button class="navitem" data-nav="library" onclick="navMenuClick('library');closeMoreMenu()">My Library</button>
     <button class="navitem" data-nav="progress" onclick="navMenuClick('progress');closeMoreMenu()">My Progress</button>
@@ -888,6 +899,33 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
     <button class="navitem" data-nav="about" onclick="navMenuClick('about');closeMoreMenu()">About</button>
     <button class="navitem" data-nav="settings" onclick="navMenuClick('settings');closeMoreMenu()">Settings</button>
     <div class="navfooter navfooter-sheet">&copy;&nbsp;<span data-app-year></span>&nbsp;<a href="https://iqbible.com" target="_blank" rel="noopener" class="wm-link"><span class="wm">IQ&nbsp;<span>Bible</span></span></a><span class="navfoot-ver">v<span data-app-version></span> &middot; <a href="https://api.iqbible.com" target="_blank" rel="noopener">API</a></span></div>
+  </div>
+
+  <!-- Discover hub — the mobile home for Explore + Study Tools (no longer
+       footer tabs). Same slide-up pattern as #moreMenuSheet; each entry opens
+       the existing overlay at that tab via discoverGo() (js/main.js). -->
+  <div id="discoverHub" aria-label="Discover">
+    <div class="disc-group">
+      <div class="disc-label">Explore</div>
+      <div class="disc-grid">
+        <button class="disc-item" onclick="discoverGo('explore','atlas')">Atlas</button>
+        <button class="disc-item" onclick="discoverGo('explore','collections')">Collections</button>
+        <button class="disc-item" onclick="discoverGo('explore','genealogy')">Genealogy</button>
+        <button class="disc-item" onclick="discoverGo('explore','harmony')">Harmony</button>
+        <button class="disc-item" onclick="discoverGo('explore','topics')">Topics</button>
+        <button class="disc-item" onclick="discoverGo('explore','extrabiblical')">Extrabiblical</button>
+      </div>
+    </div>
+    <div class="disc-group">
+      <div class="disc-label">Study Tools</div>
+      <div class="disc-grid">
+        <button class="disc-item" onclick="discoverGo('study','book')">Book Guide</button>
+        <button class="disc-item" onclick="discoverGo('study','dictionary')">Dictionary</button>
+        <button class="disc-item" onclick="discoverGo('study','word')">Word Study</button>
+        <button class="disc-item" onclick="discoverGo('study','commentaries')">Commentaries</button>
+        <button class="disc-item" onclick="discoverGo('study','variants')">Textual Variants</button>
+      </div>
+    </div>
   </div>
 
   <!-- API key gate — shown whenever no key is set (first load, or after
@@ -923,22 +961,21 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
     </div>
   </div>
 
-  <!-- book picker -->
-  <div class="modalscrim" id="bookPickerScrim">
+  <!-- book + chapter navigator — one modal, two steps (book grid → chapter grid,
+       back arrow between). openBookPicker() opens on books; openChapterPicker()
+       opens on the current book's chapters with the book list one tap back. -->
+  <div class="modalscrim" id="navPickerScrim">
     <div class="modal">
       <div class="mhead">
-        <div class="row"><h2>Choose a book</h2><button class="closebtn" onclick="closeModal('bookPickerScrim')">&times;</button></div>
-        <div class="msearch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8"/></svg><input type="text" id="bookSearchInput" placeholder="Search books…" oninput="onBookSearch()" autocomplete="off"></div>
+        <div class="row">
+          <button class="closebtn npk-back" id="navPickerBack" onclick="navPickerBack()" title="Back to books" aria-label="Back to books" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+          <h2 id="navPickerTitle">Choose a book</h2>
+          <button class="closebtn" onclick="closeModal('navPickerScrim')" aria-label="Close">&times;</button>
+        </div>
+        <div class="msearch" id="navPickerSearch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8"/></svg><input type="text" id="bookSearchInput" placeholder="Search books…" oninput="onBookSearch()" autocomplete="off"></div>
       </div>
       <div class="mlist" id="bookList"></div>
-    </div>
-  </div>
-
-  <!-- chapter picker -->
-  <div class="modalscrim" id="chapterPickerScrim">
-    <div class="modal narrow" style="width:400px">
-      <div class="mhead"><div class="row"><h2 id="chapterPickerTitle">Choose a chapter</h2><button class="closebtn" onclick="closeModal('chapterPickerScrim')">&times;</button></div></div>
-      <div class="chipgrid" id="chapterGrid"></div>
+      <div class="chipgrid" id="chapterGrid" hidden></div>
     </div>
   </div>
 
@@ -961,14 +998,22 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
     </div>
   </div>
 
-  <!-- Quick font-size popover — the same two sliders as Settings, surfaced
-       next to Search/day-night in the topbar so changing text size doesn't
-       need a trip through the full Settings modal. setFontSize/setUiFontSize
-       (js/api.js) keep this and the Settings sliders in sync either way. -->
+  <!-- Quick display popover — the two Settings font sliders plus a day/night
+       toggle, surfaced from the topbar ("Aa" on mobile, the two icons on
+       desktop) so changing text size or theme doesn't need the full Settings
+       modal. setFontSize/setUiFontSize/setTheme (js/api.js) keep this and the
+       Settings controls in sync either way. -->
   <div class="modalscrim" id="fontSizeScrim">
     <div class="modal narrow" style="width:340px">
-      <div class="mhead"><div class="row"><h2>Font Size</h2><button class="closebtn" onclick="closeModal('fontSizeScrim')">&times;</button></div></div>
+      <div class="mhead"><div class="row"><h2>Display</h2><button class="closebtn" onclick="closeModal('fontSizeScrim')">&times;</button></div></div>
       <div class="settingsbody">
+        <div class="setfield">
+          <label>Appearance</label>
+          <div class="theme-seg" role="group" aria-label="Appearance">
+            <button type="button" id="themeSegLight" onclick="setTheme('light')">Light</button>
+            <button type="button" id="themeSegDark" onclick="setTheme('dark')">Dark</button>
+          </div>
+        </div>
         <div class="setfield">
           <label for="fontSizeSlider">Reading Font Size</label>
           <input type="range" id="fontSizeSlider" min="14" max="26" step="1" oninput="setFontSize(this.value)">

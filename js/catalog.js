@@ -277,12 +277,27 @@ async function loadBooks() {
   }
 }
 async function openBookPicker() {
-  openModal("bookPickerScrim");
+  navPickerShowBooks();
+  openModal("navPickerScrim");
   document.getElementById("bookSearchInput").value = "";
   if (!bookList.length) await loadBooks();
   renderBookList("");
   // See openVersionPicker's matching comment — same reason to skip autofocus below 1180px.
   if (window.innerWidth > 1180) setTimeout(() => document.getElementById("bookSearchInput").focus(), 60);
+}
+// The navigator is one modal with two steps — book grid and chapter grid.
+// These two just flip which step is showing; the callers below do the data.
+function navPickerShowBooks() {
+  document.getElementById("navPickerTitle").textContent = "Choose a book";
+  document.getElementById("navPickerBack").hidden = true;
+  document.getElementById("navPickerSearch").hidden = false;
+  document.getElementById("bookList").hidden = false;
+  document.getElementById("chapterGrid").hidden = true;
+}
+async function navPickerBack() {
+  navPickerShowBooks();
+  if (!bookList.length) await loadBooks();
+  renderBookList(document.getElementById("bookSearchInput").value || "");
 }
 function onBookSearch() { renderBookList(document.getElementById("bookSearchInput").value); }
 // Row-major grid, 4 rows per testament: column count is Math.ceil(count/4),
@@ -312,8 +327,13 @@ function renderBookList(q) {
 }
 async function selectBook(usfm, name) {
   current.book = usfm; current.bookName = name;
-  closeModal("bookPickerScrim");
-  await loadChapter(1, true);
+  chapterMeta = [];
+  await loadChapterMeta();
+  // Single-chapter books (Obadiah, Philemon, Jude, 2–3 John) — a one-button
+  // chapter grid is pure friction, so read straight in. Every other book
+  // advances to the chapter step of the navigator.
+  if (chapterMeta.length <= 1) { closeModal("navPickerScrim"); await loadChapter(1, false); return; }
+  openChapterPicker(true);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -324,15 +344,34 @@ async function loadChapterMeta() {
     chapterMeta = data.chapters || [];
   } catch (e) { chapterMeta = [{ chapter: 1, verse_count: 0 }]; }
 }
-async function openChapterPicker() {
-  openModal("chapterPickerScrim");
-  document.getElementById("chapterPickerTitle").textContent = `${current.bookName} — choose a chapter`;
+// `freshBook` = opened straight after a book selection, so nothing is "on"
+// yet (no chapter loaded) and the old book's chapter must not light up.
+async function openChapterPicker(freshBook) {
+  openModal("navPickerScrim"); // no-op if already open (advanced here from selectBook)
+  document.getElementById("navPickerTitle").textContent = `${current.bookName} — choose a chapter`;
+  document.getElementById("navPickerBack").hidden = false;
+  document.getElementById("navPickerSearch").hidden = true;
+  document.getElementById("bookList").hidden = true;
+  document.getElementById("chapterGrid").hidden = false;
   if (!chapterMeta.length) await loadChapterMeta();
-  document.getElementById("chapterGrid").innerHTML = chapterMeta.map(c =>
-    `<button class="chapchip ${c.chapter == current.chapter ? 'on' : ''}" onclick="selectChapter(${c.chapter})">${c.chapter}</button>`
+  const grid = document.getElementById("chapterGrid");
+  grid.innerHTML = chapterMeta.map(c =>
+    `<button class="chapchip ${!freshBook && c.chapter == current.chapter ? 'on' : ''}" onclick="selectChapter(${c.chapter})">${c.chapter}</button>`
   ).join("");
+  // Prepend a full-width "Intro" chip only when the API actually carries
+  // book-intro text (GET /books/{book}/info) — it's book metadata, not a
+  // chapter, so it opens the same lightweight preview as the reading
+  // header's (i) button rather than pretending to be chapter 0. Injected
+  // async so the numbered grid never waits on this fetch.
+  const bookAtOpen = current.book;
+  getBookInfo(bookAtOpen).then(info => {
+    if (current.book !== bookAtOpen || grid.querySelector(".introchip")) return;
+    if (!info || !(info.introduction || info.canonical_significance)) return;
+    grid.insertAdjacentHTML("afterbegin",
+      `<button class="chapchip introchip" onclick="closeModal('navPickerScrim');openBookInfoModal('${bookAtOpen}')">Intro</button>`);
+  });
 }
 async function selectChapter(n) {
-  closeModal("chapterPickerScrim");
+  closeModal("navPickerScrim");
   await loadChapter(n, false);
 }

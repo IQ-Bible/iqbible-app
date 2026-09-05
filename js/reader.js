@@ -7,10 +7,18 @@ async function loadChapter(chapter, refreshMeta, verse, verseEnd) {
   logHistoryVisit();
   clearVerseSelection();
   document.getElementById("btnPickChapter").firstChild.textContent = chapter + " ";
+  const verLabel = shortVersionLabel(current.versionTitle);
   const btnVersion = document.getElementById("btnPickVersion");
-  btnVersion.firstChild.textContent = shortVersionLabel(current.versionTitle) + " ";
+  btnVersion.firstChild.textContent = verLabel + " ";
   btnVersion.title = current.versionTitle; // the abbreviation alone can't tell KJV from KJV 1611, KJVA, etc.
   document.getElementById("btnPickBook").firstChild.textContent = current.bookName + " ";
+  // Mobile mirrors — the version pill sits in the topbar and the combined
+  // book+chapter chip in #readNavRow at < 1180px, but they're always in the
+  // DOM, so keep them current at every width.
+  const topVer = document.getElementById("topVersionBtn");
+  if (topVer) { topVer.firstChild.textContent = verLabel + " "; topVer.title = current.versionTitle; }
+  const navChip = document.getElementById("readNavChip");
+  if (navChip) navChip.firstChild.textContent = `${current.bookName} ${chapter} `;
   document.getElementById("readingText").innerHTML = `<div class="spin"></div>`;
   // A fresh navigation (no target verse) always starts at the top — a cached
   // chapter renders fast enough that the previous chapter's scroll offset

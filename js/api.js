@@ -321,6 +321,9 @@ function setTheme(t) {
   const sun = document.getElementById("themeIconSun"), moon = document.getElementById("themeIconMoon");
   if (sun) sun.style.display = t === "dark" ? "none" : "";
   if (moon) moon.style.display = t === "dark" ? "" : "none";
+  const segL = document.getElementById("themeSegLight"), segD = document.getElementById("themeSegDark");
+  if (segL) segL.classList.toggle("on", t !== "dark");
+  if (segD) segD.classList.toggle("on", t === "dark");
 }
 function toggleTheme() { setTheme(getTheme() === "dark" ? "light" : "dark"); }
 
@@ -365,5 +368,8 @@ function setUiFontSize(px) {
 function openFontSizeModal() {
   document.getElementById("fontSizeSlider").value = getFontSize();
   document.getElementById("fontSizeUiSlider").value = getUiFontSize();
+  const t = getTheme();
+  document.getElementById("themeSegLight").classList.toggle("on", t !== "dark");
+  document.getElementById("themeSegDark").classList.toggle("on", t === "dark");
   openModal("fontSizeScrim");
 }

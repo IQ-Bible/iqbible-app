@@ -52,6 +52,7 @@ function switchMainView(key) {
   // stay in sync with #navrail's own active state for free.
   document.querySelectorAll("[data-nav]").forEach(b => b.classList.toggle("active", b.dataset.nav === key));
   document.getElementById("mfnMoreBtn").classList.toggle("active", MORE_MENU_KEYS.includes(key));
+  document.getElementById("mfnDiscoverBtn").classList.toggle("active", key === "explore" || key === "study");
   if (key !== "read") { closeVerseTools(); closeCardsSheet(); }
   document.body.classList.remove("chrome-hidden"); // don't land on another view with the topbar still tucked away
   mainViewBeforeSwitch = key;
@@ -83,8 +84,21 @@ function addShowInstant(el, instant) {
 function toggleMoreMenu() {
   document.getElementById("moreMenuSheet").classList.contains("show") ? closeMoreMenu() : openMoreMenu();
 }
-function openMoreMenu(instant) { addShowInstant(document.getElementById("moreMenuSheet"), instant); }
+function openMoreMenu(instant) { closeDiscoverHub(); addShowInstant(document.getElementById("moreMenuSheet"), instant); }
 function closeMoreMenu() { document.getElementById("moreMenuSheet").classList.remove("show"); }
+// Discover hub — the mobile stand-in for the (removed) Explore/Study footer
+// tabs. Same slide-up mechanics as "More"; each entry opens the existing
+// overlay at the chosen tab.
+function toggleDiscoverHub() {
+  document.getElementById("discoverHub").classList.contains("show") ? closeDiscoverHub() : openDiscoverHub();
+}
+function openDiscoverHub(instant) { closeMoreMenu(); addShowInstant(document.getElementById("discoverHub"), instant); }
+function closeDiscoverHub() { document.getElementById("discoverHub").classList.remove("show"); }
+function discoverGo(which, tab) {
+  closeDiscoverHub();
+  if (which === "explore") { openExplore(); switchExploreTab(tab); }
+  else { openStudy(); switchStudyTab(tab); }
+}
 function toggleCardsSheet() {
   document.getElementById("rightRail").classList.contains("show") ? closeCardsSheet() : openCardsSheet();
 }
@@ -104,7 +118,24 @@ function closeCardsSheet() {
 document.addEventListener("click", e => {
   const sheet = document.getElementById("moreMenuSheet");
   if (sheet.classList.contains("show") && !sheet.contains(e.target) && !e.target.closest("#mfnMoreBtn") && !e.target.closest("#tourOverlay")) closeMoreMenu();
+  const disc = document.getElementById("discoverHub");
+  if (disc.classList.contains("show") && !disc.contains(e.target) && !e.target.closest("#mfnDiscoverBtn") && !e.target.closest("#tourOverlay")) closeDiscoverHub();
 });
+
+// Long-press the "Aa" display button = flip the theme in place, skipping the
+// Display sheet. A tap still opens the sheet (openFontSizeModal, in the
+// button's onclick); the long-press just cancels that by eating the click.
+(function initDisplayBtnLongPress() {
+  const btn = document.getElementById("displayBtn");
+  if (!btn) return;
+  let timer = null, fired = false;
+  const start = () => { fired = false; timer = setTimeout(() => { fired = true; toggleTheme(); }, 450); };
+  const cancel = () => { clearTimeout(timer); };
+  btn.addEventListener("pointerdown", start);
+  btn.addEventListener("pointerup", cancel);
+  btn.addEventListener("pointerleave", cancel);
+  btn.addEventListener("click", e => { if (fired) { e.preventDefault(); e.stopImmediatePropagation(); fired = false; } }, true);
+})();
 
 // Keeps --vvh (css/styles.css :root) in sync with the actual visible height
 // so mobile modals with a search field (Choose a Translation/Book) can size
@@ -244,9 +275,10 @@ document.addEventListener("keydown", e => {
     closeProfilePanel();
     closeImageView();
     closeMoreMenu();
+    closeDiscoverHub();
     closeCardsSheet();
     if (tourActive) endTour();
-    ["bookPickerScrim", "chapterPickerScrim", "versionPickerScrim", "narrationPickerScrim", "dictTermScrim", "placesScrim", "propheciesScrim", "timelineScrim", "chapterInfoScrim", "apiErrorScrim", "peopleScrim", "fontSizeScrim", "vtShareScrim", "vtOrigLangScrim", "bookInfoScrim", "dayDrawerScrim", "tourWelcomeScrim", "tourAdvancedOfferScrim"].forEach(closeModal);
+    ["navPickerScrim", "versionPickerScrim", "narrationPickerScrim", "dictTermScrim", "placesScrim", "propheciesScrim", "timelineScrim", "chapterInfoScrim", "apiErrorScrim", "peopleScrim", "fontSizeScrim", "vtShareScrim", "vtOrigLangScrim", "bookInfoScrim", "dayDrawerScrim", "tourWelcomeScrim", "tourAdvancedOfferScrim"].forEach(closeModal);
     closeVerseTools();
     setMenuHash(null);
     // Escape bypasses closeSettings() (goes straight to switchMainView above),
@@ -256,7 +288,10 @@ document.addEventListener("keydown", e => {
 });
 document.addEventListener("click", e => {
   const wrap = document.getElementById("profileWrap");
-  if (wrap && !wrap.contains(e.target)) closeProfilePanel();
+  // .mm-profile (the "More" sheet's dashboard row, < 1180px) opens the panel
+  // from outside #profileWrap — exclude it so its own opening click doesn't
+  // immediately count as an outside click and close it again.
+  if (wrap && !wrap.contains(e.target) && !e.target.closest(".mm-profile")) closeProfilePanel();
 });
 
 // Reads the live version straight out of CHANGELOG.md's newest `## [x.y.z]`

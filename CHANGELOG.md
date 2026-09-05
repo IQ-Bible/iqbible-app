@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file. This CHANGELOG follows SemVer, see https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
+- **changed:** The book picker and chapter picker are now one navigator — pick a book and its
+  chapters appear in the same panel, with a back arrow to the book list. Choosing a book no longer
+  drops you straight onto chapter 1 (single-chapter books — Obadiah, Philemon, Jude, 2–3 John —
+  still open directly); the reading header's chapter button opens straight to that book's chapters
+  with the book list one tap back. Applies on desktop and mobile.
+- **added:** The navigator shows an "Intro" row above the numbered chapters when the API has
+  introduction text for that book (`GET /books/{book}/info`). It opens the same lightweight book
+  overview as the reading header's (i) button (author/date, Canonical Significance, Introduction,
+  with a link through to the full Book Guide). Hidden for books the API carries no intro text for.
+- **changed:** The mobile bottom nav is four fixed tabs — Read, Discover, Notes, More — instead of
+  five. Explore and Study Tools are no longer tabs; "Discover" opens a sheet listing both (Atlas,
+  Collections, Genealogy, Harmony, Topics, Extrabiblical; Book Guide, Dictionary, Word Study,
+  Commentaries, Textual Variants), each opening the existing overlay at that tab. The desktop left
+  rail is unchanged.
+- **changed:** On a phone the translation pill now lives in the top bar next to Search, and the
+  separate font-size and day/night buttons collapse into one "Aa" control that opens a Display
+  sheet (both font sliders plus a Light/Dark toggle); long-pressing "Aa" flips the theme directly.
+  The reading dashboard (streak/counts) moves to a row at the top of the "More" sheet. Desktop's
+  top bar is unchanged.
 
 ## [1.19.0] - 2026-09-05
 - **added:** Chapter navigation is now consistent across breakpoints instead of each having only
