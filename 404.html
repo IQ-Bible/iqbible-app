@@ -156,15 +156,20 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
           <div class="chhead">
             <div id="chBookIcon" class="bookicon-badge" style="display:none"></div>
             <div class="chtitlewrap">
+              <!-- Book + chapter read as one title (the caret chevrons are hidden
+                   by CSS at every width) but stay two hit targets. -->
               <button class="titlepick" id="btnPickBook" onclick="openBookPicker()">Genesis <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
-              <button class="bookinfo-btn" id="btnBookInfo" title="About this book" aria-label="About this book" onclick="openBookInfoModal(current.book)">&#9432;</button>
               <button class="titlepick" id="btnPickChapter" onclick="openChapterPicker()">1 <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
-              <!-- Mobile only (< 1180px): the one context affordance in the slim
-                   reading header. Opens the Chapter Info sheet (places, people,
-                   prophecies, timeline, chapter overview) — its top card is the
-                   book's own overview. Same sheet as the right-edge inward swipe.
-                   Desktop uses #btnBookInfo above + the always-visible rail. -->
+              <!-- Desktop ⓘ — book overview. -->
+              <button class="bookinfo-btn" id="btnBookInfo" title="About this book" aria-label="About this book" onclick="openBookInfoModal(current.book)">&#9432;</button>
+              <!-- Mobile ⓘ (< 1180px) — the one context affordance in the slim
+                   header. Opens the Chapter Info sheet (places, people, prophecies,
+                   timeline, chapter overview; the book overview is its top card).
+                   Same sheet as the right-edge inward swipe. -->
               <button class="bookinfo-btn" id="btnChapterCtx" title="Chapter info" aria-label="Chapter info" onclick="openCardsSheet()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg></button>
+              <!-- The translation pick lives in the top bar now (#topVersionBtn) —
+                   this stays in the DOM (reader.js keeps its label current) but is
+                   display:none at every width. -->
               <button class="verpick" id="btnPickVersion" onclick="openVersionPicker()">KJV <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
               <!-- Legacy 2×2 grid button — display:none at every width now
                    (desktop has the always-visible rail; mobile uses #btnChapterCtx

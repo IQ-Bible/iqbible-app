@@ -86,8 +86,12 @@ button{ font-family:inherit; cursor:pointer; }
 .aa-label span{ font-size:.62rem; }
 /* Mobile-only topbar controls — hidden on desktop, where the reading header
    carries the version pick and the two separate font/theme icons stay. */
-#topVersionBtn,#displayBtn{ display:none; }
-#topVersionBtn{ align-items:center; gap:4px; flex-shrink:0; padding:5px 9px; border:1px solid var(--brand-line); border-radius:var(--r-pill); background:var(--brand-soft); color:var(--brand); font-family:var(--font-ui); font-weight:700; font-size:.64rem; letter-spacing:.08em; text-transform:uppercase; white-space:nowrap; max-width:38vw; overflow:hidden; }
+/* The translation pill lives in the top bar at every width now; the reading
+   header's own #btnPickVersion is retired (kept in the DOM, hidden). */
+#displayBtn{ display:none; } /* mobile-only "Aa" — shown < 1180px */
+#btnPickVersion{ display:none; }
+#topVersionBtn{ display:flex; align-items:center; gap:4px; flex-shrink:0; padding:5px 10px; border:1px solid var(--brand-line); border-radius:var(--r-pill); background:var(--brand-soft); color:var(--brand); font-family:var(--font-ui); font-weight:700; font-size:.64rem; letter-spacing:.08em; text-transform:uppercase; white-space:nowrap; max-width:min(38vw,220px); overflow:hidden; }
+#topVersionBtn:hover{ border-color:var(--brand); background:var(--brand-soft); }
 #topVersionBtn svg{ width:8px; height:8px; flex-shrink:0; stroke:currentColor; }
 
 /* Appearance segmented control inside the Display sheet. */
@@ -225,7 +229,7 @@ button{ font-family:inherit; cursor:pointer; }
   /* Topbar consolidation < 1180px: version pill + one "Aa" (font size +
      day/night); the two separate font/theme icons and the profile icon move
      off the bar (profile → the "More" sheet's #mm-profile row). */
-  #topVersionBtn,#displayBtn{ display:flex; }
+  #displayBtn{ display:flex; }
   #fontSizeTrigger,#themeTrigger,#profileTrigger{ display:none; }
   /* #profileWrap stays (0-size relative box); the panel it holds becomes a
      bottom sheet (opened from the "More" sheet's row) rather than a topbar
@@ -546,10 +550,13 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 .chhead{ display:flex; align-items:center; gap:16px; position:sticky; top:0; z-index:6; background:var(--bg); margin:-40px 0 0; padding:40px 0 20px; }
 .bookicon-badge{ width:52px; height:52px; border-radius:var(--r-card); flex-shrink:0; display:flex; align-items:center; justify-content:center; overflow:hidden; }
 .bookicon-badge img{ width:100%; height:100%; object-fit:cover; }
-.chtitlewrap{ flex:0 1 auto; display:flex; align-items:baseline; flex-wrap:wrap; gap:2px 10px; min-width:0; }
+.chtitlewrap{ flex:0 1 auto; display:flex; align-items:baseline; flex-wrap:wrap; gap:2px 5px; min-width:0; }
 .titlepick{ display:flex; align-items:center; gap:5px; padding:2px 8px; margin:0 -8px; border-radius:var(--r-sm); background:none; border:none; font-family:var(--font-ui); font-size:1.7rem; font-weight:800; letter-spacing:-.02em; color:var(--ink); transition:background .15s; }
 .titlepick:hover{ background:var(--brand-soft); }
-.titlepick svg{ width:13px; height:13px; stroke:var(--muted); flex-shrink:0; }
+/* Caret chevrons hidden at every width — book + chapter read as one flush
+   title but stay separate hit targets (each highlights on hover). */
+.titlepick svg{ display:none; }
+.titlepick{ align-items:baseline; }
 /* Read-status line under the chapter title — flex:0 0 100% drops it onto its
    own row within .chtitlewrap's wrap. Only shown once the chapter's read. */
 /* Its own row under .chhead (a sibling, never a child) so it can't change
@@ -567,11 +574,8 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 .verpick:hover{ background:var(--brand-soft); color:var(--brand); }
 .verpick svg{ width:9px; height:9px; stroke:var(--muted); flex-shrink:0; }
 #btnPickNarration svg{ flex-shrink:0; }
-/* Sits between the book-title and chapter-number .titlepick buttons, which
-   share one uniform gap in .chtitlewrap — margin here pulls it visually
-   against the book title it belongs to, and pushes the chapter number
-   further away, so it no longer reads as "part of the chapter number". */
-.bookinfo-btn{ align-self:center; width:20px; height:20px; flex-shrink:0; margin:0 8px 0 -6px; border-radius:var(--r-pill); background:none; border:none; color:var(--muted); font-size:1rem; line-height:1; display:flex; align-items:center; justify-content:center; transition:background .15s,color .15s; }
+/* Sits just after the flush "Book Chapter" title. */
+.bookinfo-btn{ align-self:center; width:20px; height:20px; flex-shrink:0; margin:0 0 0 4px; border-radius:var(--r-pill); background:none; border:none; color:var(--muted); font-size:1rem; line-height:1; display:flex; align-items:center; justify-content:center; transition:background .15s,color .15s; }
 .bookinfo-btn:hover{ background:var(--brand-soft); color:var(--brand); }
 .iconbtn{ width:38px; height:38px; border-radius:var(--r-sm); display:flex; align-items:center; justify-content:center; background:var(--surface-2); border:1px solid var(--divider); color:var(--brand); flex-shrink:0; transition:background .15s; }
 .iconbtn:hover{ background:var(--brand-soft); }
