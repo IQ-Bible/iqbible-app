@@ -126,6 +126,19 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
         <button class="chapternav prev" id="btnPrevChapter" title="Previous chapter" onclick="goAdjacentChapter(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>
         <button class="chapternav next" id="btnNextChapter" title="Next chapter" onclick="goAdjacentChapter(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
 
+        <!-- Mobile only (< 1180px): the thumb-zone control row, docked just above
+             #mobileFooterNav. The two .chapternav arrows above re-dock into this
+             row's left end (CSS); #readNavChip opens the navigator; #audioDot
+             appears only when the chapter has narration and, on play, the row
+             becomes the player (body.audio-playing swaps #audioPlayer in over
+             the chip/dot — see the max-width:1180px block in css/styles.css). -->
+        <div id="readNavRow">
+          <span class="rnr-arrowspace" aria-hidden="true"></span>
+          <button class="rnr-chip" id="readNavChip" onclick="openChapterPicker()">Genesis 1 <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+          <button class="rnr-dot" id="audioDot" onclick="toggleAudio()" title="Play narration" aria-label="Play narration"><svg viewBox="0 0 32 32"><circle class="rnr-ring-t" cx="16" cy="16" r="14" fill="none" stroke-width="2.6"/><circle class="rnr-ring-f" cx="16" cy="16" r="14" fill="none" stroke-width="2.6" stroke-dasharray="88" stroke-dashoffset="88"/><circle class="rnr-disc" cx="16" cy="16" r="11"/><path class="rnr-ic" d="M13 10.5v11l8-5.5z"/></svg></button>
+          <button class="rnr-collapse" id="readNavCollapse" onclick="collapseAudioRow()" title="Chapter picker" aria-label="Back to chapter picker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        </div>
+
         <!-- One-time (first save) + periodic nudge that notes/bookmarks/
              highlights live only in this browser — see js/reader.js's DATA
              BACKUP AWARENESS section. Same box styling as #keyBanner's
@@ -146,13 +159,17 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
               <button class="titlepick" id="btnPickBook" onclick="openBookPicker()">Genesis <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
               <button class="bookinfo-btn" id="btnBookInfo" title="About this book" aria-label="About this book" onclick="openBookInfoModal(current.book)">&#9432;</button>
               <button class="titlepick" id="btnPickChapter" onclick="openChapterPicker()">1 <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+              <!-- Mobile only (< 1180px): the one context affordance in the slim
+                   reading header. Opens the Chapter Info sheet (places, people,
+                   prophecies, timeline, chapter overview) — its top card is the
+                   book's own overview. Same sheet as the right-edge inward swipe.
+                   Desktop uses #btnBookInfo above + the always-visible rail. -->
+              <button class="bookinfo-btn" id="btnChapterCtx" title="Chapter info" aria-label="Chapter info" onclick="openCardsSheet()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg></button>
               <button class="verpick" id="btnPickVersion" onclick="openVersionPicker()">KJV <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
-              <!-- Below 1180px #rightRail's places/people/prophecies/timeline
-                   cards have nowhere to live (the rail itself is hidden). This
-                   button is hidden there (see #chapterCtxChips, the labeled
-                   chip row rendered under the pickers) but still exists as the
-                   right-edge inward-swipe target; on desktop the rail is
-                   visible so it stays hidden here too. -->
+              <!-- Legacy 2×2 grid button — display:none at every width now
+                   (desktop has the always-visible rail; mobile uses #btnChapterCtx
+                   above + the right-edge inward swipe, both calling openCardsSheet).
+                   Kept in the DOM to avoid churn; harmless while hidden. -->
               <button class="iconbtn cardsheet-trigger" id="btnCardsSheet" title="Chapter info" aria-label="Chapter info" onclick="toggleCardsSheet()">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
               </button>
@@ -171,13 +188,6 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
                 <audio id="audioEl" preload="none"></audio>
               </div>
             </div>
-            <!-- Mobile only (display:none >1180px, where the right rail carries
-                 the same cards). Two chips: About <book>, and Chapter Info
-                 (opens the places/people/timeline/prophecies/chapter-overview
-                 sheet). A child of .chhead so it's part of the sticky header block —
-                 it wraps to its own full-width row and slides away / comes
-                 back with the pickers on scroll. renderChapterCtxChips(). -->
-            <div id="chapterCtxChips" hidden></div>
           </div>
 
           <!-- Compact "Read on …" line — its own row below .chhead (not inside
@@ -675,7 +685,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
             <div class="help-card">
               <div class="help-card-num">02</div>
               <div class="help-card-title">Choose a book and chapter</div>
-              <div class="help-card-body">Navigate from the left rail, or deep-link straight to a verse like /gen/1/1 — or a range, /gal/5/14-16. The address bar keeps your translation (?v=…), so a copied link reopens in the same version.</div>
+              <div class="help-card-body">Tap the book or chapter in the reading header to open the navigator — pick a book, then its chapters, with a back arrow between. On a phone the same picker is the “Book Chapter ▾” button in the bar above the nav. Or deep-link straight to a verse like /gen/1/1 — or a range, /gal/5/14-16. The address bar keeps your translation (?v=…), so a copied link reopens in the same version.</div>
             </div>
             <div class="help-card">
               <div class="help-card-num">03</div>
@@ -701,12 +711,12 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
             <div class="help-card">
               <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="7" height="7" rx="1"/><rect x="14" y="4" width="7" height="7" rx="1"/><rect x="3" y="15" width="7" height="5" rx="1"/><rect x="14" y="15" width="7" height="5" rx="1"/></svg></div>
               <div class="help-card-title">Context cards</div>
-              <div class="help-card-body">Beside each chapter (or, on a phone, from the “Chapter Info” chip under the chapter title): an overview of what the chapter is about, the places and people it names, prophecies it touches, and where it sits on the biblical timeline.</div>
+              <div class="help-card-body">Beside each chapter (or, on a phone, from the ⓘ next to the chapter, or a swipe in from the right edge): an overview of what the chapter is about, the places and people it names, prophecies it touches, where it sits on the biblical timeline, and the book's own overview.</div>
             </div>
             <div class="help-card">
               <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z"/></svg></div>
               <div class="help-card-title">Explore</div>
-              <div class="help-card-body">A Gospel harmony, topic browser, Bible atlas, genealogy explorer and curated collections.</div>
+              <div class="help-card-body">A Gospel harmony, topic browser, Bible atlas, genealogy explorer and curated collections. On a phone, Explore and Study Tools share the “Discover” tab.</div>
             </div>
             <div class="help-card">
               <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h6M10 2v6.5L4.5 18a2 2 0 0 0 1.7 3h11.6a2 2 0 0 0 1.7-3L14 8.5V2"/></svg></div>

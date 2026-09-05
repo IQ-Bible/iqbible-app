@@ -1073,29 +1073,18 @@ async function switchVersionAndJump(versionId, bookUsfm, chapter, verse, verseEn
 async function loadSidebarCards() {
   const stack = document.getElementById("cardStack");
   if (!stack) return;
-  renderChapterCtxChips(); // three static chips — no need to wait on the card fetches
   const [places, people, prophecies, timeline, chapterInfoCard] = await Promise.all([
     loadPlacesCard(), loadPeopleCard(), loadPropheciesCard(), loadTimelineCard(), loadChapterInfoCard()
   ]);
-  stack.innerHTML = [chapterInfoCard, places, timeline, people, prophecies].filter(Boolean).join("");
+  // < 1180px the reading header is a slim label with no room for an "About
+  // <book>" affordance — it folds in here as the top card of the Chapter Info
+  // sheet instead (opened by the header's ⓘ). Desktop keeps its own #btnBookInfo.
+  const aboutCard = window.innerWidth <= 1180
+    ? railCard(`About ${current.bookName}`, "Who wrote it, when, and its main themes — plus the full Book Guide.",
+        `openBookInfoModal('${current.book}')`, "railcard--compact")
+    : "";
+  stack.innerHTML = [aboutCard, chapterInfoCard, places, timeline, people, prophecies].filter(Boolean).join("");
 }
-// Mobile only (#chapterCtxChips is display:none above 1180px). Two plain
-// chips under the pickers, replacing the old unlabeled grid icon + ⓘ button:
-// About <book> (book intro) and Chapter Info (the places/people/prophecies/
-// timeline sheet — #cardStack, same content the desktop right rail shows).
-// A third "About Ch." chip used to jump straight to the chapter-overview
-// modal, but that's just a shortcut to a shortcut — Chapter Info's own first
-// card is already "About This Chapter", opening that exact same modal — so
-// it was pure duplication cluttering the row for no added reach.
-function renderChapterCtxChips() {
-  const el = document.getElementById("chapterCtxChips");
-  if (!el) return;
-  el.innerHTML =
-    `<button class="ctx-chip ctx-about" onclick="openBookInfoModal('${current.book}')">About ${escHtml(current.bookName)}</button>`
-    + `<button class="ctx-chip" onclick="openCardsSheet()">Chapter Info</button>`;
-  el.hidden = false;
-}
-
 /* ═══════════════════════════════════════════════════════════════════════
    ILLUSTRATIONS — floated inline near their tagged verse so the reading
    text wraps around them, like an old illustrated Bible plate. Schnorr
@@ -1295,10 +1284,25 @@ const AUDIO_PAUSE_SVG = `<svg width="12" height="12" viewBox="0 0 24 24" fill="c
 function setAudioPlayingUI(playing) {
   const pb = document.getElementById("playBtn");
   if (pb) pb.innerHTML = playing ? AUDIO_PAUSE_SVG : AUDIO_PLAY_SVG;
+  // < 1180px: body.audio-playing turns #readNavRow into the player (css) —
+  // hides the chip + #audioDot, swaps #audioPlayer in, shows the collapse caret.
+  document.body.classList.toggle("audio-playing", !!playing);
 }
 function setAudioProgressUI(frac) {
+  const f = Math.max(0, Math.min(1, frac || 0));
   const sf = document.getElementById("scrubFill");
-  if (sf) sf.style.width = Math.max(0, Math.min(1, frac || 0)) * 100 + "%";
+  if (sf) sf.style.width = f * 100 + "%";
+  // #audioDot's ring (circumference 2·π·14 ≈ 88) doubles as a glanceable
+  // progress indicator while the row is collapsed to just the dot.
+  const ring = document.querySelector("#audioDot .rnr-ring-f");
+  if (ring) ring.style.strokeDashoffset = String(88 * (1 - f));
+}
+// The collapse caret in #readNavRow's playing state — pause and drop back to
+// the chip. (Playback position is kept; tapping the dot resumes.)
+function collapseAudioRow() {
+  const el = document.getElementById("audioEl");
+  if (el) el.pause();
+  setAudioPlayingUI(false);
 }
 function resetAudioPlayerUI() {
   const el = document.getElementById("audioEl");

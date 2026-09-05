@@ -3,6 +3,8 @@
 All notable changes to this project will be documented in this file. This CHANGELOG follows SemVer, see https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
+
+## [1.20.0] - 2026-09-05
 - **changed:** The book picker and chapter picker are now one navigator — pick a book and its
   chapters appear in the same panel, with a back arrow to the book list. Choosing a book no longer
   drops you straight onto chapter 1 (single-chapter books — Obadiah, Philemon, Jude, 2–3 John —
@@ -22,6 +24,18 @@ All notable changes to this project will be documented in this file. This CHANGE
   sheet (both font sliders plus a Light/Dark toggle); long-pressing "Aa" flips the theme directly.
   The reading dashboard (streak/counts) moves to a row at the top of the "More" sheet. Desktop's
   top bar is unchanged.
+- **changed:** The mobile reading chrome is rebuilt around a bottom control row (`#readNavRow`),
+  docked just above the nav where a thumb reaches it: prev/next as a left-aligned pair, then a
+  single "Book Chapter" button that opens the navigator. The chapter header collapses to a slim
+  one-line label (book · chapter · a single ⓘ for chapter context — its sheet now leads with the
+  book's own overview). The old chip row under the pickers is gone.
+- **changed:** Audio narration on a phone is a round play button at the end of that row, shown only
+  when the chapter has narration, with a ring that tracks position. Pressing it turns the row into
+  the full player (scrubber, time, voice picker) in place; a back arrow returns to the picker. The
+  separate full-width docked audio bar is gone, and the bar no longer reserves height whether or
+  not there's narration — so the reading column is the same length either way.
+- **changed:** Take a Tour and the Help page were updated for the new mobile navigation (Discover,
+  the bottom control row, the ⓘ chapter-context button, the profile row in "More").
 
 ## [1.19.0] - 2026-09-05
 - **added:** Chapter navigation is now consistent across breakpoints instead of each having only

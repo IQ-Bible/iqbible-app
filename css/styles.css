@@ -28,7 +28,9 @@
   --shadow:rgba(45,27,88,.12); --shadow-lg:rgba(45,27,88,.18);
   --overlay-scrim:rgba(247,246,252,.94);
   --mfn-h:58px; /* #mobileFooterNav's height — referenced by everything below 1180px that needs to clear it */
-  --audio-h:0px; /* height the docked mobile audio bar reserves above #mobileFooterNav — 0 when no narration, set by body.has-audio below */
+  --audio-h:0px; /* legacy — kept 0 everywhere now; the docked mobile audio bar was replaced by #readNavRow's in-row player */
+  --readnavrow-h:0px; /* #readNavRow's height (0 above 1180px, ~46px below) — reserved at the foot of the reading column and cleared by every bottom-anchored mobile element */
+  --rnr-arrow-w:88px; /* left inset in #readNavRow reserved for the two re-docked .chapternav arrows */
   --vvh:100vh; /* actual visible height, kept in sync with window.visualViewport by trackVisualViewport (js/main.js) — falls back to 100vh until that runs / on browsers without the API. Needed because a fixed-position element sized in vh doesn't shrink when the on-screen keyboard opens, so content lower in it silently renders behind the keyboard instead of scrolling into view. */
 }
 /* Day/night toggle (toggleTheme, in main.js) sets data-theme on <html>,
@@ -151,16 +153,19 @@ button{ font-family:inherit; cursor:pointer; }
    topbar/footer (body.chrome-hidden below) — a horizontal swipe on the
    reading column still works too (initReaderGestures, js/reader.js). ── */
 .iconbtn.cardsheet-trigger{ display:none; }
+#btnChapterCtx{ display:none; } /* mobile-only ⓘ — shown < 1180px */
+#readNavRow{ display:none; } /* mobile-only bottom control row — shown < 1180px */
 #mobileFooterNav{ display:none; }
 #moreMenuSheet{ display:none; }
 #discoverHub{ display:none; }
 .rightrail-sheethead{ display:none; }
 @media (max-width:1180px){
-  /* The 2×2 grid button and the ⓘ book-info button are both replaced on
-     mobile by #chapterCtxChips (the labeled chip row under the pickers).
-     (#notesLauncher is hidden further down — after its own base rule, which
-     would otherwise win on source order.) */
-  .iconbtn.cardsheet-trigger,#btnBookInfo{ display:none; }
+  /* The 2×2 grid button, the desktop ⓘ book-info button, the in-header version
+     pick (now in the topbar) and the old chip row are all replaced on mobile by
+     the slim header's single #btnChapterCtx ⓘ + the bottom #readNavRow.
+     (#notesLauncher is hidden further down — after its own base rule.) */
+  .iconbtn.cardsheet-trigger,#btnBookInfo,#btnPickVersion{ display:none; }
+  #btnChapterCtx{ display:flex; }
 
   #mobileFooterNav{ display:flex; position:fixed; left:0; right:0; bottom:0; height:var(--mfn-h); background:var(--surface); border-top:1px solid var(--divider); z-index:410; padding-bottom:env(safe-area-inset-bottom,0); box-shadow:0 -2px 10px var(--shadow); }
   .mfn-item{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; background:none; border:none; color:var(--muted); font-family:var(--font-ui); font-weight:600; font-size:.56rem; letter-spacing:0; }
@@ -169,14 +174,14 @@ button{ font-family:inherit; cursor:pointer; }
   /* Notes is a drawer, not a view, so navMenuClick never marks it active. */
   body.notes-drawer-open #mfnNotesBtn{ color:var(--brand); }
 
-  /* Chapter-context chips — three plain chips (About book, About Ch., Ch.
-     Info) replacing the old grid icon + ⓘ. A wrapped full-width row inside
-     .chhead so it belongs to the sticky header and slides away / returns with
-     the pickers on scroll. */
-  .chhead{ flex-wrap:wrap; row-gap:8px; }
-  #chapterCtxChips{ flex-basis:100%; display:flex; flex-wrap:wrap; gap:7px; padding:8px 16px 10px; margin-bottom:-20px; border-bottom:1px solid var(--divider); }
-  .ctx-chip{ flex:0 0 auto; font-family:var(--font-ui); font-size:.7rem; font-weight:600; color:var(--ink-soft); background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-pill); padding:6px 11px; white-space:nowrap; }
-  .ctx-chip.ctx-about{ color:var(--brand); border-color:var(--brand-line); }
+  /* Slim reading header — one non-wrapping row: book icon, book + chapter as a
+     compact tappable label, and the single ⓘ (Chapter Info). The version pick
+     is in the topbar, chapter context is the ⓘ / #readNavRow, so nothing wraps
+     to a second row here any more. */
+  .chhead{ flex-wrap:nowrap; gap:10px; align-items:center; }
+  .chtitlewrap{ flex-wrap:nowrap; align-items:center; gap:2px 6px; min-width:0; }
+  .chhead .titlepick{ font-size:1.35rem; padding:2px 4px; margin:0 -4px; }
+  #btnChapterCtx{ align-self:center; }
 
   /* Anchored just above the footer bar, not a floating popover like
      #profilePanel/.plan-menu — full-width so it reads as "the rest of the
@@ -463,7 +468,7 @@ button{ font-family:inherit; cursor:pointer; }
    (not in the mobile-nav rule block further up) since an override with the
    same specificity as this base rule only wins by appearing later in the
    file; a media query alone doesn't beat plain source order. */
-@media (max-width:1180px){ #readMain{ padding-bottom:calc(40px + var(--mfn-h) + var(--audio-h)); } }
+@media (max-width:1180px){ #readMain{ padding-bottom:calc(40px + var(--mfn-h) + var(--readnavrow-h)); } }
 #readCol{ width:100%; max-width:700px; padding-top:40px; }
 
 /* ── no-API-key gate — a full-screen blocking overlay (not a .mainview
@@ -524,11 +529,6 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
    the header height or shift the inline audio player. Positive top margin —
    .chhead is a sticky, opaque, z-index:6 box, so any overlap paints over
    this line's top edge. */
-/* The mobile chapter-context chip row — rendered at every width by
-   renderChapterCtxChips but only shown below 1180px (the desktop right rail
-   carries the same cards). Styled in the max-width:1180px block above; the
-   two width-bounded rules never overlap, so their file order doesn't matter. */
-@media (min-width:1181px){ #chapterCtxChips{ display:none; } }
 #chapterReadStamp{ display:none; align-items:center; gap:6px; margin:6px 0 16px; font-family:var(--font-ui); font-size:.74rem; color:var(--muted); }
 #chapterReadStamp.show{ display:flex; }
 #chapterReadStamp .read-check{ display:flex; align-items:center; justify-content:center; width:15px; height:15px; flex-shrink:0; background:none; border:none; padding:0; cursor:pointer; color:var(--read-check); border-radius:var(--r-sm); transition:background .15s; }
@@ -554,41 +554,66 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 .chapternav:hover{ border-color:var(--brand); color:var(--brand-2); }
 .chapternav svg{ width:20px; height:20px; }
 @media (max-width:1180px){
-  /* alignChapterNavButtons() (js/reader.js) only computes left/right against
-     #readCol's own edges above 1180px — below it there's no side margin to
-     float outside of, so these dock to the screen edges instead, same 8px
-     inset #audioPlayer already uses. A horizontal swipe on the reading
-     column (initReaderGestures) or #chapterEndNav's Previous/Next buttons
-     at the foot of the chapter still work too — this is a third way in,
-     not a replacement for either. */
-  .chapternav{ transition:transform .28s ease,border-color .15s,color .15s; }
-  .chapternav.prev{ left:8px; }
-  .chapternav.next{ right:8px; }
-  /* Slides out past its own width plus the edge inset so it fully clears the
-     viewport instead of stopping at the edge — same idea as #audioPlayer's
-     translateY(calc(100% + var(--mfn-h))) above, just sideways. Riding
-     body.chrome-hidden (scroll-down hides, scroll-up brings it back) keeps
-     this consistent with every other piece of mobile chrome instead of
-     inventing its own scroll listener. */
-  body.chrome-hidden .chapternav.prev{ transform:translateY(-50%) translateX(-150%); }
-  body.chrome-hidden .chapternav.next{ transform:translateY(-50%) translateX(150%); }
+  :root{ --readnavrow-h:46px; }
 
-  /* Audio player: a full-width bar docked flush above #mobileFooterNav, all
-     controls visible. A solid background is required — it overlaps the
-     scrolling reading column. Slides away with the rest of the chrome on
-     scroll-down (body.chrome-hidden above). */
-  #audioPlayer{ position:fixed; left:8px; right:8px; width:auto; transform:none; margin:0;
-    bottom:calc(var(--mfn-h) + env(safe-area-inset-bottom,0)); z-index:16;
-    background:var(--surface); border:1px solid var(--divider); border-bottom:0;
-    border-radius:var(--r-control) var(--r-control) 0 0;
-    box-shadow:0 -2px 12px var(--shadow); padding:0; transition:transform .28s ease; }
-  /* padding-left lands the play button's centre under the first footer tab
-     ("Read"): one tab is 10vw, minus #audioPlayer's 8px inset and half the
-     34px button. */
-  .audio-controls-row{ width:100%; max-width:none; min-height:47px; padding:0 12px 0 calc(10vw - 25px); }
-  /* The voice button reads as a real control here, not a bare caret. */
-  #btnPickNarration{ flex-shrink:0; gap:3px; padding:5px 8px; border:1px solid var(--divider); border-radius:var(--r-pill); color:var(--ink-soft); background:var(--surface-2); font-size:.62rem; }
-  #btnPickNarration svg{ width:13px; height:13px; }
+  /* ── #readNavRow — the thumb-zone control row, docked just above the footer.
+     Contents: the re-docked prev/next pair (fixed .chapternav, in the reserved
+     --rnr-arrow-w inset at the left), the combined "Book Ch ▾" chip
+     (#readNavChip → navigator), and #audioDot (only when the chapter has
+     narration). On Play, body.audio-playing hides the chip + dot and swaps
+     #audioPlayer in over that space, with a collapse caret to return. The whole
+     row slides down with the rest of the chrome on scroll (body.chrome-hidden). */
+  #readNavRow{ display:flex; position:fixed; left:0; right:0; z-index:15;
+    bottom:calc(var(--mfn-h) + env(safe-area-inset-bottom,0)); height:var(--readnavrow-h);
+    align-items:center; gap:8px; padding:0 10px 0 var(--rnr-arrow-w);
+    background:var(--surface); border-top:1px solid var(--divider);
+    box-shadow:0 -2px 10px var(--shadow); transition:transform .28s ease; }
+  body.chrome-hidden #readNavRow{ transform:translateY(calc(100% + var(--mfn-h))); }
+  .rnr-arrowspace{ display:none; }
+
+  .rnr-chip{ flex:1; min-width:0; display:flex; align-items:center; justify-content:space-between;
+    gap:6px; font-family:var(--font-ui); font-weight:700; font-size:.8rem; letter-spacing:-.01em;
+    color:var(--ink); background:var(--surface-2); border:1px solid var(--divider);
+    border-radius:var(--r-pill); padding:8px 14px; white-space:nowrap; overflow:hidden; }
+  .rnr-chip svg{ width:10px; height:10px; flex-shrink:0; stroke:var(--muted); }
+  body.audio-playing .rnr-chip{ display:none; }
+
+  .rnr-dot{ position:relative; width:32px; height:32px; flex-shrink:0; background:none; border:none; padding:0; display:none; }
+  body.has-audio .rnr-dot{ display:block; }
+  body.audio-playing .rnr-dot{ display:none; }
+  .rnr-dot svg{ position:absolute; inset:0; width:100%; height:100%; }
+  .rnr-ring-t{ stroke:var(--divider); }
+  .rnr-ring-f{ stroke:var(--brand); stroke-linecap:round; transform:rotate(-90deg); transform-origin:center; transition:stroke-dashoffset .2s linear; }
+  .rnr-disc{ fill:var(--brand); }
+  .rnr-ic{ fill:#fff; }
+
+  .rnr-collapse{ width:30px; height:30px; flex-shrink:0; border-radius:var(--r-pill);
+    background:var(--surface-2); border:1px solid var(--divider); color:var(--muted);
+    display:none; align-items:center; justify-content:center; }
+  .rnr-collapse svg{ width:14px; height:14px; }
+  body.audio-playing .rnr-collapse{ display:flex; }
+
+  /* Prev/Next stay position:fixed (a display:none ancestor would kill them, and
+     #readNavRow is display:none on desktop) but re-dock as a left-aligned pair
+     in the row's reserved inset; slide down with the row on scroll. */
+  .chapternav{ top:auto; transform:none; width:30px; height:30px; box-shadow:none;
+    bottom:calc(var(--mfn-h) + env(safe-area-inset-bottom,0) + (var(--readnavrow-h) - 30px) / 2);
+    transition:transform .28s ease,border-color .15s,color .15s; }
+  .chapternav.prev{ left:10px; right:auto; }
+  .chapternav.next{ left:46px; right:auto; }
+  body.chrome-hidden .chapternav{ transform:translateY(calc(100% + var(--mfn-h))); }
+
+  /* Audio player: hidden until playback starts (then it fills the chip/dot area
+     of #readNavRow). !important beats the inline `display` that
+     refreshAudioAvailability sets for the desktop inline player. */
+  #audioPlayer{ position:fixed; left:var(--rnr-arrow-w); right:10px; width:auto; margin:0; transform:none;
+    bottom:calc(var(--mfn-h) + env(safe-area-inset-bottom,0)); height:var(--readnavrow-h); z-index:17;
+    background:var(--surface); border:0; border-radius:0; box-shadow:none; padding:0;
+    align-items:center; display:none !important; transition:transform .28s ease; }
+  body.audio-playing #audioPlayer{ display:flex !important; }
+  .audio-controls-row{ width:100%; max-width:none; min-height:0; padding:0; gap:8px; }
+  #btnPickNarration{ flex-shrink:0; gap:3px; padding:4px 7px; border:1px solid var(--divider); border-radius:var(--r-pill); color:var(--ink-soft); background:var(--surface-2); font-size:.6rem; }
+  #btnPickNarration svg{ width:12px; height:12px; }
 }
 
 /* ── audio player — inline in the chapter header, right after the version
@@ -596,12 +621,10 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
    current version has narration for this book; no separate toggle. Below
    1180px it's a full-width bar docked above the footer nav — see the
    max-width:1180px block above. */
-/* Reserve the docked mobile audio bar's height at the foot of the reading
-   column and above the other bottom-anchored chrome. refreshAudioAvailability
-   (js/reader.js) toggles .has-audio with the player's own visibility. Above
-   1180px --audio-h stays 0 (the player is inline in .chhead). */
-body.has-audio{ --audio-h:49px; }
-@media (min-width:1181px){ body.has-audio{ --audio-h:0px; } }
+/* refreshAudioAvailability (js/reader.js) still toggles body.has-audio — now it
+   only gates whether #audioDot shows in #readNavRow. The row reserves its own
+   fixed --readnavrow-h at every mobile width, narration or not, so audio no
+   longer adds any height (it transforms the row in place on Play). */
 .inline-audio{ flex:1; min-width:180px; display:flex; flex-direction:column; gap:5px; }
 .audio-controls-row{ display:flex; align-items:center; gap:10px; width:100%; }
 .playbtn{ width:34px; height:34px; border-radius:var(--r-pill); flex-shrink:0; background:linear-gradient(135deg,var(--brand),var(--brand-2)); display:flex; align-items:center; justify-content:center; color:var(--on-brand); border:none; }
@@ -705,7 +728,7 @@ body.has-audio{ --audio-h:49px; }
    sit after the base rule" note as #readMain's own mobile padding-bottom
    above; a media query alone doesn't win a same-specificity tie against a
    plain rule that simply comes later in the file. */
-@media (max-width:1180px){ #verseToolsPanel{ bottom:calc(var(--mfn-h) + var(--audio-h) + 12px); } }
+@media (max-width:1180px){ #verseToolsPanel{ bottom:calc(var(--mfn-h) + var(--readnavrow-h) + 12px); } }
 .vtp-head{ display:flex; align-items:center; justify-content:space-between; padding:16px 16px 0 20px; flex-shrink:0; }
 .vtp-head span{ font-family:var(--font-ui); font-weight:800; letter-spacing:-.02em; font-size:1.1rem; color:var(--brand); }
 .panel-close{ width:26px; height:26px; border-radius:var(--r-pill); background:var(--surface-2); border:none; color:var(--muted); font-size:1.1rem; line-height:1; flex-shrink:0; }
@@ -1451,7 +1474,7 @@ details.bg-accordion{ border:1px solid var(--divider); border-radius:var(--r-con
    alone can't just move to clear #mobileFooterNav without also growing that
    offset, or the hidden toast peeks back into view at the new, taller
    bottom (which is exactly what happened here the first time around). */
-@media (max-width:1180px){ #toast{ bottom:calc(var(--mfn-h) + var(--audio-h) + 12px); transform:translateX(-50%) translateY(140px); } }
+@media (max-width:1180px){ #toast{ bottom:calc(var(--mfn-h) + var(--readnavrow-h) + 12px); transform:translateX(-50%) translateY(140px); } }
 #toast.show{ transform:translateX(-50%) translateY(0); }
 
 ::-webkit-scrollbar{ width:6px; }
@@ -1468,7 +1491,7 @@ details.bg-accordion{ border:1px solid var(--divider); border-radius:var(--r-con
      sticky offset math (see the "chapter header" comment above) only
      cancels out #readCol's own padding-top — any padding added here would
      reappear as a permanent gap between the topbar and the stuck chhead. */
-  #readMain{ padding:0 16px calc(90px + var(--mfn-h)); overflow-x:hidden; }
+  #readMain{ padding:0 16px calc(40px + var(--mfn-h) + var(--readnavrow-h)); overflow-x:hidden; }
 
   /* Chapter images stay inline illustrations, just not lightbox-openable —
      the zoom-in affordance/tap target isn't worth it on a small screen. */

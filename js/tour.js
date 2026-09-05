@@ -39,23 +39,22 @@ function openVerseToolsForTour() {
 // on it right before the tour ends is what lets finishing the tour offer to
 // keep going with a per-button breakdown of the same panel, still open).
 const TOUR_STEPS = [
-  { selector: "#readCol .chhead", title: "Reading", body: "Pick a version, book and chapter up here, then just start reading." },
-  { selector: "#audioPlayer", title: "Audio Narration", body: "Versions with narration available show a player — tap play to hear the chapter read aloud. On a phone it's a bar just above the nav." },
-  { selector: "#btnPickNarration", title: "Choose a Voice", body: "Some versions have more than one narrator recorded — tap the voice button and pick whichever you like." },
-  // #cardStack (desktop's always-visible sidebar) or #chapterCtxChips (its
-  // mobile stand-in — the chip row under the pickers) — never both at once.
-  // Not auto-opened the way #moreMenuSheet steps are: the chips are already
-  // visible in the header, and opening the sheet would cover them.
-  { selector: "#cardStack, #chapterCtxChips", title: "Chapter Context", body: "Places (with maps), people, prophecy fulfillments, a timeline, and a chapter overview for whatever chapter you're reading. On a phone, tap “Chapter Info” below the pickers (or swipe in from the right edge); “About <book>” next to it opens the book's own overview.", before: () => switchMainView("read") },
+  // Desktop: the reading header carries version/book/chapter. Mobile (< 1180px):
+  // a slim label up top, the combined book+chapter chip + prev/next in #readNavRow
+  // down by the thumb, the translation pill in the top bar. renderTourStep picks
+  // whichever candidate is visible.
+  { selector: "#readNavRow, #readCol .chhead", title: "Reading", body: "Pick your translation, book and chapter, then just start reading. On a phone the book/chapter picker and the prev/next arrows sit in the bar just above the nav; the translation is the pill in the top bar." },
+  { selector: "#audioDot, #audioPlayer", title: "Audio Narration", body: "When a chapter has narration a round play button appears (on a phone, in the bar above the nav; on desktop, a player in the reading header). Press it to listen — on a phone the bar becomes the full player while it's playing, with a voice picker if more than one narrator was recorded." },
+  // #cardStack (desktop's always-visible rail) or #btnChapterCtx (mobile's ⓘ in
+  // the slim header) — never both at once. Not auto-opened: both are already
+  // visible, and opening the sheet would cover the spotlight.
+  { selector: "#cardStack, #btnChapterCtx", title: "Chapter Context", body: "Places (with maps), people, prophecy fulfillments, a timeline, and a chapter overview for whatever chapter you're reading. On a phone, tap the ⓘ next to the chapter (or swipe in from the right edge) — the book's own overview is the first card in that sheet.", before: () => switchMainView("read") },
   { selector: "#searchTrigger", title: "Search", body: "Tap here any time to search the whole Bible instantly." },
-  // Bare [data-nav] (not .navitem) — below 1180px Explore/Study are
-  // #mobileFooterNav's .mfn-item instead of #navrail's (hidden) .navitem, a
-  // different class; renderTourStep's target resolution below picks whichever
-  // candidate is actually visible. Share is no longer a footer item — like
-  // library/progress/plans it lives in #moreMenuSheet on mobile, so its step
-  // opens that first (.navitem selector, not the bare [data-nav]).
-  { selector: '[data-nav="explore"]', title: "Explore", body: "A Gospel harmony, topic browser, Bible atlas, genealogy explorer and curated collections to wander through." },
-  { selector: '[data-nav="study"]', title: "Study Tools", body: "Per-book guides, a Bible-dictionary lookup, a Strong's word study, verse-by-verse commentary and NT textual variants." },
+  // Explore + Study Tools: separate items in the desktop rail, but one "Discover"
+  // tab on mobile that opens #discoverHub. renderTourStep's target resolution
+  // picks whichever candidate is visible; the before() opens the hub on mobile
+  // (harmless no-op class add on desktop, where #discoverHub is display:none).
+  { selector: '#mfnDiscoverBtn, .navitem[data-nav="explore"]', title: "Discover", body: "Everything beyond plain reading. Explore: a Gospel harmony, topic browser, Bible atlas, genealogy explorer, curated collections. Study Tools: per-book guides, a five-source Bible dictionary, a Strong's word study, verse-by-verse commentary, NT textual variants. On a phone they're all under the Discover tab.", before: () => { if (typeof openDiscoverHub === "function") openDiscoverHub(true); } },
   { selector: '.navitem[data-nav="share"]', title: "Share Tools", body: "Turn any verse into a shareable image, link or embeddable widget.", before: () => openMoreMenu(true) },
   // library/progress/plans/devotionals live in both #navrail and (below
   // 1180px) #moreMenuSheet, both as .navitem — opening the "More" dropup
@@ -64,7 +63,9 @@ const TOUR_STEPS = [
   { selector: '.navitem[data-nav="progress"]', title: "My Progress", body: "A streak calendar, read counts and your active plan's progress, all in one place.", before: () => openMoreMenu(true) },
   { selector: '.navitem[data-nav="plans"]', title: "Reading Plans", body: "Build or import a reading plan, then track it day by day on a calendar.", before: () => openMoreMenu(true) },
   { selector: '.navitem[data-nav="devotionals"]', title: "Devotionals", body: "A new reading each morning and evening, with its own progress tracking.", before: () => openMoreMenu(true) },
-  { selector: "#profileTrigger", title: "Your Reading", body: "Streaks and quick stats live here too, with a shortcut back to Settings." },
+  // Desktop: the topbar profile icon. Mobile: a row at the top of the "More"
+  // sheet (#profileTrigger is hidden < 1180px), so open that first.
+  { selector: ".mm-profile, #profileTrigger", title: "Your Reading", body: "Your streak, read counts and continue-reading, with shortcuts to Progress, My Library and Settings.", before: () => { if (window.innerWidth <= 1180) openMoreMenu(true); } },
   // Desktop's #notesLauncher pill is display:none while the drawer is open (so
   // close it first); on mobile it's the Notes tab in the footer nav
   // (#mfnNotesBtn) — renderTourStep picks whichever candidate is visible.

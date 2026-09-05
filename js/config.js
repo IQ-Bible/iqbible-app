@@ -48,4 +48,4 @@ const FEATURE_SEARCH_ALL_VERSIONS = true;
 // fetch succeeds, so this constant only shows if the fetch fails (e.g. no
 // network). Bump alongside a CHANGELOG.md version cut anyway, so the offline
 // case doesn't drift too far.
-const APP_VERSION = "1.16.4";
+const APP_VERSION = "1.20.0";
