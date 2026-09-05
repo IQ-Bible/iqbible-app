@@ -1288,7 +1288,7 @@ details.bg-accordion{ border:1px solid var(--divider); border-radius:var(--r-con
    image itself the only bright thing on screen) regardless of site theme. */
 #imageViewScrim{ background:rgba(10,7,5,.88); }
 #imageViewScrim .modal{ position:relative; width:auto; max-width:90vw; max-height:none; background:none; box-shadow:none; align-items:center; border:none; overflow:visible; }
-#imageViewScrim img{ display:block; max-width:88vw; max-height:76vh; border-radius:var(--r-sm); box-shadow:0 30px 70px rgba(0,0,0,.5); }
+#imageViewScrim img{ display:block; width:auto; height:auto; max-width:88vw; max-height:76vh; border-radius:var(--r-sm); box-shadow:0 30px 70px rgba(0,0,0,.5); }
 #imageViewMap{ width:min(90vw,900px); height:min(76vh,650px); border-radius:var(--r-sm); box-shadow:0 30px 70px rgba(0,0,0,.5); }
 #imageViewScrim .cap{ color:rgba(255,255,255,.85); font-size:.85rem; margin-top:14px; text-align:center; max-width:640px; font-style:italic; }
 #imageViewScrim .closebtn{ position:absolute; top:-14px; right:-14px; background:rgba(255,255,255,.15); color:#fff; }

@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file. This CHANGE
 
 ## [Unreleased]
 
+## [1.16.4] - 2026-09-05
+- **fixed:** The 1.16.3 lightbox fix set the `<img>`'s `width`/`height` attributes but the
+  `#imageViewScrim img` rule only had `max-width`/`max-height` — with no `width:auto; height:auto`
+  to override the resulting fixed-pixel box, the two max- constraints clamped each axis
+  independently instead of scaling together, visibly stretching plates whose aspect ratio didn't
+  match the viewport's. Added `width:auto; height:auto` so the box scales proportionally again,
+  matching the pattern `.inline-illust img` already used.
+
 ## [1.16.3] - 2026-09-05
 - **fixed:** Inline chapter illustrations (and their lightbox) now use the API's per-image
   `width`/`height` to reserve their exact box via computed `aspect-ratio` before the plate loads —
