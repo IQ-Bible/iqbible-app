@@ -65,8 +65,10 @@ async function loadBookAbbreviations() {
 
 /* ═══════════════════════════════════════════════════════════════════════
    VERSION PICKER — search-first because the catalog spans 1,000+
-   languages; a language is a filterable field, not a menu to scroll. */
-const POPULAR_LANGS = ["English", "Spanish", "French", "German", "Portuguese", "Arabic", "Chinese", "Hebrew", "Greek", "Russian"];
+   languages; a language is a filterable field, not a menu to scroll. The
+   active language filter shows as one always-visible button (#langSelBtn)
+   that opens a language sub-screen; it used to be a scrolling chip strip
+   whose selected chip could sit off-screen. */
 let versionPickerLang = null;
 let versionPickerAudioOnly = false;
 const AUDIO_ICON = `<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 5V4L8 9H4Z"/><path d="M17 8a5 5 0 0 1 0 8"/></svg>`;
@@ -122,22 +124,23 @@ function shortVersionLabel(title) {
 // same search/filter picker to instead add a version to a Compare list
 // (Settings' persisted default set, or a one-off addition inside Verse Tools >
 // Compare) — see pickVersionRow() below. Every other picker mechanic (search,
-// language chips, audio filter) is unchanged regardless of mode.
+// language selector, audio filter) is unchanged regardless of mode.
 let versionPickerMode = "navigate";
-async function openVersionPicker(mode) {
-  versionPickerMode = mode || "navigate";
-  document.getElementById("versionPickerTitle").textContent =
-    (versionPickerMode === "navigate" || versionPickerMode === "plan") ? "Choose a translation"
+function versionPickerTitleText() {
+  return (versionPickerMode === "navigate" || versionPickerMode === "plan") ? "Choose a translation"
     : versionPickerMode === "search" ? "Search a translation"
     : "Add a Compare version";
+}
+async function openVersionPicker(mode) {
+  versionPickerMode = mode || "navigate";
   openModal("versionPickerScrim");
   document.getElementById("versionSearchInput").value = "";
   await loadCatalog();
   versionPickerLang = getLastLang();
   versionPickerAudioOnly = false;
   document.getElementById("audioFilterCheck").checked = false;
-  renderFavRow();
-  renderLangRow();
+  versionPickerShowVersions(); // resets to the translation screen (a prior open may have left it on the language sub-screen) and sets the title
+  renderLangSelector();
   renderVersionList("");
   // Skip autofocus below the mobile breakpoint (1180px, matching every other
   // mobile check in this app) — it pops the on-screen keyboard immediately on
@@ -153,18 +156,83 @@ function pickVersionRow(id) {
   addCompareVersion(id, versionPickerMode);
   closeModal("versionPickerScrim");
 }
-function renderLangRow() {
-  const counts = {};
-  (catalog || []).forEach(v => { counts[v.language_name] = (counts[v.language_name] || 0) + 1; });
-  const row = document.getElementById("langRow");
-  const chips = [`<button class="langchip ${!versionPickerLang ? 'on' : ''}" onclick="pickLang(null)">All languages · ${(catalog || []).length}</button>`];
-  POPULAR_LANGS.forEach(l => {
-    if (!counts[l]) return;
-    chips.push(`<button class="langchip ${versionPickerLang === l ? 'on' : ''}" onclick="pickLang('${l.replace(/'/g, "\\'")}')">${l} · ${counts[l]}</button>`);
-  });
-  row.innerHTML = chips.join("");
+
+// Two screens in one modal — the translation list and a language sub-screen —
+// toggled with a back arrow, same pattern as the book/chapter navigator.
+function versionPickerShowVersions() {
+  document.getElementById("versionPickerTitle").textContent = versionPickerTitleText();
+  document.getElementById("versionPickerBack").hidden = true;
+  document.getElementById("langListSearch").hidden = true;
+  document.getElementById("langSelBtn").hidden = false;
+  document.getElementById("versionPickerSearch").hidden = false;
+  document.getElementById("versionPickerFilters").hidden = false;
+  document.getElementById("versionList").hidden = false;
+  document.getElementById("versionLangList").hidden = true;
+  renderFavRow(); // restores #favRow's display (openLangList hid it)
 }
-function pickLang(l) { versionPickerLang = l; setLastLang(l); renderLangRow(); renderVersionList(document.getElementById("versionSearchInput").value); }
+function openLangList() {
+  document.getElementById("versionPickerTitle").textContent = "Choose a language";
+  document.getElementById("versionPickerBack").hidden = false;
+  document.getElementById("langSelBtn").hidden = true;
+  document.getElementById("versionPickerSearch").hidden = true;
+  document.getElementById("versionPickerFilters").hidden = true;
+  document.getElementById("favRow").style.display = "none";
+  document.getElementById("langListSearch").hidden = false;
+  document.getElementById("langSearchInput").value = "";
+  document.getElementById("versionList").hidden = true;
+  document.getElementById("versionLangList").hidden = false;
+  renderLangList("");
+  if (window.innerWidth > 1180) setTimeout(() => document.getElementById("langSearchInput").focus(), 60);
+}
+function versionPickerBack() {
+  versionPickerShowVersions();
+  renderVersionList(document.getElementById("versionSearchInput").value);
+}
+
+// The active language filter as one always-visible button (was a horizontal
+// #langRow chip strip whose selected chip scrolled out of sight — a filter you
+// can't see is a filter you forget, then fight when you search). Also names the
+// filter in the search placeholder so its scope is never ambiguous.
+function renderLangSelector() {
+  const count = versionPickerLang
+    ? (catalog || []).filter(v => v.language_name === versionPickerLang).length
+    : (catalog || []).length;
+  document.getElementById("langSelName").textContent = versionPickerLang || "All languages";
+  document.getElementById("langSelCount").textContent =
+    count.toLocaleString() + (count === 1 ? " version" : " versions");
+  document.getElementById("versionSearchInput").placeholder = versionPickerLang
+    ? `Search ${versionPickerLang} versions…`
+    : "Search all translations…";
+}
+
+// The language sub-screen — every language in the catalog (not a curated
+// preset list), alphabetical, each with its version count and a tick on the
+// active one. "All languages" (no filter) leads.
+function renderLangList(q) {
+  q = (q || "").trim().toLowerCase();
+  const counts = {};
+  (catalog || []).forEach(v => { if (v.language_name) counts[v.language_name] = (counts[v.language_name] || 0) + 1; });
+  const names = Object.keys(counts).sort((a, b) => a.localeCompare(b)).filter(n => !q || n.toLowerCase().includes(q));
+  const tick = `<svg class="langlist-tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg>`;
+  const row = (label, call, on, count) =>
+    `<button type="button" class="vrow langlist-row${on ? " on" : ""}"${on ? ' aria-current="true"' : ""} onclick="${call}"><span class="vt">${escHtml(label)}</span><span class="langlist-count">${count.toLocaleString()}</span>${on ? tick : ""}</button>`;
+  let html = "";
+  if (!q) {
+    html += row("All languages", "pickLang(null)", !versionPickerLang, (catalog || []).length);
+    html += `<div class="glabel">Languages</div>`;
+  }
+  names.forEach(n => { html += row(n, `pickLang('${n.replace(/'/g, "\\'")}')`, versionPickerLang === n, counts[n]); });
+  if (q && !names.length) html = `<div class="emptynote" style="padding:24px">No language matches &ldquo;${escHtml(q)}&rdquo;. Try the version search instead.</div>`;
+  document.getElementById("versionLangList").innerHTML = html;
+}
+function pickLang(l) {
+  versionPickerLang = l;
+  setLastLang(l);
+  document.getElementById("versionSearchInput").value = "";
+  renderLangSelector();
+  versionPickerShowVersions();
+  renderVersionList("");
+}
 function toggleAudioFilter() {
   versionPickerAudioOnly = !versionPickerAudioOnly;
   document.getElementById("audioFilterCheck").checked = versionPickerAudioOnly;
@@ -173,11 +241,10 @@ function toggleAudioFilter() {
 function onVersionSearch() { renderVersionList(document.getElementById("versionSearchInput").value); }
 
 /* ── favorite translations — a star per row in the picker to favorite/
-   unfavorite, plus a small standalone chip row (#favRow, styled like the
-   existing #langRow) above the list for one-tap access — not a section
-   mixed into the scrollable list itself. Pure client-side (localStorage),
-   global across every picker mode — a favorite translation is a favorite
-   regardless of why you opened the picker. */
+   unfavorite, plus a small standalone chip row (#favRow) above the list for
+   one-tap access — not a section mixed into the scrollable list itself. Pure
+   client-side (localStorage), global across every picker mode — a favorite
+   translation is a favorite regardless of why you opened the picker. */
 const LS_FAV_VERSIONS = "iqb_fav_versions";
 function getFavoriteVersions() {
   try { return new Set(JSON.parse(localStorage.getItem(LS_FAV_VERSIONS) || "[]")); }
@@ -236,7 +303,13 @@ function renderVersionList(q) {
   rows = rows.slice(0, 200);
 
   const list = document.getElementById("versionList");
-  if (!rows.length) { list.innerHTML = `<div class="emptynote" style="padding:24px">No matching translation. Try a language name, code (e.g. "spa"), or version title.</div>`; return; }
+  if (!rows.length) {
+    const hint = versionPickerLang
+      ? `No matching translation in ${escHtml(versionPickerLang)}. Try a version name, or change the language above.`
+      : `No matching translation. Try a language name, code (e.g. "spa"), or version title.`;
+    list.innerHTML = `<div class="emptynote" style="padding:24px">${hint}</div>`;
+    return;
+  }
 
   const favs = getFavoriteVersions();
   let html = "";

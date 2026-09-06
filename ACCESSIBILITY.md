@@ -74,6 +74,19 @@ Esc, version-row select, modal focus trap + restore + background `inert`, audio 
 **Still needs a human:** a real assistive-technology pass (NVDA / JAWS / VoiceOver / TalkBack) —
 axe + keyboard automation is done, AT testing is not something this can substitute for.
 
+## Later changes
+
+**2026-09-06 — translation picker language selector.** The version picker's language filter went
+from a scrolling `#langRow` chip strip to one always-visible `<button class="langsel">` that opens
+a language sub-screen (`#versionLangList`), same back-arrow two-screen pattern as the book/chapter
+navigator. New interactive elements: the `.langsel` button (text-labelled, global focus ring, ~39 px
+tall), the reused `.closebtn.npk-back` back button (`aria-label`), `.langlist-row` buttons
+(text-labelled, `aria-current="true"` on the active language, ~42 px tall), and a `.mclear` (×) on
+both search inputs (existing 24 px pattern, `aria-label`). Decorative SVGs (`.langsel-globe`,
+`.langsel-chev`, `.langlist-tick`) are `aria-hidden`. axe-core 4.10 (wcag2a/2aa, wcag21a/21aa,
+wcag22aa) clean on `#versionPickerScrim` in both screens, light + dark, desktop + 390 px. Keyboard:
+selector → sub-screen → filter → pick → back, all operable; modal focus trap unaffected.
+
 ## Accessibility statement page
 
 `#accessibilityView` (in `index.html` / `404.html`, wired through `js/main.js` +

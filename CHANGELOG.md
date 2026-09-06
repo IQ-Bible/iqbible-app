@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file. This CHANGE
 
 ## [Unreleased]
 
+## [1.22.0] - 2026-09-06
+- **changed:** The translation picker's language filter is now one always-visible button at the top
+  of the panel — showing the current language and how many versions it has — instead of a strip of
+  language chips that scrolled sideways. Tapping it opens a dedicated language screen with its own
+  filter box and the full list of languages (not just ten presets), each with a version count.
+  Previously the selected language could sit scrolled out of view, so a filtered list looked
+  unfiltered and a search for another language turned up nothing; the search box now also names
+  what it's searching ("Search Spanish versions…"), and both search boxes got a clear (×) button.
+
 ## [1.21.0] - 2026-09-06
 - **fixed:** A place the historical data can't pin to a modern location (Nod, and a handful of
   others) showed its status as a raw code — `unknown_place` — which read like an error. It's now

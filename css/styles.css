@@ -1042,6 +1042,10 @@ button.bookicon-badge:active{ transform:scale(.96); }
    modal (Settings, Verse Tools > Compare), so it needs to reliably win over
    a same-class .modalscrim rather than falling back to DOM source order. */
 #versionPickerScrim{ z-index:140; }
+/* The picker's two screens (translation list / language sub-screen) toggle via
+   [hidden]; .langsel/.msearch/.mfilters/.closebtn each set their own display,
+   which would otherwise beat the bare attribute. */
+#versionPickerScrim [hidden]{ display:none; }
 /* Book info can be opened from the mobile Chapter Info sheet (#rightRail, z-425)
    via its "About <book>" card — that card closes the sheet first, but a bump
    here also covers the slide-out transition and any other in-sheet path. */
@@ -1060,7 +1064,7 @@ button.bookicon-badge:active{ transform:scale(.96); }
    the modal (Psalms has 150). */
 #navPickerScrim [hidden]{ display:none; }
 #navPickerScrim #chapterGrid{ flex:1; min-height:0; overflow-y:auto; align-content:start; }
-.mhead{ padding:20px 24px 16px; border-bottom:1px solid var(--divider); }
+.mhead{ padding:20px 24px 16px; border-bottom:1px solid var(--divider); flex-shrink:0; }
 .mhead .row{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
 /* Back arrow on the chapter step — same chrome as .closebtn, sits left of the title. */
 .npk-back svg{ width:15px; height:15px; }
@@ -1101,19 +1105,33 @@ button.bookicon-badge:active{ transform:scale(.96); }
 .mfilters{ display:flex; gap:8px; margin-top:12px; }
 .mfilter-check{ display:inline-flex; align-items:center; gap:8px; font-family:var(--font-ui); font-size:.8rem; color:var(--ink-soft); cursor:pointer; user-select:none; }
 .mfilter-check input{ width:15px; height:15px; margin:0; accent-color:var(--brand); cursor:pointer; }
-/* flex-shrink:0 keeps this row at its content height — without it, a flex
-   column parent can compress it toward zero once the sibling list below
-   grows tall, which read as the language row being "hidden underneath" the
-   version list. min-height:0 on .mlist is the companion fix: a scrolling
-   flex child defaults to a content-based automatic minimum size, which
-   without this override lets its own content push past the modal's
-   max-height instead of actually scrolling inside it. */
-.langrow{ display:flex; gap:7px; padding:12px 24px 16px; overflow-x:auto; border-bottom:1px solid var(--divider); flex-shrink:0; }
-.langchip{ font-family:var(--font-ui); font-size:.62rem; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); background:var(--surface-2); padding:7px 13px; border-radius:var(--r-pill); white-space:nowrap; border:1px solid transparent; }
-.langchip.on{ color:var(--brand); background:rgba(109,40,217,.14); border-color:var(--brand); }
+/* flex-shrink:0 on .mhead (above) keeps the picker chrome — language selector,
+   search, favorites, filters — at its content height instead of being squeezed
+   toward zero once the version list below grows tall. min-height:0 on .mlist is
+   the companion fix: a scrolling flex child defaults to a content-based
+   automatic minimum size, which without the override lets its own content push
+   past the modal's max-height instead of actually scrolling inside it. */
+
+/* Language selector — one always-visible button in place of the old scrolling
+   #langRow chip strip, whose selected chip could scroll out of sight (a filter
+   you can't see is a filter you forget, then fight when you search). Opens the
+   language sub-screen; mirrors YouVersion's language button. */
+.langsel{ width:100%; display:flex; align-items:center; gap:11px; text-align:left; background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-control); padding:11px 13px; color:var(--ink); margin-bottom:10px; }
+.langsel:hover{ border-color:var(--brand-line); }
+.langsel-globe{ width:17px; height:17px; color:var(--brand); flex-shrink:0; }
+.langsel-stack{ flex:1; min-width:0; }
+.langsel-name{ display:block; font-family:var(--font-ui); font-weight:700; font-size:.9rem; color:var(--ink); }
+.langsel-count{ display:block; font-family:var(--font-ui); font-size:.72rem; color:var(--muted); margin-top:1px; }
+.langsel-chev{ width:15px; height:15px; color:var(--muted); flex-shrink:0; }
+/* Language sub-screen rows reuse the .vrow shape — button reset, a version
+   count on the right, a tick on the active language. */
+.langlist-row{ width:100%; background:none; border:none; font:inherit; color:inherit; text-align:left; cursor:pointer; }
+.langlist-count{ font-family:var(--font-ui); font-size:.78rem; color:var(--muted); font-variant-numeric:tabular-nums; flex-shrink:0; padding-right:2px; }
+.langlist-tick{ width:16px; height:16px; color:var(--brand); flex-shrink:0; }
+
 /* Favorite-translation quick-access row (#favRow) — a one-tap shortcut row
-   above the language chips, same shape as .langrow/.langchip but its own
-   gold accent (matching the star toggle's color) since these aren't a
+   above the version list, same pill shape as the search/selector chrome but its
+   own gold accent (matching the star toggle's color) since these aren't a
    filter, they're saved picks. Hidden (inline style) when there are none. */
 .favrow{ display:flex; align-items:center; gap:7px; padding:14px 24px; overflow-x:auto; flex-shrink:0; }
 .favrow-label{ flex-shrink:0; }
