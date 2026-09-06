@@ -1,5 +1,27 @@
 /* ═══════════════════════════════════════════════════════════════════════
    CATALOG */
+// The API's language_code / version-id prefix is ISO 639-3; BCP-47 (and the
+// axe "valid-lang" check) wants the 2-letter 639-1 code where one exists.
+// Covers the languages the catalog actually carries translations in; anything
+// not listed falls back to the 3-letter code, which is still valid BCP-47.
+const ISO3_TO_BCP47 = {
+  eng: "en", spa: "es", por: "pt", fra: "fr", fre: "fr", deu: "de", ger: "de", rus: "ru", ita: "it",
+  nld: "nl", dut: "nl", pol: "pl", ron: "ro", rum: "ro", ell: "el", gre: "el", ukr: "uk", ces: "cs", cze: "cs",
+  hun: "hu", swe: "sv", fin: "fi", dan: "da", nor: "no", nob: "nb", nno: "nn", isl: "is", ice: "is", tur: "tr",
+  ara: "ar", heb: "he", fas: "fa", per: "fa", urd: "ur", hin: "hi", ben: "bn", tam: "ta", tel: "te", mar: "mr",
+  guj: "gu", pan: "pa", kan: "kn", mal: "ml", nep: "ne", sin: "si", tha: "th", vie: "vi", ind: "id",
+  msa: "ms", may: "ms", zsm: "ms", tgl: "tl", zho: "zh", chi: "zh", cmn: "zh", yue: "zh", jpn: "ja", kor: "ko",
+  swa: "sw", swh: "sw", amh: "am", hau: "ha", yor: "yo", ibo: "ig", zul: "zu", xho: "xh", afr: "af", som: "so",
+  mlg: "mg", nya: "ny", sna: "sn", kin: "rw", lug: "lg", lin: "ln", hrv: "hr", srp: "sr", slk: "sk", slo: "sk",
+  slv: "sl", bul: "bg", bel: "be", lit: "lt", lav: "lv", est: "et", sqi: "sq", alb: "sq", hye: "hy", arm: "hy",
+  kat: "ka", geo: "ka", aze: "az", kaz: "kk", uzb: "uz", mon: "mn", khm: "km", lao: "lo", mya: "my", bur: "my",
+  cat: "ca", eus: "eu", baq: "eu", glg: "gl", cym: "cy", wel: "cy", gle: "ga", gla: "gd", bre: "br", ltz: "lb",
+  mlt: "mt", epo: "eo", lat: "la", hat: "ht", tir: "ti", orm: "om", tuk: "tk", kir: "ky", tgk: "tg", pus: "ps",
+};
+function bcp47(code) {
+  const c = (code || "").toLowerCase().split(/[-_]/)[0];
+  return ISO3_TO_BCP47[c] || c || "";
+}
 async function loadCatalog() {
   if (catalog && catalog.length) return catalog;
   try {
@@ -192,9 +214,12 @@ function versionRowHtml(v, favs) {
     ? `<span class="audiobadge" title="${v.audio_count > 1 ? v.audio_count + ' narrations available' : 'Audio narration available'}">${AUDIO_ICON}${v.audio_count > 1 ? ` ×${v.audio_count}` : ""}</span>`
     : "";
   const isFav = favs.has(v.version_id);
-  return `<div class="vrow ${on ? 'on' : ''}" onclick="pickVersionRow('${v.version_id}')">
-      <div><div class="vt">${escHtml(v.title || v.version_id)}</div><div class="vd">${escHtml(v.language_name || "")}${audioBit}</div></div>
-      <button type="button" class="fav-star ${isFav ? 'on' : ''}" onclick="event.stopPropagation(); toggleFavoriteVersion('${v.version_id}')" aria-label="${isFav ? 'Remove from favorites' : 'Add to favorites'}" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">${isFav ? '★' : '☆'}</button>
+  // The row itself is a plain container — the name is one button and the star
+  // another, as siblings, so there's no interactive-inside-interactive
+  // (WCAG 4.1.2 / axe nested-interactive) and both are real tab stops.
+  return `<div class="vrow ${on ? 'on' : ''}"${on ? ' aria-current="true"' : ''}>
+      <button type="button" class="vrow-main" onclick="pickVersionRow('${v.version_id}')"><span class="vt">${escHtml(v.title || v.version_id)}</span><span class="vd">${escHtml(v.language_name || "")}${audioBit}</span></button>
+      <button type="button" class="fav-star ${isFav ? 'on' : ''}" onclick="toggleFavoriteVersion('${v.version_id}')" aria-pressed="${isFav}" aria-label="${isFav ? 'Remove ' + escAttr(v.title || v.version_id) + ' from favorites' : 'Add ' + escAttr(v.title || v.version_id) + ' to favorites'}">${isFav ? '★' : '☆'}</button>
     </div>`;
 }
 function renderVersionList(q) {
@@ -232,6 +257,7 @@ async function selectVersion(id) {
   current.version = id;
   current.versionTitle = v.title || id;
   current.textDirection = v.text_direction === "rtl" ? "rtl" : "ltr";
+  current.lang = bcp47(v.language_code || id);
   if (v.language_name) setLastLang(v.language_name);
   setLastVersion(id);
   closeModal("versionPickerScrim");
@@ -256,6 +282,7 @@ function applyVersionById(id) {
   current.version = id;
   current.versionTitle = v.title || id;
   current.textDirection = v.text_direction === "rtl" ? "rtl" : "ltr";
+  current.lang = bcp47(v.language_code || id);
   return true;
 }
 // Applied once at init from the stored iqb_last_version (js/main.js).

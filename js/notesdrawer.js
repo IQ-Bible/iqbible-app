@@ -923,6 +923,9 @@ function initNotesDrawer() {
       return;
     }
     if (e.key === "Escape") {
+      // A modal open over the drawer (e.g. the formatting-help sheet) owns the
+      // first Escape — let it close before Escape touches the drawer.
+      if (document.querySelector(".modalscrim.show")) return;
       const d = document.getElementById("notesDrawer");
       if (d && !d.hidden) {
         if (ndSwitcherOpen) ndCloseSwitcher();

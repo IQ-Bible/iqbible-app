@@ -70,19 +70,23 @@ window.addEventListener("popstate", async () => {
    open (replaceState, not pushState) rather than its own history stack —
    Back/Forward still only walks chapter history, same as before; this just
    makes an already-open view's URL something you can copy and share. */
-const HASH_SLUGS = { search: "search", library: "my-library", explore: "explore", study: "study-tools", devotionals: "devotionals", share: "share-tools", settings: "settings", about: "about", plans: "plans", help: "help", progress: "my-progress" };
+const HASH_SLUGS = { search: "search", library: "my-library", explore: "explore", study: "study-tools", devotionals: "devotionals", share: "share-tools", settings: "settings", about: "about", accessibility: "accessibility", plans: "plans", help: "help", progress: "my-progress" };
+// A tabbed view (Explore/Study Tools/My Library) can carry its open tab as a
+// second segment: /gen/1#study-tools/word.
 function parseHashRoute() {
-  const slug = (location.hash || "").slice(1);
-  return Object.keys(HASH_SLUGS).find(k => HASH_SLUGS[k] === slug) || null;
+  const [slug, tab] = (location.hash || "").slice(1).split("/");
+  const key = Object.keys(HASH_SLUGS).find(k => HASH_SLUGS[k] === slug) || null;
+  return key ? { key, tab: tab || null } : null;
 }
-function setMenuHash(key) {
+function setMenuHash(key, tab) {
   const slug = HASH_SLUGS[key] || "";
-  const url = currentPath() + (slug ? `#${slug}` : "");
+  const frag = slug ? `#${slug}${tab ? `/${tab}` : ""}` : "";
+  const url = currentPath() + frag;
   if (location.pathname + location.search + location.hash === url) return;
   history.replaceState(null, "", url);
 }
 function openHashRoute() {
-  const key = parseHashRoute();
-  if (key) navMenuClick(key);
+  const r = parseHashRoute();
+  if (r) navMenuClick(r.key, r.tab);
 }
 window.addEventListener("hashchange", openHashRoute);

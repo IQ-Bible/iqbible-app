@@ -294,7 +294,7 @@ function renderPlanBuilderHtml() {
           <label><input type="radio" name="planScope" value="testament" onchange="updatePlanScopeFields()"> Testament</label>
           <label><input type="radio" name="planScope" value="books" onchange="updatePlanScopeFields()"> Specific Books</label>
         </div>
-        <select id="planTestamentSelect" class="plan-scope-sub" style="display:none">
+        <select id="planTestamentSelect" aria-label="Testament" class="plan-scope-sub" style="display:none">
           <option value="ot">Old Testament</option>
           <option value="nt">New Testament</option>
         </select>
@@ -433,7 +433,10 @@ function truncatedRefLinks(refs, previewByRef) {
       const text = previewByRef[`${r.book}.${r.chapter}.${r.verse}`];
       if (text) citeAttr = ` data-cite-id="${registerCiteId(label, text)}"`;
     }
-    return `<a href="javascript:void(0)" class="cal-ref${citeAttr ? " citelink" : ""}"${citeAttr} onclick="event.stopPropagation();jumpFromCalendar('${escAttr(r.book)}',${r.chapter}${hasVerse ? "," + r.verse : ""})">${escHtml(label)}</a>`;
+    // Plain text inside the day-cell button (a button can't contain a link).
+    // Mouse hover still previews via [data-cite-id]; the day drawer this cell
+    // opens carries the same refs as real, focusable, jump-able controls.
+    return `<span class="cal-ref${citeAttr ? " citelink" : ""}"${citeAttr}>${escHtml(label)}</span>`;
   });
   let html = links.join(", ");
   if (extra > 0) html += ` <span class="cal-ref-more">+${extra} more</span>`;
@@ -506,16 +509,16 @@ function planDayCellHtml(cell, plan, completedSet, todayStr, previewByRef) {
     : `<svg width="12" height="12" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5.5" fill="none" stroke="var(--muted2)" stroke-width="1.5"/></svg>`;
   let refsHtml;
   if (plan.mode === "mcheyne") {
-    refsHtml = `<div class="cal-refline"><b>F</b> ${truncatedRefLinks(dayObj.family || [])}</div><div class="cal-refline"><b>S</b> ${truncatedRefLinks(dayObj.secret || [])}</div>`;
+    refsHtml = `<span class="cal-refline"><b>F</b> ${truncatedRefLinks(dayObj.family || [])}</span><span class="cal-refline"><b>S</b> ${truncatedRefLinks(dayObj.secret || [])}</span>`;
   } else if (plan.mode === "topic") {
-    refsHtml = `<div class="cal-refline">${truncatedRefLinks(dayObj.verses || [], previewByRef)}</div>`;
+    refsHtml = `<span class="cal-refline">${truncatedRefLinks(dayObj.verses || [], previewByRef)}</span>`;
   } else {
-    refsHtml = `<div class="cal-refline">${truncatedRefLinks(dayObj.chapters || [])}</div>`;
+    refsHtml = `<span class="cal-refline">${truncatedRefLinks(dayObj.chapters || [])}</span>`;
   }
-  return `<div class="cal-daycell ${stateClass}" onclick="openDayDrawer(${dayObj.day})">
-    <div class="cal-cellhead"><span class="cal-daynum${isToday ? " cal-daynum-today" : ""}">${cell.dayNum}</span>${icon}</div>
+  return `<button type="button" class="cal-daycell ${stateClass}" onclick="openDayDrawer(${dayObj.day})" aria-label="Day ${cell.dayNum}${done ? ", complete" : missed ? ", missed" : ""}">
+    <span class="cal-cellhead"><span class="cal-daynum${isToday ? " cal-daynum-today" : ""}">${cell.dayNum}</span>${icon}</span>
     ${refsHtml}
-  </div>`;
+  </button>`;
 }
 function togglePlanExportMenu() { planExportMenuOpen = !planExportMenuOpen; renderPlansView(); }
 function closePlanExportMenu() { planExportMenuOpen = false; renderPlansView(); }
@@ -1029,9 +1032,14 @@ function planDayFullyRead(plan, dayObj) {
   const refs = planDayChapterRefs(plan, dayObj);
   return refs.length > 0 && refs.every(r => progress[`${r.book}.${r.chapter}`]);
 }
-function markChapterRead() {
+// opts.fromAudio (handleAudioEnded, continuous listening) suppresses the
+// per-chapter "Added to your Progress" toast — a "Day N complete!" milestone
+// still shows — and no-ops if the chapter's already marked.
+function markChapterRead(opts) {
+  const quiet = !!(opts && opts.fromAudio);
   const key = `${current.book}.${current.chapter}`;
   const progress = getProgress();
+  if (progress[key]) return;
   progress[key] = Date.now();
   setProgress(progress);
   const dayMatch = findMatchingPlanDay(current.book, current.chapter);
@@ -1043,11 +1051,11 @@ function markChapterRead() {
       if (!completed.includes(dayMatch)) completed.push(dayMatch);
       setPlanCompletedDays(plan.id, completed);
       toast(`Day ${dayMatch} marked complete!`);
-    } else {
+    } else if (!quiet) {
       const remaining = dayObj ? planDayChapterRefs(plan, dayObj).filter(r => !progress[`${r.book}.${r.chapter}`]).length : 0;
       toast(remaining ? `Checked off — ${remaining} more chapter${remaining === 1 ? "" : "s"} to finish Day ${dayMatch}` : "Added to your Progress");
     }
-  } else {
+  } else if (!quiet) {
     toast("Added to your Progress");
   }
   renderChapterReadPrompt();

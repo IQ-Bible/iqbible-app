@@ -10,9 +10,13 @@ function toggleProfilePanel() {
   if (panel.classList.contains("show")) { closeProfilePanel(); return; }
   renderProfilePanel();
   panel.classList.add("show");
+  if (typeof markSheet === "function") markSheet("profilePanel", true);
 }
 function closeProfilePanel() {
-  document.getElementById("profilePanel").classList.remove("show");
+  const panel = document.getElementById("profilePanel");
+  const was = panel.classList.contains("show");
+  panel.classList.remove("show");
+  if (was && typeof markSheet === "function") markSheet("profilePanel", false);
 }
 // Consecutive-day streak (local calendar days) off History's visitedAt
 // timestamps, most-recent-first — a streak that ended yesterday still counts

@@ -35,11 +35,11 @@ function renderShareTool() {
   const embedCode = `<iframe src="${shareEmbedSrc()}" width="600" height="315" frameborder="0"></iframe>`;
   body.innerHTML = `
     <div class="share-fields">
-      <select id="shareBookSelect" onchange="onShareFieldChange()">
+      <select id="shareBookSelect" aria-label="Book" onchange="onShareFieldChange()">
         ${books.map(b => `<option value="${escAttr(b.usfm)}"${b.usfm === shareToolRef.book ? " selected" : ""}>${escHtml(b.name)}</option>`).join("")}
       </select>
-      <input type="number" id="shareChapterInput" min="1" value="${shareToolRef.chapter}" onchange="onShareFieldChange()">
-      <input type="number" id="shareVerseInput" min="1" value="${shareToolRef.verse}" onchange="onShareFieldChange()">
+      <input type="number" id="shareChapterInput" aria-label="Chapter" min="1" value="${shareToolRef.chapter}" onchange="onShareFieldChange()">
+      <input type="number" id="shareVerseInput" aria-label="Verse" min="1" value="${shareToolRef.verse}" onchange="onShareFieldChange()">
       <button class="filter-chip${shareToolTheme === "light" ? " active" : ""}" onclick="setShareTheme('light')">Light</button>
       <button class="filter-chip${shareToolTheme === "dark" ? " active" : ""}" onclick="setShareTheme('dark')">Dark</button>
     </div>

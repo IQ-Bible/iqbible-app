@@ -43,12 +43,12 @@ const TOUR_STEPS = [
   // a slim label up top, the combined book+chapter chip + prev/next in #readNavRow
   // down by the thumb, the translation pill in the top bar. renderTourStep picks
   // whichever candidate is visible.
-  { selector: "#readNavRow, #readCol .chhead", title: "Reading", body: "Pick your translation, book and chapter, then just start reading. On a phone the book/chapter picker and the prev/next arrows sit in the bar just above the nav; the translation is the pill in the top bar." },
+  { selector: "#readNavRow, #readCol .chhead", title: "Reading", body: "Pick your translation, book and chapter, then just start reading. On a phone the book/chapter picker and the prev/next arrows sit in the bar just above the nav, and the translation is the pill in the top bar; on desktop all three are together in the reading header." },
   { selector: "#audioDot, #audioPlayer", title: "Audio Narration", body: "When a chapter has narration a round play button appears (on a phone, in the bar above the nav; on desktop, a player in the reading header). Press it to listen — on a phone the bar becomes the full player while it's playing. It has a voice picker (if more than one narrator was recorded), a clock button for a sleep timer, and there's a Settings option to keep playing into the next chapter." },
-  // #cardStack (desktop's always-visible rail) or #btnChapterCtx (mobile's ⓘ in
-  // the slim header) — never both at once. Not auto-opened: both are already
-  // visible, and opening the sheet would cover the spotlight.
-  { selector: "#cardStack, #btnChapterCtx", title: "Chapter Context", body: "Places (with maps), people, prophecy fulfillments, a timeline, and a chapter overview for whatever chapter you're reading. On a phone, tap the ⓘ next to the chapter (or swipe in from the right edge) — the book's own overview is the first card in that sheet.", before: () => switchMainView("read") },
+  // #cardStack (desktop's always-visible rail) or #chapterChips (the mobile
+  // chip row below the slim header) — never both at once. Not auto-opened: both
+  // are already visible, and opening the sheet would cover the spotlight.
+  { selector: "#cardStack, #chapterChips", title: "Chapter Context", body: "Places (with maps), people, prophecy fulfillments, a timeline, and a chapter overview for whatever chapter you're reading. On a phone, tap one of the small icons just below the chapter title (or swipe in from the right edge for the full sheet).", before: () => switchMainView("read") },
   { selector: "#searchTrigger", title: "Search", body: "Tap here any time to search the whole Bible instantly." },
   // Explore + Study Tools: separate items in the desktop rail, but one "Discover"
   // tab on mobile that opens #discoverHub. renderTourStep's target resolution
@@ -134,6 +134,12 @@ function maybeShowTourWelcome() {
 function dismissTourWelcome() { markTourSeen(); closeModal("tourWelcomeScrim"); }
 function startTourFromWelcome() { closeModal("tourWelcomeScrim"); startTour(); }
 
+let _tourReturnFocus = null;
+let _tourFocusedStep = -1;
+const TOUR_INERT_IDS = ["topbar", "profilePanel", "shell", "mobileFooterNav", "moreMenuSheet", "discoverHub", "notesLauncher", "notesDrawer"];
+function _tourSetInert(on) {
+  TOUR_INERT_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.inert = on; });
+}
 function startTour(steps) {
   activeTourSteps = steps || TOUR_STEPS;
   markTourSeen();
@@ -142,8 +148,12 @@ function startTour(steps) {
   tourActive = true;
   tourStepIndex = 0;
   tourRenderedIndex = -1;
+  _tourFocusedStep = -1;
+  _tourReturnFocus = document.activeElement;
   document.getElementById("tourOverlay").classList.add("show");
+  _tourSetInert(true);
   renderTourStep();
+  requestAnimationFrame(() => { try { document.getElementById("tourNextBtn").focus(); } catch (e) {} });
 }
 function startAdvancedTour() { startTour(ADVANCED_TOUR_STEPS); }
 function acceptAdvancedOffer() {
@@ -153,8 +163,22 @@ function acceptAdvancedOffer() {
 function endTour() {
   tourActive = false;
   document.getElementById("tourOverlay").classList.remove("show");
+  _tourSetInert(false);
   switchMainView("read"); // no-op for the basic tour; cleans up after the advanced one
+  const r = _tourReturnFocus; _tourReturnFocus = null;
+  if (r && r.isConnected && !r.closest("[inert]")) { try { r.focus(); } catch (e) {} }
 }
+// Keep Tab inside the tour tooltip while it's up.
+document.addEventListener("keydown", e => {
+  if (!tourActive || e.key !== "Tab") return;
+  const tip = document.getElementById("tourTooltip");
+  const f = [...tip.querySelectorAll("button")].filter(b => b.offsetParent !== null && b.style.visibility !== "hidden");
+  if (!f.length) return;
+  const first = f[0], last = f[f.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  else if (!tip.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+}, true);
 function tourSkip() { endTour(); }
 function tourNext() {
   if (tourStepIndex >= activeTourSteps.length - 1) {
@@ -247,5 +271,12 @@ function renderTourStep(skipDepth) {
   document.getElementById("tourBackBtn").style.visibility = tourStepIndex === 0 ? "hidden" : "visible";
   document.getElementById("tourNextBtn").textContent = tourStepIndex === activeTourSteps.length - 1 ? "Done" : "Next";
   positionTourTooltip(rect);
+  // Pull focus to the tooltip on a real step change (not on a resize
+  // reposition) so a screen reader announces the new step and Tab stays here.
+  if (tourStepIndex !== _tourFocusedStep) {
+    _tourFocusedStep = tourStepIndex;
+    const tip = document.getElementById("tourTooltip");
+    try { tip.focus({ preventScroll: true }); } catch (e) {}
+  }
 }
 window.addEventListener("resize", () => { if (tourActive) renderTourStep(); });

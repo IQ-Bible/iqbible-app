@@ -4,10 +4,145 @@ All notable changes to this project will be documented in this file. This CHANGE
 
 ## [Unreleased]
 
+## [1.21.0] - 2026-09-06
+- **fixed:** A place the historical data can't pin to a modern location (Nod, and a handful of
+  others) showed its status as a raw code — `unknown_place` — which read like an error. It's now
+  written plainly ("Unknown place"), in the chapter Places view and the Bible Atlas alike.
+- **fixed:** On a version that narrates only part of the canon — a Greek New Testament with no Old
+  Testament audio, say — pressing Play on a chapter it doesn't cover used to leave the player
+  stuck retrying a missing file. It now shows a short "Narration isn't available for this chapter"
+  line in the player instead, and clears it as soon as you move to a chapter that does have audio.
+- **fixed:** A chapter illustration that landed on the same verse as a section heading (Genesis 9's
+  Sweet Publishing plate at "The New Covenant") no longer wedges between the heading and its first
+  verse — it now sits just below that verse, so the heading stays with the text it introduces.
+- **changed:** A Scripture reference that spans a longer passage (John 3:1-10) is now hover- and
+  click-previewable like any other — the popup shows the opening verses with a "+N more" note
+  rather than being left as plain text because the range was too long.
+- **fixed:** Hovering a deuterocanonical reference (1 Maccabees, Sirach…) while reading a
+  66-book translation now shows the verse text. The preview lookup falls back to the citation
+  resolver — which finds an apocrypha-carrying edition — for any reference the reading version
+  can't itself resolve. Affects cross-references, prophecy fulfilments, and the My Library tabs.
+- **fixed:** Study Tools › Commentaries now lists only the sources that actually have an entry for
+  the chapter (or verse) you're looking at, instead of every source that touches the book
+  anywhere. Picking a book with sparse coverage no longer shows a long list that's mostly dead ends.
+- **changed:** Sharpened the page title and the link-preview (Open Graph) card copy — a social
+  unfurl of app.iqbible.com now leads with "read Scripture in 1,400+ translations" and a real
+  description rather than a bare site name. (An existing LinkedIn/Slack/etc. preview may need a
+  manual re-scrape to pick up the change.)
+- **changed:** Continuous play ("Keep playing narration into the next chapter") now carries on
+  across a book boundary too — the end of Malachi rolls into Matthew, Titus into Philemon — and
+  stops only at the last chapter of the canon rather than at the end of each book.
+- **added:** README now has a "Working on the code" section — architecture, a file-by-file map of
+  the `js/*.js` layout, the script load-order gotcha, and the doc-sync / verse-preview /
+  accessibility conventions — for anyone forking or extending the app.
+- **changed:** On a phone, the ⓘ next to the chapter title is replaced by a small row of muted
+  icons just below it — Places, People, Prophecy, Timeline (each with a count of what the chapter
+  holds) and About. Each opens its view directly; About opens the full Chapter Info sheet. The
+  swipe-in-from-the-right gesture still opens that sheet too.
+- **fixed:** That icon row no longer makes the page jump when you swipe to a chapter you haven't
+  read yet — it now holds its place from the moment the chapter loads instead of appearing a beat
+  later.
+- **added:** Book Icons now offers a "Lettered" style — every book shown as its abbreviation
+  (GEN, 1CO, REV…) — alongside the existing Overview Bible artwork. The Color / Black & White
+  choice applies to both: Overview Bible art, and the lettered tiles (brand purple vs greyscale).
+  Books the Overview Bible set doesn't cover already used the lettered tile as a fallback.
+- **changed:** The book icon in the reading header is now tappable — it opens the book picker,
+  the same as tapping the book name.
+- **changed:** The right-side context rail now leads with what's specific to the chapter you're
+  reading (About Chapter, Places, Timeline, People, Prophecies); the book overview, which is the
+  same across a whole book and is also in the book/chapter picker's Intro, moves to the end as a
+  one-line card. Each card now carries a small icon matching the mobile row.
+- **added:** The desktop left nav now discloses sub-items for the three sections that open a
+  tabbed view — Explore (Atlas, Collections, Extrabiblical, Genealogy, Harmony, Topics), Study
+  Tools (Book Guide, Dictionary, Word Study, Commentaries, Textual Variants) and My Library (Notes,
+  Bookmarks, Highlights, History). Click the caret to expand a section — a single-open accordion:
+  opening one (or navigating into it) closes the rest, and leaving for a view without sub-items
+  closes it too. Clicking a sub-item opens that view straight to its tab, and each tab is now
+  linkable (e.g. `#study-tools/word`). Mobile is unchanged — the Discover sheet already covers this.
+- **added:** My Library shows a quiet count next to each of Notes / Bookmarks / Highlights in the
+  left nav, and a total on "My Library" itself (capped at 9+). They update live as you save or
+  remove items. History isn't counted (it's a recent-activity list, not saved content).
+- **fixed:** The reading header no longer jerks sideways when you change chapter or book — the
+  column was taking its width from the loading spinner rather than the verses, and a reserved
+  scrollbar gutter now keeps it from shifting between short and long chapters too.
+- **changed:** Dropped the small ⓘ button next to the book/chapter title on desktop. The book
+  overview it opened is in the right rail (and the book/chapter picker's Intro); the mobile Chapter
+  Info sheet already showed it.
+- **changed:** The "About Chapter" (was "About This Chapter") rail card now shows a two-line taste
+  of the actual overview text with an ellipsis, instead of a fixed teaser line / a five-line block.
+  Tap through for the full text as before.
+- **changed:** On a phone, swiping between chapters is now a real page drag — the next (or
+  previous) chapter's verses follow your finger in from the edge, so you see where you're going
+  before you commit; release past about a third of the way to turn, or let go to snap back.
+  Resists at the first and last chapter of the Bible. (At a book boundary it falls back to a
+  slide-and-fade, and the preview reuses the same fetch the turn needs — no extra API calls.)
+- **fixed:** The right-rail "Places" card no longer shows a big blank square when the chapter's
+  first place has no photo or map (e.g. Exodus 31's "the Holy Place"). It now uses the first place
+  in the chapter that *does* have imagery; if none do, the card shrinks to a one-line list the
+  size of the People and Prophecies cards.
+- **fixed:** The right-rail "Places" card's image is no longer squashed to a thin sliver when the
+  chapter has a long list of places (Genesis 14). The photo (or map) now keeps a proper 4:3 shape
+  and the card grows to fit; the caption under it is one line — the first place plus a "+N more"
+  count.
+- **fixed:** On a narrow phone (iPhone SE, Galaxy Z Fold cover screen), the "Copy" and "Compare"
+  buttons in the verse Tools panel ran off the right edge of the screen. The tool grid now fits
+  the panel at every width, dropping to three columns on the smallest phones.
+- **changed:** On a phone, the tab rows in Explore, Study Tools and My Library now wrap onto as
+  many rows as they need instead of scrolling sideways. Jumping straight to a tab near the end
+  (Discover › Harmony) no longer lands you on an active tab that's scrolled out of view.
+- **fixed:** Chapter section headings (e.g. Exodus 35, "An Offering for the Tabernacle") and inline
+  illustrations no longer render a beat after the verses and jolt them down — both are now placed
+  as the chapter renders, in one pass. This also means the swipe pager's preview shows the headings
+  and plates and stays aligned, to the word, with the page it turns to.
+- **changed:** The audio player's sleep-timer button only appears when "Keep playing narration into
+  the next chapter" is on. Without it a chapter is just a few minutes of audio, so the minute
+  options never applied and stopping at the chapter's end was already the default.
+- **changed:** On a phone, the audio player now fades in and out when narration starts or stops,
+  instead of appearing and disappearing instantly.
+- **fixed:** On a narrow phone, the playing audio bar's voice picker and sleep-timer button could
+  be pushed off the right edge of the screen (the sleep timer often not visible at all). The
+  controls now stay on-screen down to the smallest phones; the bar drops its elapsed-time readout
+  to make room at those widths.
+- **fixed:** On a phone, pausing narration from the expanded player also hid the bottom bars (as
+  if you'd scrolled down). Pausing now just collapses the player and leaves the bars in place.
+- **fixed:** On a phone, the cards in the Chapter Info sheet (Places, People, Prophecies, Timeline,
+  About) did nothing when tapped — the sheet's own contents were being frozen along with the page
+  behind it.
+- **fixed:** Narration that was paused and returned to much later (after the audio link had
+  expired) would silently refuse to play until a page reload. The app now fetches a fresh link on
+  the fly and picks up where you left off.
+- **changed:** A book with no icon on file (most of the deuterocanon — 2 Maccabees, Tobit, Sirach…)
+  now shows a small text tile with its abbreviation ("2MA", "TOB") in the reading header, the same
+  size as a real icon, instead of an empty box.
+- **added:** Settings option "Mark a chapter read when I finish listening to it" (off by default) —
+  when a chapter's narration plays to the end it's added to your Progress, unless a sleep timer is
+  running (chapters that play out while you're dozing off don't count).
+- **fixed:** The "Next" button at the foot of a chapter had its › chevron before the label instead
+  of after it.
+- **added:** Accessibility — the app now targets WCAG 2.2 AA (issue #250).
+  - Keyboard: a "Skip to reading" link, a visible focus outline everywhere, verse numbers are real
+    buttons (Verse Tools without a mouse), dictionary words and Scripture references in prose are
+    focusable and preview on focus (Esc to dismiss, and the popup no longer vanishes when you reach
+    for it), every list row / card / picker responds to Enter and Space, and the audio progress bar
+    is a real slider (arrow keys, with the current time announced).
+  - Dialogs: every modal now traps focus while open, returns focus to what opened it on close,
+    hides the rest of the page from assistive tech, and is announced with its title. The "add an
+    API key" screen and the guided tour get the same treatment.
+  - Announcements: status messages (the little toast) are now read aloud by screen readers.
+  - Reading: the chapter has a proper page heading and title, and its text carries the correct
+    language for the translation you're reading.
+  - Visuals: secondary text was darkened to meet contrast in both light and dark themes; selected
+    filter/tab chips now show a weight change, not just colour; small controls (highlight
+    swatches, the tag "×") were enlarged to a comfortable tap size; all motion respects the
+    "reduce motion" system setting and the UI adapts to Windows High Contrast.
+- **added:** An **Accessibility** page (linked from the left-nav footer, the About page, and Help)
+  — the standard it targets, what's been tested, the known gaps, and how to report a problem.
+
 ## [1.20.0] - 2026-09-05
-- **changed:** The reading header is the same on desktop and mobile now — book and chapter read as
-  one flush "Book Chapter" title (still two separate click targets, just no caret chevrons), and the
-  translation pick moved out of the header into the top bar next to Search at every width.
+- **changed:** The reading header reads the same on desktop and mobile now — book and chapter as
+  one flush "Book Chapter" title (still two separate click targets, just no caret chevrons). On
+  desktop the translation pick sits right after it; on a phone it's the pill in the top bar next
+  to Search (the slim header has no room).
 - **added:** Continuous play — a Settings toggle ("Keep playing narration into the next chapter").
   When a chapter's narration ends it loads the next chapter and keeps playing; stops at the end of
   the book. Off by default.
@@ -53,6 +188,16 @@ All notable changes to this project will be documented in this file. This CHANGE
 - **fixed:** The round audio button's progress ring is cleared when you move to another chapter,
   so it no longer briefly shows the previous chapter's position. Changing the narration voice no
   longer collapses the player back to the picker.
+  - **fixed:** After the audio sleep timer's fade-out ran (or two overlapping fades did), the
+  narration volume stayed turned down for the rest of the session — so "Keep playing narration into
+  the next chapter" appeared to stop working and only a page reload brought the sound back. The
+  fade now always restores full volume, and a chapter change cancels any fade still in progress.
+- **fixed:** Closing Settings could trigger Chrome's "Update password?" prompt. The API-key field
+  is no longer a password input (it's the visitor's own key, not a site credential) — it stays
+  visually masked in Chrome/Edge/Safari, and Chrome's password manager leaves it alone.
+- **fixed:** A chapter that opens with a story-title heading (e.g. Genesis 4) and one that opens
+  straight into verse 1 (e.g. Genesis 5) now start their first line at the same height — the two
+  were off by the heading's top margin.
 
 ## [1.19.0] - 2026-09-05
 - **added:** Chapter navigation is now consistent across breakpoints instead of each having only

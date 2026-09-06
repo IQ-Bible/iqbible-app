@@ -4,9 +4,9 @@
    Original Language/Cross-refs/Commentary/Compare/Topics, but nothing
    book-level or lexicon-level). Same overlay shell as #exploreOverlay. */
 let studyActiveTab = "book";
-function openStudy() {
+function openStudy(tab) {
   switchMainView("study");
-  switchStudyTab(studyActiveTab);
+  switchStudyTab(tab && tab in STUDY_TAB_DESC ? tab : studyActiveTab);
 }
 function closeStudy() {
   switchMainView("read");
@@ -20,6 +20,7 @@ const STUDY_TAB_DESC = {
 };
 function switchStudyTab(tab) {
   studyActiveTab = tab;
+  syncNavSub("study", tab);
   document.querySelectorAll("#studyTabs .lib-tab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
   document.getElementById("studyDesc").textContent = STUDY_TAB_DESC[tab] || "";
   if (tab === "word") renderStudyWord();
@@ -273,41 +274,54 @@ async function renderStudyCommentaries() {
   body.innerHTML = `<div class="spin"></div>`;
   if (!cmtBook) { cmtBook = current.book; cmtChapter = current.chapter; cmtVerse = 0; }
   const token = ++cmtToken;
-  const [allSources, meta] = await Promise.all([getCommentarySources(), getBookMeta(cmtBook)]);
+  const meta = await getBookMeta(cmtBook);
   if (token !== cmtToken) return;
   const books = bookList.length ? bookList : [{ usfm: cmtBook, name: current.bookName }];
-  const sources = allSources.filter(s => !s.books || !s.books.length || s.books.includes(cmtBook));
-  const rank = s => s.name === "mhenry" ? 0 : s.name === "gill" ? 1 : 2;
-  sources.sort((a, b) => rank(a) - rank(b) || (a.author_name || "").localeCompare(b.author_name || ""));
-  if (!sources.some(s => s.name === cmtSource)) cmtSource = sources.length ? sources[0].name : null;
 
   const chapterCount = meta.length || 1;
   if (cmtChapter > chapterCount) cmtChapter = 1;
   const verseCount = (meta.find(m => m.chapter === cmtChapter) || {}).verse_count || 0;
   if (cmtVerse > verseCount) cmtVerse = 0;
 
-  if (!sources.length) {
-    body.innerHTML = `
-      <div class="tool-filter-row share-fields">
-        <select onchange="onCommentaryBookChange(this.value)">${books.map(b => `<option value="${escAttr(b.usfm)}"${b.usfm === cmtBook ? " selected" : ""}>${escHtml(b.name)}</option>`).join("")}</select>
-      </div>
-      <div class="dd-empty">No commentary source covers this book.</div>`;
-    return;
+  // Only the sources that actually have an entry for this chapter (or verse) —
+  // GET /books/{book}/commentaries?chapter=&verse= (the same coverage-scoped
+  // list Verse Tools uses). The plain /commentaries list can't do this: its
+  // `books` field is book-level at best and often absent, so filtering on it
+  // left every source showing for a book only a handful of them cover (#273).
+  let sources = [];
+  try {
+    const q = `?chapter=${cmtChapter}` + (cmtVerse ? `&verse=${cmtVerse}` : "");
+    sources = (await apiJSONCached(`/books/${cmtBook}/commentaries${q}`)).data || [];
+  } catch (e) {
+    sources = (await getCommentarySources()).filter(s => !s.books || !s.books.length || s.books.includes(cmtBook));
   }
+  if (token !== cmtToken) return;
+  const rank = s => s.name === "mhenry" ? 0 : s.name === "gill" ? 1 : 2;
+  sources.sort((a, b) => rank(a) - rank(b) || (a.author_name || "").localeCompare(b.author_name || ""));
+  if (!sources.some(s => s.name === cmtSource)) cmtSource = sources.length ? sources[0].name : null;
 
   const chapterOpts = Array.from({ length: chapterCount }, (_, i) => i + 1)
     .map(c => `<option value="${c}"${c === cmtChapter ? " selected" : ""}>Chapter ${c}</option>`).join("");
   const verseOpts = `<option value="0"${cmtVerse === 0 ? " selected" : ""}>Whole chapter</option>` +
     Array.from({ length: verseCount }, (_, i) => i + 1)
       .map(v => `<option value="${v}"${v === cmtVerse ? " selected" : ""}>Verse ${v}</option>`).join("");
+  const bookSel = `<select aria-label="Book" onchange="onCommentaryBookChange(this.value)">${books.map(b => `<option value="${escAttr(b.usfm)}"${b.usfm === cmtBook ? " selected" : ""}>${escHtml(b.name)}</option>`).join("")}</select>`;
+  const chapSel = `<select aria-label="Chapter" onchange="onCommentaryChapterChange(this.value)">${chapterOpts}</select>`;
+  const verseSel = `<select aria-label="Verse" onchange="onCommentaryVerseChange(this.value)">${verseOpts}</select>`;
+
+  if (!sources.length) {
+    body.innerHTML = `
+      <div class="tool-filter-row share-fields">${bookSel}${chapSel}${verseSel}</div>
+      <div class="dd-empty">No commentary covers ${escHtml(bookNameFor(cmtBook))} ${cmtChapter}${cmtVerse ? ":" + cmtVerse : ""}.</div>`;
+    return;
+  }
+
   const sourceOpts = sources.map(s => `<option value="${escAttr(s.name)}"${s.name === cmtSource ? " selected" : ""}>${escHtml(s.author_name || s.name)}</option>`).join("");
 
   body.innerHTML = `
     <div class="tool-filter-row share-fields">
-      <select onchange="onCommentarySourceChange(this.value)">${sourceOpts}</select>
-      <select onchange="onCommentaryBookChange(this.value)">${books.map(b => `<option value="${escAttr(b.usfm)}"${b.usfm === cmtBook ? " selected" : ""}>${escHtml(b.name)}</option>`).join("")}</select>
-      <select onchange="onCommentaryChapterChange(this.value)">${chapterOpts}</select>
-      <select onchange="onCommentaryVerseChange(this.value)">${verseOpts}</select>
+      <select aria-label="Commentary source" onchange="onCommentarySourceChange(this.value)">${sourceOpts}</select>
+      ${bookSel}${chapSel}${verseSel}
     </div>
     <div id="cmtStudyArea"></div>`;
   runCommentaryStudy();
@@ -369,7 +383,7 @@ function renderStudyBook() {
   const books = bookList.length ? bookList : [{ usfm: current.book, name: current.bookName }];
   document.getElementById("studyBody").innerHTML = `
     <div class="share-fields" style="margin-bottom:16px">
-      <select id="bookGuideSelect" onchange="onBookGuideChange()">${books.map(b => `<option value="${escAttr(b.usfm)}"${b.usfm === bookGuideSelected ? " selected" : ""}>${escHtml(b.name)}</option>`).join("")}</select>
+      <select id="bookGuideSelect" aria-label="Book" onchange="onBookGuideChange()">${books.map(b => `<option value="${escAttr(b.usfm)}"${b.usfm === bookGuideSelected ? " selected" : ""}>${escHtml(b.name)}</option>`).join("")}</select>
     </div>
     <div id="bookGuideArea"></div>`;
   runBookGuideLookup();
@@ -403,9 +417,10 @@ async function bookInfoPreviewHTML(usfm, closeScrimId) {
     ${!sigHtml && !introHtml ? `<div class="dd-empty">No book guide data on file for this book.</div>` : ""}
     <button class="filter-chip" style="margin-top:12px" onclick="${closeCall}openBookGuide('${usfm}')">Read More in Book Guide →</button>`;
 }
-// The reading header's (i) button — a lightweight preview instead of
-// jumping straight into the full Study Tools > Book Guide.
+// The "About <book>" rail card / navigator Intro row — a lightweight preview
+// instead of jumping straight into the full Study Tools > Book Guide.
 async function openBookInfoModal(usfm) {
+  closeCardsSheet(); // else on mobile this modal opens beneath the still-open Chapter Info sheet — see openPlacesModal
   const b = bookList.find(x => x.usfm === usfm);
   const name = b ? b.name : (current.bookName || usfm);
   document.getElementById("bookInfoTitle").textContent = name;
@@ -444,11 +459,15 @@ async function runBookGuideLookup() {
 
   let iconHtml = "";
   const iconStyle = getIconStyle();
-  if (iconStyle !== "off") {
+  const letteredTile = () =>
+    `<div class="bookicon-badge bookicon-fallback${getIconOBVariant() === "bw" ? " bookicon-bw" : ""}">${escHtml(bookIconLetters(usfm, info.name_en))}</div>`;
+  if (iconStyle === "letters") {
+    iconHtml = letteredTile();
+  } else if (iconStyle === "overview") {
     try {
-      const icon = await apiJSONCached(`/icons/${usfm}?style=${iconStyle}`);
-      if (icon.url) iconHtml = `<div class="bookicon-badge"><img src="${escHtml(icon.url)}" alt=""></div>`;
-    } catch (e) { /* no icon on file for this book — header just skips it */ }
+      const icon = await apiJSONCached(`/icons/${usfm}?style=${getIconOBVariant()}`);
+      iconHtml = icon.url ? `<div class="bookicon-badge"><img src="${escHtml(icon.url)}" alt=""></div>` : letteredTile();
+    } catch (e) { iconHtml = letteredTile(); }
   }
   const metaCells = BG_META_FIELDS.filter(([k]) => info[k] != null && info[k] !== "")
     .map(([k, label]) => `<div class="bg-meta-cell"><div class="bg-meta-label">${escHtml(label)}</div><div class="bg-meta-value">${escHtml(String(info[k]))}</div></div>`).join("");
@@ -580,7 +599,7 @@ async function renderStudyVariants() {
   const books = bookList.filter(b => presentBooks.has(b.usfm));
   document.getElementById("studyBody").innerHTML = `
     <div class="tool-filter-row share-fields">
-      <select id="variantsBookSelect" onchange="onVariantsFilterChange()"><option value="">All Books</option>${books.map(b => `<option value="${escAttr(b.usfm)}"${b.usfm === variantsBookFilter ? " selected" : ""}>${escHtml(b.name)}</option>`).join("")}</select>
+      <select id="variantsBookSelect" aria-label="Filter by book" onchange="onVariantsFilterChange()"><option value="">All Books</option>${books.map(b => `<option value="${escAttr(b.usfm)}"${b.usfm === variantsBookFilter ? " selected" : ""}>${escHtml(b.name)}</option>`).join("")}</select>
     </div>
     <div id="variantsArea"></div>`;
   runVariantsLookup(all);

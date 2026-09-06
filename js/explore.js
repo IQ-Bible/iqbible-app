@@ -7,9 +7,9 @@
    (js/notes.js); every tab renders its own controls + list/detail view
    into #exploreBody rather than pre-built per-tab markup. */
 let exploreActiveTab = "atlas";
-function openExplore() {
+function openExplore(tab) {
   switchMainView("explore");
-  switchExploreTab(exploreActiveTab);
+  switchExploreTab(tab && tab in EXPLORE_TAB_DESC ? tab : exploreActiveTab);
 }
 function closeExplore() {
   switchMainView("read");
@@ -24,6 +24,7 @@ const EXPLORE_TAB_DESC = {
 };
 function switchExploreTab(tab) {
   exploreActiveTab = tab;
+  syncNavSub("explore", tab);
   document.querySelectorAll("#exploreTabs .lib-tab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
   document.getElementById("exploreDesc").textContent = EXPLORE_TAB_DESC[tab] || "";
   if (tab === "harmony") renderExploreHarmonyList();
@@ -238,7 +239,7 @@ function renderAtlasResults(places, q) {
   const area = document.getElementById("atlasListArea");
   if (!places.length) { area.innerHTML = `<div class="dd-empty">No places match "${escHtml(q)}".</div>`; return; }
   area.innerHTML = places.slice(0, 60).map(p =>
-    `<div class="vrow" onclick="openAtlasPlace(${p.id})"><div><div class="vt">${escHtml((p.preceding_article ? p.preceding_article + " " : "") + p.name)}</div><div class="vd">${escHtml([p.place_type, p.modern_name].filter(Boolean).join(" · "))}</div></div></div>`
+    `<div class="vrow" onclick="openAtlasPlace(${p.id})"><div><div class="vt">${escHtml((p.preceding_article ? p.preceding_article + " " : "") + p.name)}</div><div class="vd">${escHtml([p.special ? null : humanizeToken(p.place_type), p.modern_name].filter(Boolean).join(" · "))}</div></div></div>`
   ).join("");
 }
 async function runAtlasSearch(q) {
@@ -274,10 +275,10 @@ async function openAtlasPlace(id) {
   try { p = await apiJSONCached(`/geo/places/${id}`); }
   catch (e) { body.innerHTML = backRow + `<div class="dd-empty">Could not load this place.</div>`; return; }
   const title = (p.preceding_article ? p.preceding_article + " " : "") + p.name;
-  const meta = [p.place_type, p.modern_name ? `modern: ${p.modern_name}` : ""].filter(Boolean).join(" · ");
+  const meta = [p.special ? null : humanizeToken(p.place_type), p.modern_name ? `modern: ${p.modern_name}` : ""].filter(Boolean).join(" · ");
   const thumb = p.thumbnail ? `<img class="place-thumb" src="${escHtml(p.thumbnail.url)}" alt="${escHtml(p.name)}" onerror="this.remove()">` : "";
   const hasCoords = typeof p.lat === "number" && typeof p.lon === "number";
-  const map = hasCoords ? placeMapPreviewHTML(p.lat, p.lon, title) : (p.special ? `<div class="dd-empty">${escHtml(p.special)}</div>` : "");
+  const map = hasCoords ? placeMapPreviewHTML(p.lat, p.lon, title) : (p.special ? `<div class="dd-empty">${escHtml(humanizeToken(p.special))}</div>` : "");
   const allVerses = p.verses || [];
   const verses = allVerses.slice(0, 40);
   const [previewByRef, descHtml] = await Promise.all([fetchVersePreviews(verses), atlasPlaceDescriptionHTML(p.description)]);

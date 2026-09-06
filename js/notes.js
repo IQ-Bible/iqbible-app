@@ -13,10 +13,10 @@ let notesActiveNotebook = ""; // "" all, "none" Unfiled, else a notebookId
 let notesSearchTimer = null;
 let renderedHistoryEntries = [];
 
-function openLibrary() {
+function openLibrary(tab) {
   switchMainView("library");
   document.getElementById("librarySearchInput").value = "";
-  switchLibraryTab(libraryActiveTab);
+  switchLibraryTab(tab && tab in LIBRARY_TAB_DESC ? tab : libraryActiveTab);
   // Skip the autofocus while the tour is driving this overlay — it's just
   // pointing at each tab in turn, and focusing the search input pops the
   // mobile keyboard up over the tour tooltip for no reason.
@@ -37,6 +37,7 @@ const LIBRARY_TAB_DESC = {
 function switchLibraryTab(tab) {
   libraryActiveTab = tab;
   localStorage.setItem("iqb_library_tab", tab);
+  syncNavSub("library", tab);
   document.querySelectorAll(".lib-tab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
   document.getElementById("libraryOverlay").classList.toggle("lib-tab-notes", tab === "notes");
   document.getElementById("libraryDesc").textContent = LIBRARY_TAB_DESC[tab] || "";
@@ -83,6 +84,29 @@ function renderLibraryList() {
   if (libraryActiveTab === "highlights") return renderHighlightsList();
   if (libraryActiveTab === "history") return renderHistoryList();
   return renderNotesList();
+}
+/* Nav-rail count pills. The parent "My Library" pill totals the three saved-
+   item tabs; History (a capped recent-activity list, not saved content) is
+   deliberately uncounted, so parent === Notes + Bookmarks + Highlights. Counts
+   match the entry cards you'd see in each tab — bookmarks/highlights collapse a
+   multi-verse action into one entry (groupId), same as the list does. Kept
+   current by the get/set helpers in reader.js calling this on every write. */
+function setNavCount(id, n, cap) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = cap && n > cap ? `${cap}+` : (n > 999 ? "999+" : String(n));
+  el.hidden = !n;
+}
+function updateLibraryCounts() {
+  const notes = getNotes().length;
+  const bookmarks = groupedBookmarkEntries(getBookmarks()).length;
+  const highlights = groupedHighlightEntries(getHighlights()).length;
+  setNavCount("navLibCountNotes", notes);
+  setNavCount("navLibCountBookmarks", bookmarks);
+  setNavCount("navLibCountHighlights", highlights);
+  // Parent is a rough "you've got things saved" signal, not a figure to read —
+  // capped at 9+ so it stays a single glyph; the per-tab pills carry the real numbers.
+  setNavCount("navLibCount", notes + bookmarks + highlights, 9);
 }
 function notesBookName(usfm) {
   if (!usfm) return "General";

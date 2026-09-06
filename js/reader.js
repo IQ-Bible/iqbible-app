@@ -12,6 +12,9 @@ async function loadChapter(chapter, refreshMeta, verse, verseEnd) {
   btnVersion.firstChild.textContent = verLabel + " ";
   btnVersion.title = current.versionTitle; // the abbreviation alone can't tell KJV from KJV 1611, KJVA, etc.
   document.getElementById("btnPickBook").firstChild.textContent = current.bookName + " ";
+  const rHeading = document.getElementById("readingHeading");
+  if (rHeading) rHeading.textContent = `${current.bookName} ${chapter}`;
+  document.title = `${current.bookName} ${chapter} — IQ Bible`;
   // Mobile mirrors — the version pill sits in the topbar and the combined
   // book+chapter chip in #readNavRow at < 1180px, but they're always in the
   // DOM, so keep them current at every width.
@@ -30,15 +33,31 @@ async function loadChapter(chapter, refreshMeta, verse, verseEnd) {
   document.getElementById("chapterReadPrompt").className = "";
   document.getElementById("chapterReadStamp").className = "";
   document.getElementById("chapterEndNav").hidden = true;
+  // Paint the context row at full height right now — just the "About" glyph,
+  // which needs no data — so it never appears late and shifts the page down
+  // mid-swipe. renderChapterChips (via loadSidebarCards) fills in the counted
+  // glyphs; they're the same height, so the row doesn't grow.
+  { const cc = document.getElementById("chapterChips"); if (cc && typeof chapterChip === "function") { cc.innerHTML = chapterChip("About", null, "openCardsSheet()", "about"); cc.hidden = false; } }
 
   if (refreshMeta) await loadChapterMeta();
 
   try {
-    // Kick the illustrations fetch off now so it runs alongside the chapter-text
-    // request rather than after render — loadInlineIllustrations() below picks up
-    // the shared in-flight promise.
-    prefetchInlineIllustrations();
-    const data = await apiJSONCached(`/bibles/${current.version}/${current.book}/${chapter}?include=words_of_jesus`);
+    // Fetch the plate data alongside the chapter text (not after render) so
+    // renderChapter can place the figures in the same pass — arriving a beat
+    // late and inserting them is what used to reflow the column. null = no
+    // plates / fetch failed (the common no-plates case included); undefined =
+    // it didn't come back fast enough, so render the text now and let
+    // loadInlineIllustrations() below pick the plates up async. The text is
+    // never held up on it for more than the race timeout.
+    const pack = getIllustPack();
+    const illustReq = pack === "off" ? Promise.resolve(null) : Promise.race([
+      apiJSONCached(`/illustrations/${current.book}/${chapter}?artist=${pack}`).catch(() => null),
+      new Promise(res => setTimeout(() => res(undefined), 1200)),
+    ]);
+    const [data, illustData] = await Promise.all([
+      apiJSONCached(`/bibles/${current.version}/${current.book}/${chapter}?include=words_of_jesus`),
+      illustReq,
+    ]);
     if (!(data.data || []).length) {
       // A verse range that overshoots a real chapter still 200s with the
       // verses that exist (beta-46) — an empty list here means an odd edge
@@ -46,10 +65,14 @@ async function loadChapter(chapter, refreshMeta, verse, verseEnd) {
       // out-of-range chapter/verse now 404s and is handled in the catch.
       document.getElementById("readingText").innerHTML = `<div class="errnote">${escHtml(current.bookName)} ${chapter} isn't in ${escHtml(current.versionTitle)}. Switch to a translation that includes it to read it.</div>`;
     } else {
-      document.getElementById("readingText").dir = current.textDirection;
-      renderChapter(data.data);
+      const rt = document.getElementById("readingText");
+      rt.dir = current.textDirection;
+      // Language of parts (WCAG 3.1.2) — BCP-47, mapped from the version's
+      // ISO 639-3 language_code (bcp47(), js/catalog.js).
+      rt.lang = current.lang || (current.version || "").split("_")[0];
+      renderChapter(data.data, illustData);
       applyVerseAnnotations();
-      loadInlineIllustrations();
+      if (pack !== "off" && !illustData) loadInlineIllustrations(); // fetch failed or timed out above — pick plates up async
       loadInlineStoryTitles();
       loadSidebarCards();
       markDictionaryTerms();
@@ -112,26 +135,85 @@ document.addEventListener("click", e => {
   clearJumpTarget();
 });
 
-function renderChapter(verses) {
-  let html = "<p>";
+// Story-title headings for a chapter, resolved synchronously from data that's
+// already in hand (getAllStories / resolveStoryRefs cache both in module state
+// + localStorage). Returns [] until that data has been fetched once this
+// session — loadInlineStoryTitles() is the async path that then fills the gap.
+// Used so both renderChapter() and the swipe pager can place a heading inline
+// at render time instead of popping it in a beat later and shoving the verses
+// down (which is exactly the jump a chapter like Exodus 35 showed).
+function chapterStoryHeadings(book, chapter) {
+  if (!allStories || !storyRefMap) return [];
+  return allStories
+    .map(s => ({ title: s.title, ref: storyRefMap[s.title] }))
+    .filter(x => x.ref && x.ref.book === book && x.ref.chapter === chapter)
+    .map(x => ({ title: x.title, verse: x.ref.verse || 1 }));
+}
+// Pure — the verse markup for a chapter, no DOM writes or side effects, so the
+// swipe-pager (initReaderGestures) can render the adjacent chapter into its
+// peek pane with the same output renderChapter() puts in #readingText.
+// `headings` — chapterStoryHeadings() output, each a block <h3> before its verse.
+// `illusts` — placeChapterIllusts() output, each a float <span> at its verse.
+// Both are placed inline at render time rather than DOM-inserted a beat later,
+// which is what used to jolt the verses (Exodus 35's heading, chapter plates).
+function chapterVersesHTML(verses, headings, illusts) {
+  if (!(verses || []).length) return `<div class="emptynote">No verses in this chapter.</div>`;
+  const bucket = (list, val) => { const m = {}; (list || []).forEach(x => { (m[String(x.verse)] = m[String(x.verse)] || []).push(val(x)); }); return m; };
+  const headByVerse = bucket(headings, h => `<h2 class="story-title-heading">${escHtml(h.title)}</h2>`);
+  const illBefore = bucket((illusts || []).filter(x => !x.after), x => x.html);
+  const illAfter = bucket((illusts || []).filter(x => x.after), x => x.html);
+  let html = "", pOpen = false;
+  const openP = () => { if (!pOpen) { html += "<p>"; pOpen = true; } };
+  const closeP = () => { if (pOpen) { html += "</p>"; pOpen = false; } };
   verses.forEach((v, i) => {
     const num = v.verse_number ?? v.verse ?? "";
-    const dropcap = (i === 0);
+    const key = String(num);
     const rawText = v.text || "";
     // ¶ is a genuine paragraph marker some editions carry verbatim in the
     // verse text — rendered as an actual paragraph break, the way a
     // printed KJV shows it.
     const hasPara = i > 0 && rawText.includes("¶");
+    const hasHead = !!headByVerse[key];
+    if (hasPara) closeP();
+    if (hasHead) { closeP(); html += headByVerse[key].join(""); }
+    openP();
+    // A "before" illustration on a verse that also carries a story-title
+    // heading would wedge between the heading and its own first verse, reading
+    // as if the plate belonged to the heading (Genesis 9:8, "The New Covenant"
+    // — Sweet's plates carry no verse ref so they land by even spread). Push it
+    // past the verse in that case so the heading sits right above its text.
+    if (illBefore[key] && !hasHead) html += illBefore[key].join("");
     let inner = escHtml(rawText.replace(/¶\s*/g, ""));
-    if (dropcap && inner.length) {
-      inner = `<span class="dropcap">${inner.charAt(0)}</span>` + inner.slice(1);
-    }
-    if (hasPara) html += `</p><p>`;
-    const mark = hasPara ? `<span class="paramark">¶</span>` : "";
-    html += `<span class="verse-span" data-verse="${num}">${mark}<span class="vnum">${num}</span>${inner}</span> `;
+    if (i === 0 && inner.length) inner = `<span class="dropcap">${inner.charAt(0)}</span>` + inner.slice(1);
+    const mark = hasPara ? `<span class="paramark" aria-hidden="true">¶</span>` : "";
+    // .vnum is a real <button> so verse selection / Verse Tools is keyboard-
+    // reachable (Enter/Space bubbles to the same delegated click handler the
+    // mouse path uses). Inline in running text, so the 2.5.8 target-size
+    // inline exception applies — no min-size bump needed.
+    html += `<span class="verse-span" data-verse="${num}">${mark}<button type="button" class="vnum" data-verse="${num}" aria-label="Verse ${num} — verse tools" aria-pressed="false">${num}</button>${inner}</span> `;
+    if (illAfter[key]) html += illAfter[key].join("");
+    if (illBefore[key] && hasHead) html += illBefore[key].join("");
   });
-  html += "</p>";
-  document.getElementById("readingText").innerHTML = html || `<div class="emptynote">No verses in this chapter.</div>`;
+  closeP();
+  return html;
+}
+// Non-null illustKey means renderChapter() already placed the plates for this
+// exact book/chapter/pack, so loadInlineIllustrations() has nothing to add.
+let renderedIllustKey = null;
+function renderChapter(verses, illustData) {
+  const pack = getIllustPack();
+  let illusts = [];
+  const headings = chapterStoryHeadings(current.book, current.chapter);
+  if (illustData !== undefined) {
+    renderedIllustKey = `${current.book}/${current.chapter}/${pack}`;
+    if (illustData && pack !== "off") {
+      illusts = placeChapterIllusts(illustData.data || [], verses.map(v => v.verse_number ?? v.verse), headings.map(h => h.verse));
+    }
+  } else {
+    renderedIllustKey = null;
+  }
+  document.getElementById("readingText").innerHTML =
+    chapterVersesHTML(verses, headings, illusts);
 }
 
 // dir is -1 (previous) or 1 (next). Steps within the current book's
@@ -216,29 +298,164 @@ window.addEventListener("resize", alignChapterNavButtons);
 // Passive listeners (no preventDefault) so vertical scroll and
 // tap-to-select-verse keep working untouched; a swipe only acts once it's
 // clearly more horizontal than vertical and past a minimum distance, so an
-// ordinary scroll can't misfire it.
+// ordinary scroll can't misfire it. While it drags, the verses track the
+// finger (with resistance, and much more of it past a canon boundary) so the
+// gesture visibly turns a page rather than jumping with no warning.
+function canTurnChapter(dir) {
+  const maxCh = chapterMeta.length ? chapterMeta[chapterMeta.length - 1].chapter : current.chapter;
+  const target = current.chapter + dir;
+  if (target >= 1 && target <= maxCh) return true;
+  const idx = bookList.findIndex(b => b.usfm === current.book);
+  return idx !== -1 && idx + dir >= 0 && idx + dir < bookList.length;
+}
+// The chapter a swipe in `dir` lands on when it's a plain step inside the
+// current book — the case the pager can show a live preview of. null at a book
+// boundary (rare); the turn still works there, just without the peek pane,
+// which would otherwise need the adjacent book's own chapter list first.
+function sameBookAdjacent(dir) {
+  const maxCh = chapterMeta.length ? chapterMeta[chapterMeta.length - 1].chapter : current.chapter;
+  const target = current.chapter + dir;
+  return (target >= 1 && target <= maxCh) ? target : null;
+}
 (function initReaderGestures() {
   const col = document.getElementById("readCol");
   if (!col) return;
-  const EDGE = 30;
-  let sx = 0, sy = 0, tracking = false, fromRightEdge = false, actedGesture = false;
+  const EDGE = 30, COMMIT = 64;
+  let sx = 0, sy = 0, tracking = false, fromRightEdge = false, actedGesture = false, dragging = false;
+  let peekDir = 0, peekChapter = 0, peekReq = 0;
+  const pageEl = () => document.getElementById("readingText");
+  // t: px offset (0 allowed). o: opacity, or null to leave it. trans: transition
+  // shorthand, or falsy for an instant set. Always writes an explicit
+  // translateX so a following transition has a value to interpolate from.
+  const setPage = (t, o, trans) => {
+    const p = pageEl();
+    p.style.transition = trans || "none";
+    p.style.transform = `translateX(${t}px)`;
+    if (o != null) p.style.opacity = String(o);
+    p.style.willChange = "transform";
+  };
+  const clearPage = () => {
+    const p = pageEl();
+    if (p) { p.style.transition = ""; p.style.transform = ""; p.style.opacity = ""; p.style.willChange = ""; }
+  };
+
+  // The peek pane — a fixed, opaque panel just below the reading header that
+  // carries the adjacent chapter's verses while a swipe drags, so the gesture
+  // actually reveals the page you're turning to. Built once, reused.
+  function peekEl() {
+    let el = document.getElementById("chapterPeek");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "chapterPeek";
+      el.className = "chapter-peek";
+      el.hidden = true;
+      el.innerHTML = `<div class="chapter-peek-inner"><div class="chapter-peek-body"></div></div>`;
+      document.getElementById("readMain").appendChild(el);
+    }
+    return el;
+  }
+  const setPeek = (t, trans) => { const el = peekEl(); el.style.transition = trans || "none"; el.style.transform = `translateX(${t}px)`; };
+  function hidePeek() {
+    const el = document.getElementById("chapterPeek");
+    if (el) { el.hidden = true; el.style.transition = ""; el.style.transform = ""; }
+    peekDir = 0; peekChapter = 0; peekReq++;
+  }
+  // Fetch + render the adjacent chapter into the peek once the swipe direction
+  // is known. Uses the exact request loadChapter() makes on commit, so
+  // apiJSONCached serves that one from cache — the turn costs no extra call.
+  function primePeek(dir) {
+    const target = sameBookAdjacent(dir);
+    if (!target) { if (peekDir) hidePeek(); return; }
+    if (peekDir === dir && peekChapter === target) return;
+    peekDir = dir; peekChapter = target;
+    const req = ++peekReq;
+    const el = peekEl();
+    const w = window.innerWidth;
+    const body = pageEl();
+    // Match #readingText's box exactly so text wraps identically — same top
+    // (line up the first verse), and same left/width so a scrollbar gutter or
+    // any padding rounding can't fit one more word per line in the peek than
+    // the page (which shows up as the second line starting a word earlier once
+    // you commit). dir mirrored for RTL.
+    const rt = body.getBoundingClientRect();
+    el.style.top = Math.max(rt.top, -2 * window.innerHeight) + "px";
+    const inner = el.querySelector(".chapter-peek-inner");
+    inner.style.marginLeft = rt.left + "px";
+    inner.style.width = rt.width + "px";
+    el.querySelector(".chapter-peek-body").dir = body.dir || "";
+    el.querySelector(".chapter-peek-body").innerHTML = `<div class="spin"></div>`;
+    el.style.transition = "none";
+    el.style.transform = `translateX(${dir > 0 ? w : -w}px)`;
+    el.hidden = false;
+    // Both fetches are the exact requests the commit's loadChapter makes, so
+    // apiJSONCached serves them from cache then — the turn adds no calls.
+    const pack = getIllustPack();
+    Promise.all([
+      apiJSONCached(`/bibles/${current.version}/${current.book}/${target}?include=words_of_jesus`),
+      pack === "off" ? Promise.resolve(null) : apiJSONCached(`/illustrations/${current.book}/${target}?artist=${pack}`).catch(() => null),
+    ]).then(([data, illustData]) => {
+      if (req !== peekReq) return;
+      const verses = data.data || [];
+      const peekHeadings = chapterStoryHeadings(current.book, target);
+      const illusts = (illustData && pack !== "off") ? placeChapterIllusts(illustData.data || [], verses.map(v => v.verse_number ?? v.verse), peekHeadings.map(h => h.verse)) : [];
+      el.querySelector(".chapter-peek-body").innerHTML = chapterVersesHTML(verses, peekHeadings, illusts);
+    }).catch(() => { if (req === peekReq) el.querySelector(".chapter-peek-body").innerHTML = ""; });
+  }
 
   document.addEventListener("touchstart", e => {
     if (e.touches.length !== 1) { tracking = false; return; }
     sx = e.touches[0].clientX; sy = e.touches[0].clientY;
-    tracking = true; actedGesture = false;
+    tracking = true; actedGesture = false; dragging = false;
     fromRightEdge = sx >= window.innerWidth - EDGE;
+  }, { passive: true });
+
+  document.addEventListener("touchmove", e => {
+    if (!tracking || fromRightEdge || actedGesture || e.touches.length !== 1) return;
+    if (window.innerWidth > 1180 || (typeof tourActive !== "undefined" && tourActive)) return;
+    const dx = e.touches[0].clientX - sx, dy = e.touches[0].clientY - sy;
+    if (!dragging) {
+      if (Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(dy) * 1.6) return;
+      if (!(e.target.closest && e.target.closest("#readCol")) || document.querySelector(".modalscrim.show")) { tracking = false; return; }
+      const rvg = document.getElementById("readViewGroup");
+      if (rvg && rvg.style.display === "none") { tracking = false; return; }
+      dragging = true; hidePeek();   // clean slate for this drag
+    }
+    const dir = dx < 0 ? 1 : -1;
+    const canTurn = canTurnChapter(dir);
+    if (canTurn) primePeek(dir); else if (peekDir) hidePeek();
+    const peek = document.getElementById("chapterPeek");
+    const hasPeek = canTurn && peekDir === dir && peek && !peek.hidden;
+    const give = hasPeek ? 1 : (canTurn ? 0.55 : 0.14);   // 1:1 with the finger when a real page rides along; rubber-band at the canon's ends
+    const t = Math.sign(dx) * Math.min(Math.abs(dx) * give, hasPeek ? window.innerWidth : 130);
+    setPage(t, hasPeek ? null : 1 - Math.min(Math.abs(t) / 460, 0.3));
+    if (hasPeek) setPeek((peekDir > 0 ? window.innerWidth : -window.innerWidth) + t);   // rides in from its off-screen side
   }, { passive: true });
 
   document.addEventListener("touchend", e => {
     if (!tracking) return;
     tracking = false;
-    if (window.innerWidth > 1180) return;
-    if (typeof tourActive !== "undefined" && tourActive) return;
+    if (window.innerWidth > 1180 || (typeof tourActive !== "undefined" && tourActive)) { hidePeek(); return; }
     const rvg = document.getElementById("readViewGroup");
-    if (rvg && rvg.style.display === "none") return; // Search / Explore / etc. is up, not the reader
+    if (rvg && rvg.style.display === "none") { hidePeek(); return; } // Search / Explore / etc. is up, not the reader
     const dx = e.changedTouches[0].clientX - sx;
     const dy = e.changedTouches[0].clientY - sy;
+
+    if (dragging) {
+      actedGesture = true;
+      const dir = dx < 0 ? 1 : -1;
+      const peekShown = (() => { const p = document.getElementById("chapterPeek"); return p && !p.hidden && peekDir === dir; })();
+      // A live page preview invites a bigger, more deliberate pull before it
+      // commits; a peekless turn keeps the light 64px trigger it had before.
+      const need = peekShown ? Math.max(COMMIT, window.innerWidth * 0.3) : COMMIT;
+      if (Math.abs(dx) >= need && Math.abs(dx) > Math.abs(dy) * 1.6 && canTurnChapter(dir)) { turnChapterAnimated(dir); return; }
+      // spring back
+      const w = window.innerWidth;
+      const peek = document.getElementById("chapterPeek");
+      if (peek && !peek.hidden) setPeek(peekDir > 0 ? w : -w, "transform .18s ease-out");
+      setPage(0, 1, "transform .18s ease-out, opacity .18s ease-out");
+      setTimeout(() => { clearPage(); hidePeek(); }, 200);
+      return;
+    }
 
     // Right edge → inward: open Chapter Info. Claims the gesture so the
     // chapter-turn check below can't also fire off the same drag.
@@ -257,9 +474,43 @@ window.addEventListener("resize", alignChapterNavButtons);
     }
   }, { passive: true });
 
+  // Commit. With a peek primed: slide it home to fill the viewport and the old
+  // verses off the far side, then let goAdjacentChapter() do the real load
+  // behind it (cached from primePeek, so instant) and drop the peek next
+  // frame — the fresh #readingText is the same content, also scrolled to top,
+  // so the swap is invisible. Without a peek (book boundary, or a flick faster
+  // than the fetch): the old slide-and-fade.
+  async function turnChapterAnimated(dir) {
+    if (prefersReducedMotion()) { clearPage(); hidePeek(); await goAdjacentChapter(dir); return; }
+    const w = window.innerWidth;
+    const peek = document.getElementById("chapterPeek");
+    if (peek && !peek.hidden && peekDir === dir) {
+      setPeek(0, "transform .2s ease-out");
+      setPage(dir > 0 ? -w : w, null, "transform .2s ease-out");
+      await new Promise(r => setTimeout(r, 195));
+      clearPage();
+      await goAdjacentChapter(dir);
+      requestAnimationFrame(hidePeek);
+      return;
+    }
+    setPage(dir > 0 ? -0.42 * w : 0.42 * w, 0, "transform .15s ease-out, opacity .15s ease-out");
+    await new Promise(r => setTimeout(r, 140));
+    clearPage();
+    await goAdjacentChapter(dir);
+    setPage(dir > 0 ? 0.16 * w : -0.16 * w, 0);
+    requestAnimationFrame(() => {
+      setPage(0, 1, "transform .22s ease-out, opacity .22s ease-out");
+      setTimeout(clearPage, 260);
+    });
+  }
+
   col.addEventListener("click", e => {
     if (window.innerWidth > 1180 || actedGesture) return;
     if (typeof tourActive !== "undefined" && tourActive) return;
+    // A target that removed itself mid-click (e.g. the play/pause button swapping
+    // its own icon via innerHTML) was an interactive control, not empty reading
+    // space — .closest() would miss it now that it's detached, so bail here.
+    if (!e.target.isConnected) return;
     if (e.target.closest(".verse-span, a, button, input, textarea, .dict-term, [data-cite-id], .inline-illust, [onclick]")) return;
     if (window.getSelection().toString()) return;
     document.body.classList.toggle("chrome-hidden");
@@ -389,13 +640,28 @@ async function getChronologyForChapter(book, chapter) {
   try { return await apiJSONCached(`/chronology/for/${book}/${chapter}${chronologyParams()}`); }
   catch (e) { return null; }
 }
-// extraClass: "railcard--feature" (square, for About This Chapter / Places
-// without media) or "railcard--compact" (one-line teaser — Timeline, People,
-// Prophecies). Keeps all five cards visible without scrolling the rail.
-function railCard(label, body, onclick, extraClass) {
+// Small stroke glyphs shared by the desktop rail cards (in .rc-label) and the
+// mobile #chapterChips row (chapterChip) so the two surfaces match. All inherit
+// currentColor; the prophecy mark is a cross.
+const CTX_ICONS = {
+  places: '<svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg>',
+  people: '<svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3.2"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M17 8.2a3 3 0 0 0 0-5.4M21.5 20a6 6 0 0 0-4.5-5.8"/></svg>',
+  prophecy: '<svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><path d="M12 3v18"/><path d="M7.5 8.5h9"/></svg>',
+  timeline: '<svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>',
+  about: '<svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>',
+  book: '<svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h11a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3z"/><path d="M18 20a2 2 0 0 1 2-2V4"/></svg>',
+};
+// extraClass: "railcard--media" (a square 1:1 image card — Places, hand-built
+// below, not via this helper), "railcard--excerpt" (two-line prose taste —
+// About Chapter) or "railcard--compact" (one-line teaser — Timeline, People,
+// Prophecies, imageless Places, About <book>). iconKey (optional) picks a
+// CTX_ICONS glyph shown before the label. Keeps every card visible without
+// scrolling the rail.
+function railCard(label, body, onclick, extraClass, iconKey) {
   const cls = "railcard" + (onclick ? " clickable" : "") + (extraClass ? " " + extraClass : "");
   const click = onclick ? ` onclick="${onclick}"` : "";
-  return `<div class="${cls}"${click}><div class="rc-label">${escHtml(label)}</div><div class="rc-body">${body}</div></div>`;
+  const icon = iconKey && CTX_ICONS[iconKey] ? CTX_ICONS[iconKey] : "";
+  return `<div class="${cls}"${click}><div class="rc-label">${icon}${escHtml(label)}</div><div class="rc-body">${body}</div></div>`;
 }
 // Standard slippy-map tile math (lon/lat -> the z/x/y tile that contains it)
 // — a plain raster image, not an interactive embed, for contexts too small
@@ -432,28 +698,36 @@ async function loadPlacesCard() {
     const places = d.data || [];
     if (!places.length) return null;
     const names = places.slice(0, 3).map(p => escHtml(p.name)).join(", ");
-    const moreText = names + (places.length > 3 ? ` +${places.length - 3} more` : "");
-    // A preview of the first place right on the card face rather than
-    // making every open a click-through into the modal to see anything
-    // visual — a real photo first when there is one (the API's own
-    // thumbnail, no attribution/UI chrome to worry about), a plain static
-    // map tile as a fallback when there's only coordinates. The full
-    // interactive OSM embed (openPlacesModal, below) stays iframe-based —
-    // it's shown at a real size there and works fine; at card-thumbnail
-    // size that iframe's own "Make a donation"/attribution footer chrome
-    // dominates a box this small, which is why this isn't just a smaller
-    // copy of that embed.
-    const first = places[0];
+    const moreText = names + (places.length > 3 ? ` <span class="rc-dim">+${places.length - 3}</span>` : "");
+    // The media card clamps its caption to one line (see .railcard--media
+    // .rc-body) so the photo keeps its full box — lead with just the first
+    // place and a "+N more" tail rather than a list that gets truncated anyway.
+    const mediaCaption = escHtml(places[0].name) + (places.length > 1 ? ` <span class="rc-dim">+${places.length - 1} more</span>` : "");
+    // A preview of one of the chapter's places right on the card face rather
+    // than making every open a click-through into the modal to see anything
+    // visual — a real photo first when any place has one (the API's own
+    // thumbnail, no attribution/UI chrome to worry about), a plain static map
+    // tile as a fallback for a place that resolved to coordinates. Scans past
+    // places that carry neither (abstract ones like "the Holy Place") instead
+    // of reserving a blank square for whichever happens to be first. The full
+    // interactive OSM embed (openPlacesModal, below) stays iframe-based — it's
+    // shown at a real size there; at card-thumbnail size that iframe's own
+    // "Make a donation"/attribution chrome dominates a box this small.
+    const withThumb = places.find(p => p.thumbnail && p.thumbnail.url);
+    const withCoords = places.find(p => typeof p.lat === "number" && typeof p.lon === "number");
     let media = "";
-    if (first.thumbnail) {
-      media = `<img class="rc-thumb" src="${escHtml(first.thumbnail.url)}" alt="" onerror="this.remove()">`;
-    } else if (typeof first.lat === "number" && typeof first.lon === "number") {
-      media = `<img class="rc-thumb" src="${staticMapTileURL(first.lon, first.lat, 7)}" alt="Map of ${escHtml(first.name)}" onerror="this.remove()">`;
+    if (withThumb) {
+      media = `<img class="rc-thumb" src="${escHtml(withThumb.thumbnail.url)}" alt="" onerror="this.closest('.railcard')?.classList.remove('railcard--media');this.remove()">`;
+    } else if (withCoords) {
+      media = `<img class="rc-thumb" src="${staticMapTileURL(withCoords.lon, withCoords.lat, 7)}" alt="Map of ${escHtml(withCoords.name)}" onerror="this.closest('.railcard')?.classList.remove('railcard--media');this.remove()">`;
     }
-    // Square either way: 1:1 with the media (.railcard--media), or a plain
-    // square holding the name list when there's no thumbnail/coords
-    // (.railcard--feature) — Places is an "anchor" card, not a compact one.
-    return `<div class="railcard clickable ${media ? "railcard--media" : "railcard--feature"}" onclick="openPlacesModal()"><div class="rc-label">Places</div>${media ? `<div class="rc-media">${media}</div>` : ""}<div class="rc-body">${moreText}</div></div>`;
+    // With a preview: a square 1:1 media card. With none — no place in the
+    // chapter has a photo or coordinates — drop to a one-line card the size of
+    // the People / Prophecies ones rather than a big empty square.
+    if (media) {
+      return `<div class="railcard clickable railcard--media" onclick="openPlacesModal()"><div class="rc-label">${CTX_ICONS.places}Places</div><div class="rc-media">${media}</div><div class="rc-body">${mediaCaption}</div></div>`;
+    }
+    return railCard("Places", moreText, "openPlacesModal()", "railcard--compact", "places");
   } catch (e) { return null; }
 }
 // Opens with a real embedded map per place — a plain OpenStreetMap iframe
@@ -477,10 +751,10 @@ async function openPlacesModal() {
   if (!places.length) { body.innerHTML = `<div class="dd-empty">No places found for this chapter.</div>`; return; }
   body.innerHTML = places.map(p => {
     const title = (p.preceding_article ? p.preceding_article + " " : "") + p.name;
-    const meta = [p.place_type, p.modern_name ? `modern: ${p.modern_name}` : ""].filter(Boolean).join(" · ");
+    const meta = [p.special ? null : humanizeToken(p.place_type), p.modern_name ? `modern: ${p.modern_name}` : ""].filter(Boolean).join(" · ");
     const thumb = p.thumbnail ? `<img class="place-thumb" src="${escHtml(p.thumbnail.url)}" alt="${escHtml(p.name)}" onerror="this.remove()">` : "";
     const hasCoords = typeof p.lat === "number" && typeof p.lon === "number";
-    const map = hasCoords ? placeMapPreviewHTML(p.lat, p.lon, title) : (p.special ? `<div class="dd-empty">${escHtml(p.special)}</div>` : "");
+    const map = hasCoords ? placeMapPreviewHTML(p.lat, p.lon, title) : (p.special ? `<div class="dd-empty">${escHtml(humanizeToken(p.special))}</div>` : "");
     // Side by side only when there's actually two things to sit side by
     // side — a lone thumb or lone map keeps its previous full-width look.
     const media = (thumb && map) ? `<div class="place-media-row">${thumb}${map}</div>` : (thumb + map);
@@ -528,7 +802,7 @@ async function loadPeopleCard() {
     currentChapterPeople = people;
     if (!people.length) return null;
     const names = people.slice(0, 3).map(p => escHtml(p.name)).join(", ");
-    return railCard("People", names + (people.length > 3 ? ` <span class="rc-dim">+${people.length - 3}</span>` : ""), "openPeopleModal()", "railcard--compact");
+    return railCard("People", names + (people.length > 3 ? ` <span class="rc-dim">+${people.length - 3}</span>` : ""), "openPeopleModal()", "railcard--compact", "people");
   } catch (e) { currentChapterPeople = []; return null; }
 }
 // Detail view resolves a person via GET /bible-characters/by-ustrong/{ustrong}
@@ -757,7 +1031,7 @@ async function loadPropheciesCard() {
     const citeAttr = text ? ` data-cite-id="${registerCiteId(e0.citation, text)}"` : "";
     const body = `${escHtml(e0.prefix)}<span class="citelink"${citeAttr}>${escHtml(e0.citation)}</span>`
       + (entries.length > 1 ? ` <span class="rc-dim">+${entries.length - 1}</span>` : "");
-    return railCard("Prophecies", body, "openPropheciesModal()", "railcard--compact");
+    return railCard("Prophecies", body, "openPropheciesModal()", "railcard--compact", "prophecy");
   } catch (e) { return null; }
 }
 async function openPropheciesModal() {
@@ -793,7 +1067,7 @@ async function openPropheciesModal() {
 }
 async function loadTimelineCard() {
   const info = await getChronologyForChapter(current.book, current.chapter);
-  if (!info) return railCard("Timeline", "Explore biblical chronology", "openTimelineModal()", "railcard--compact");
+  if (!info) return railCard("Timeline", "Explore biblical chronology", "openTimelineModal()", "railcard--compact", "timeline");
   const events = info.events || [];
   let body;
   if (events.length) {
@@ -803,7 +1077,7 @@ async function loadTimelineCard() {
     const anchor = (info.story_anchor && info.story_anchor.title) || `${current.bookName} ${current.chapter}`;
     body = escHtml(anchor) + (info.era ? ` <span class="rc-dim">· ${escHtml(info.era)}</span>` : "");
   }
-  return railCard("Timeline", body, "openTimelineModal()", "railcard--compact");
+  return railCard("Timeline", body, "openTimelineModal()", "railcard--compact", "timeline");
 }
 async function openTimelineModal() {
   closeCardsSheet(); // else this modal opens beneath the still-open mobile Chapter Info sheet — see openPlacesModal
@@ -922,7 +1196,7 @@ async function jumpFreeTextRef(refText, onClose) {
   } catch (e) { /* apiJSON already surfaced the error */ }
 }
 
-/* ── About This Chapter — GET /books/{book}/chapters/{chapter}/info. A
+/* ── About Chapter — GET /books/{book}/chapters/{chapter}/info. A
    version-independent chapter "argument" (prose overview) drawn from a
    public-domain commentary, the source picked server-side (Matthew Henry →
    Gill → first available) so the app doesn't stitch one from verse-by-verse
@@ -946,9 +1220,20 @@ async function loadChapterInfoCard() {
   chapterInfoSource = null;
   const info = await getChapterInfo(current.book, current.chapter);
   if (!info || !info.summary) return null;
-  // CSS line-clamps the square card; a little slack past that is fine.
-  const snippet = info.summary.length > 240 ? info.summary.slice(0, 240).replace(/\s+\S*$/, "") + "…" : info.summary;
-  return railCard("About This Chapter", escHtml(snippet), "openChapterInfoModal()", "railcard--feature");
+  // CSS clamps the card to two lines + ellipsis; ship a loose slice, not the
+  // whole argument, so a long summary isn't pushed through innerHTML for nothing.
+  return railCard("About Chapter", escHtml(info.summary.slice(0, 300)), "openChapterInfoModal()", "railcard--excerpt", "about");
+}
+// The book overview — the same on every chapter of a book, and reachable from
+// the picker's Intro chip, so it sits *last* in the rail as a compact one-liner
+// (the rail otherwise leads with what's specific to this chapter). It still
+// always returns a card, so a chapter the API has no place/people/timeline/
+// summary data for isn't left with an empty rail.
+async function loadAboutBookCard() {
+  const info = typeof getBookInfo === "function" ? await getBookInfo(current.book) : null;
+  const text = info && (info.introduction || info.canonical_significance);
+  const body = text ? escHtml(text.slice(0, 140)) : "Author, date, themes — and the full Book Guide.";
+  return railCard(`About ${current.bookName}`, body, `openBookInfoModal('${current.book}')`, "railcard--compact", "book");
 }
 async function openChapterInfoModal() {
   closeCardsSheet();
@@ -1073,119 +1358,152 @@ async function switchVersionAndJump(versionId, bookUsfm, chapter, verse, verseEn
 async function loadSidebarCards() {
   const stack = document.getElementById("cardStack");
   if (!stack) return;
-  const [places, people, prophecies, timeline, chapterInfoCard] = await Promise.all([
-    loadPlacesCard(), loadPeopleCard(), loadPropheciesCard(), loadTimelineCard(), loadChapterInfoCard()
+  // The rail leads with what's specific to this chapter — About Chapter, then
+  // Places / Timeline / People / Prophecies — and closes with the book overview
+  // (loadAboutBookCard), which is identical across a book and already reachable
+  // from the picker's Intro chip.
+  const [aboutCard, places, people, prophecies, timeline, chapterInfoCard] = await Promise.all([
+    loadAboutBookCard(), loadPlacesCard(), loadPeopleCard(), loadPropheciesCard(), loadTimelineCard(), loadChapterInfoCard()
   ]);
-  // < 1180px the reading header is a slim label with no room for an "About
-  // <book>" affordance — it folds in here as the top card of the Chapter Info
-  // sheet instead (opened by the header's ⓘ). Desktop keeps its own #btnBookInfo.
-  const aboutCard = window.innerWidth <= 1180
-    ? railCard(`About ${current.bookName}`, "Who wrote it, when, and its main themes — plus the full Book Guide.",
-        `closeCardsSheet();openBookInfoModal('${current.book}')`, "railcard--compact")
-    : "";
-  stack.innerHTML = [aboutCard, chapterInfoCard, places, timeline, people, prophecies].filter(Boolean).join("");
+  stack.innerHTML = [chapterInfoCard, places, timeline, people, prophecies, aboutCard].filter(Boolean).join("");
+  renderChapterChips();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CHAPTER CHIPS (#chapterChips) — the < 1180px chapter-context row, just
+   below the slim header. One chip per category the chapter actually has
+   (Places / People / Prophecy / Timeline, each with a count) plus an
+   "About" chip that always shows and opens the full Chapter Info sheet.
+   Reuses the same cached fetches loadSidebarCards makes — no extra calls.
+   Glyphs are the shared CTX_ICONS set (also on the desktop rail cards). */
+// Icon + muted count, no text label — the label lives in aria-label/title only.
+function chapterChip(label, count, onclick, iconKey) {
+  const aria = label === "About" ? "About this chapter"
+    : count != null ? `${label} in this chapter (${count})`
+    : `${label} for this chapter`;
+  return `<button class="ctxchip" onclick="${onclick}" aria-label="${aria}" title="${label}">`
+    + CTX_ICONS[iconKey]
+    + (count != null ? `<span class="ct">${count}</span>` : "")
+    + "</button>";
+}
+async function renderChapterChips() {
+  const row = document.getElementById("chapterChips");
+  if (!row) return;
+  const reqBook = current.book, reqCh = current.chapter;
+  // "About" paints straight away so the row has its height from the start.
+  row.innerHTML = chapterChip("About", null, "openCardsSheet()", "about");
+  row.hidden = false;
+  const [places, people, prophecy, chrono] = await Promise.all([
+    apiJSONCached(`/geo/${reqBook}/${reqCh}`).then(d => (d.data || []).length).catch(() => 0),
+    apiJSONCached(`/bible-people/${reqBook}/${reqCh}`).then(d => (d.data || []).length).catch(() => 0),
+    getAllProphecies().then(all => propheciesEntriesForChapter(all, reqBook, reqCh).length).catch(() => 0),
+    getChronologyForChapter(reqBook, reqCh).catch(() => null),
+  ]);
+  if (current.book !== reqBook || current.chapter !== reqCh) return; // navigated away mid-fetch
+  let html = "";
+  if (places) html += chapterChip("Places", places, "openPlacesModal()", "places");
+  if (people) html += chapterChip("People", people, "openPeopleModal()", "people");
+  if (prophecy) html += chapterChip("Prophecy", prophecy, "openPropheciesModal()", "prophecy");
+  if (chrono) html += chapterChip("Timeline", null, "openTimelineModal()", "timeline");
+  html += chapterChip("About", null, "openCardsSheet()", "about");
+  row.innerHTML = html;
 }
 /* ═══════════════════════════════════════════════════════════════════════
    ILLUSTRATIONS — floated inline near their tagged verse so the reading
-   text wraps around them, like an old illustrated Bible plate. Schnorr
-   plates carry a real reference.verse (the start of their tagged range),
-   so each one is inserted right before that verse. Which artist pack (or
-   none) is a Settings pref — see getIllustPack/setIllustPack in api.js. */
-// Fired concurrently with the chapter-text fetch (in loadChapter), not after
-// render — so the plate data is usually in hand by the time the text paints and
-// the figures insert in one pass instead of arriving a few hundred ms late and
-// reflowing the column. apiJSONCached shares the in-flight promise, so the
-// loadInlineIllustrations() call after render gets this same request for free.
-function prefetchInlineIllustrations() {
-  const pack = getIllustPack();
-  if (pack === "off") return;
-  apiJSONCached(`/illustrations/${current.book}/${current.chapter}?artist=${pack}`).catch(() => {});
+   text wraps around them, like an old illustrated Bible plate. Placed by
+   renderChapter() in the same pass as the verses (loadChapter fetches the
+   plate data alongside the text); loadInlineIllustrations() is now only the
+   pack-change / fetch-retry path. Which artist pack (or none) is a Settings
+   pref — see getIllustPack/setIllustPack in api.js. */
+// Pure — one plate's <span> markup. A float span (not a <div>) so it's valid
+// inside a <p> both when built here as a string and when inserted into the DOM
+// by loadInlineIllustrations; that keeps renderChapter and the pack-change
+// refresh producing the same structure.
+function inlineIllustHTML(img, index) {
+  // srcset+sizes let the browser pull the 320w/640w rung (WebP-negotiated) for
+  // the ~260px figure instead of the multi-MB master; the lightbox reuses this
+  // same srcset at sizes="100vw" (js/main.js). Older responses without `image`
+  // fall back to `url`. width/height (backfilled server-side, beta-63; a row
+  // without both just omits them) give a computed aspect-ratio so the box is
+  // reserved before the plate paints. onerror drops a figure whose image never
+  // landed in storage rather than leaving a broken icon + orphan caption.
+  const src = img.image ? img.image.src : img.url;
+  const srcset = img.image && img.image.srcset ? ` srcset="${escHtml(img.image.srcset.join(", "))}" sizes="(max-width: 640px) 92vw, 260px"` : "";
+  const dim = img.image && img.image.width && img.image.height ? ` width="${img.image.width}" height="${img.image.height}"` : "";
+  const cap = `${escHtml(img.caption || "")}${img.artist ? ` — ${escHtml(img.artist)}` : ""}`;
+  return `<span class="inline-illust${index % 2 === 0 ? " illust-left" : ""}"><img src="${escHtml(src)}"${srcset}${dim} alt="${escHtml(img.caption || "")}" loading="lazy" decoding="async" onerror="this.closest('.inline-illust').remove()"><span class="cap">${cap}</span></span>`;
 }
+// Pure — decide which of a chapter's plates to show and which verse each sits
+// at. Past 9 in one chapter (Matthew 17 under Sweet can carry 15+) it keeps a
+// spread — first two, middle two, last two — so the chapter doesn't become more
+// gallery than text. Schnorr plates carry a real reference.verse; Sweet's never
+// do (its filenames only ever encoded book+chapter — see cmd/importillustrations
+// in the backend), so those are spread evenly across the verses rather than all
+// piled at verse 1, which is closer to how a printed plate landed at the
+// nearest break anyway. `after` marks a plate at the opening verse — it renders
+// *after* that verse so the first sentence reads before the image.
+function placeChapterIllusts(rawData, verseNums, headingVerses) {
+  const raw = rawData || [];
+  const nums = (verseNums || []).map(Number).filter(n => !isNaN(n));
+  if (!raw.length || !nums.length) return [];
+  const all = raw.length > 9
+    ? raw.slice(0, 2).concat(raw.slice(Math.floor(raw.length / 2) - 1, Math.floor(raw.length / 2) + 1), raw.slice(-2))
+    : raw;
+  const first = nums[0];
+  // Story-title headings (curated app-side data) the spread pass should keep
+  // clear of: a plate landing on the verse just before a heading dangles above
+  // it, reading as if it belonged to the next section. Nudge it onto the
+  // heading verse instead — chapterVersesHTML then renders it just after that
+  // verse, tucked under the new section's first line rather than over its title.
+  const headSet = new Set((headingVerses || []).map(Number).filter(n => !isNaN(n)));
+  const unresolvedCount = all.filter(img => !(img.reference && img.reference.verse)).length;
+  let ui = 0;
+  return all.map((img, i) => {
+    const v = img.reference && img.reference.verse;
+    let verse;
+    if (v) verse = nums.includes(v) ? v : first;
+    else {
+      verse = nums[Math.min(nums.length - 1, Math.floor((ui + 0.5) * nums.length / unresolvedCount))]; ui++;
+      if (headSet.has(verse + 1) && !headSet.has(verse)) verse += 1;
+    }
+    return { html: inlineIllustHTML(img, i), verse, after: verse === first };
+  });
+}
+// Only runs now when the illustration-pack Settings pref changes mid-view, or
+// as loadChapter's retry when the plate fetch failed at render time — a normal
+// chapter load places the figures inline via renderChapter (renderedIllustKey).
 async function loadInlineIllustrations() {
   const pack = getIllustPack();
+  const rt = document.getElementById("readingText");
+  const key = `${current.book}/${current.chapter}/${pack}`;
+  if (renderedIllustKey === key && rt.querySelector(".inline-illust")) return; // already placed by renderChapter
+  rt.querySelectorAll(".inline-illust").forEach(el => el.remove());
   if (pack === "off") return;
   try {
-    // Each data[] entry carries an `image` object with a pre-formatted srcset
-    // ladder (320/640/960/1280/1920w, WebP or JPEG per Accept). The figure is
-    // size-independent — the browser picks a rung off srcset+sizes — so there's
-    // no ?size= on the request anymore. (`image.full`, the untouched master, is
-    // not used: the lightbox reads the top of this same ladder instead.)
     const d = await apiJSONCached(`/illustrations/${current.book}/${current.chapter}?artist=${pack}`);
-    const raw = d.data || [];
-    // Past this many plates in one chapter (a Matthew 17-style chapter under
-    // the Sweet pack can carry 15+), showing every single one turns the
-    // chapter into more gallery than reading text — keep a spread instead:
-    // first two, middle two, last two, so the chapter's overall illustrated
-    // arc still comes through without every plate crowding the column.
-    const all = raw.length > 9
-      ? raw.slice(0, 2).concat(raw.slice(Math.floor(raw.length / 2) - 1, Math.floor(raw.length / 2) + 1), raw.slice(-2))
-      : raw;
-    const spans = Array.from(document.querySelectorAll(".verse-span"));
-    if (!all.length || !spans.length) return;
-    // Not every artist resolves to a specific verse — Schnorr's plates do
-    // (a real reference.verse, the start of their tagged range), but Sweet
-    // Publishing's are only ever resolved to book+chapter (its own filename
-    // convention "never encoded verse precision, only chapter" — see
-    // cmd/importillustrations in the backend), so `verse` is absent
-    // (omitempty) on every single one of them. Rather than pile every
-    // verse-less plate at verse 1 (which quietly overstates precision the
-    // source data doesn't have), they're spread evenly across the chapter's
-    // verses instead — closer to how printed illustrated Bibles actually
-    // worked anyway: a full-page plate couldn't interrupt a verse
-    // mid-column, so it landed at the nearest natural break, not pinned to
-    // an exact one.
-    const unresolvedCount = all.filter(img => !(img.reference && img.reference.verse)).length;
-    let unresolvedIdx = 0;
-    all.forEach((img, i) => {
-      const verse = img.reference && img.reference.verse;
-      let target;
-      if (verse) {
-        target = document.querySelector(`.verse-span[data-verse="${verse}"]`) || spans[0];
-      } else {
-        const slot = Math.min(spans.length - 1, Math.floor((unresolvedIdx + 0.5) * spans.length / unresolvedCount));
-        target = spans[slot];
-        unresolvedIdx++;
-      }
-      insertInlineIllust(target, img, i, target === spans[0]);
+    const nums = Array.from(rt.querySelectorAll(".verse-span")).map(s => s.dataset.verse);
+    // The verse each heading sits above — walk the heading/verse elements in
+    // document order (a heading is a sibling of the <p> its verse lives in, not
+    // of the .verse-span itself, so nextElementSibling alone misses it).
+    const flow = Array.from(rt.querySelectorAll(".story-title-heading, .verse-span"));
+    const headVerses = flow
+      .map((el, i) => el.classList.contains("story-title-heading") && (flow.slice(i + 1).find(x => x.classList.contains("verse-span")) || {}).dataset)
+      .map(d => d && d.verse).filter(Boolean);
+    const headSet = headVerses.map(String);
+    placeChapterIllusts(d.data || [], nums, headVerses).forEach(pl => {
+      const target = rt.querySelector(`.verse-span[data-verse="${pl.verse}"]`);
+      if (!target) return;
+      const node = document.createRange().createContextualFragment(pl.html);
+      // A plate on a heading verse renders just after it, not between the
+      // heading and its first line (matches chapterVersesHTML's warm path).
+      const afterTarget = pl.after || headSet.includes(String(pl.verse));
+      target.parentNode.insertBefore(node, afterTarget ? target.nextSibling : target);
     });
   } catch (e) { /* no illustrations on file for this chapter — fine, nothing to show */ }
 }
-// Re-renders inline illustrations for the chapter already on screen, for
-// when the illustration-pack Settings pref changes mid-view (a fresh
-// chapter load doesn't need this — its readingText is already illust-free).
 function refreshInlineIllustrations() {
-  document.querySelectorAll(".inline-illust").forEach(el => el.remove());
+  renderedIllustKey = null; // force loadInlineIllustrations to rebuild for the new pack
   loadInlineIllustrations();
-}
-function insertInlineIllust(target, img, index, afterTarget) {
-  if (!target) return null;
-  const fig = document.createElement("div");
-  fig.className = "inline-illust" + (index % 2 === 0 ? " illust-left" : "");
-  // A staged work can have a DB row (so it passes the API's own "any
-  // illustrations here?" check) without its image object actually having
-  // landed in storage yet — onerror removes the whole figure rather than
-  // leaving a broken-image icon and an orphaned caption sitting in the
-  // reading column.
-  // lazy/async: a long chapter can carry a dozen plates, most below the fold.
-  // srcset+sizes let the browser pull the 320w/640w rung (WebP-negotiated) for
-  // the ~260px figure instead of the multi-MB master; the lightbox reuses this
-  // same srcset at sizes="100vw" to land on a large WebP rung rather than
-  // re-fetching the master (see js/main.js). Older API responses without `image`
-  // fall back to the master.
-  const src = img.image ? img.image.src : img.url;
-  const srcsetAttr = img.image && img.image.srcset ? ` srcset="${escHtml(img.image.srcset.join(", "))}" sizes="(max-width: 640px) 92vw, 260px"` : "";
-  // width/height give the browser an aspect-ratio to reserve the figure's box
-  // before the plate loads (combined with .inline-illust img{width:100%} +
-  // height:auto in css/styles.css) — no image.width/height (not yet
-  // backfilled server-side) just means today's un-reserved layout, not a bug.
-  const dimAttr = img.image && img.image.width && img.image.height ? ` width="${img.image.width}" height="${img.image.height}"` : "";
-  fig.innerHTML = `<img src="${escHtml(src)}"${srcsetAttr}${dimAttr} alt="${escHtml(img.caption || "")}" loading="lazy" decoding="async" onerror="this.closest('.inline-illust').remove()"><div class="cap">${escHtml(img.caption || "")}${img.artist ? ` — ${escHtml(img.artist)}` : ""}</div>`;
-  // A plate tagged to the chapter's first verse would otherwise land above
-  // the dropcap, before any text has rendered at all — insert it after that
-  // verse instead so the opening sentence reads before the image does.
-  if (afterTarget) target.parentNode.insertBefore(fig, target.nextSibling);
-  else target.parentNode.insertBefore(fig, target);
-  return fig;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -1229,17 +1547,27 @@ async function resolveStoryRefs(stories) {
   return map;
 }
 async function loadInlineStoryTitles() {
+  // Warm data means renderChapter() already inlined the headings from it (and
+  // chapterStoryHeadings won't have missed any), so there's nothing to add
+  // here — and re-inserting would only reflow the verses that already moved.
+  if (allStories && storyRefMap) return;
   try {
     const stories = await getAllStories();
     if (!stories.length) return;
     const refMap = await resolveStoryRefs(stories);
-    const spans = Array.from(document.querySelectorAll(".verse-span"));
+    const rt = document.getElementById("readingText");
+    const spans = Array.from(rt.querySelectorAll(".verse-span"));
     if (!spans.length) return;
+    // renderChapter() already places these inline when the story data was warm
+    // at render time; clear and rebuild rather than double them up (a cold
+    // first render has none yet — this is also the path that just resolved
+    // refMap). Scoped to #readingText so the swipe pager's peek is left alone.
+    rt.querySelectorAll(".story-title-heading").forEach(h => h.remove());
     stories.forEach(s => {
       const ref = refMap[s.title];
       if (!ref || ref.book !== current.book || ref.chapter !== current.chapter) return;
-      const target = document.querySelector(`.verse-span[data-verse="${ref.verse}"]`) || spans[0];
-      const h = document.createElement("h3");
+      const target = rt.querySelector(`.verse-span[data-verse="${ref.verse}"]`) || spans[0];
+      const h = document.createElement("h2");
       h.className = "story-title-heading";
       h.textContent = s.title;
       target.parentNode.insertBefore(h, target);
@@ -1251,16 +1579,41 @@ async function loadInlineStoryTitles() {
 /* ═══════════════════════════════════════════════════════════════════════
    BOOK ICON — style (or off) is a Settings pref, see getIconStyle/
    setIconStyle in api.js. */
+// The short tile string for a book. The USFM code (GEN, 1CO, 2MA, REV) is
+// already the compact, consistent form for the 66 + deuterocanon; only fall
+// back to the API's shortest abbreviation (/books/abbreviations) or the name
+// for anything that isn't a plain 2–4-char code (extrabiblical works). Never a
+// made-up scheme either way. Used as the "Lettered" style and as the fallback
+// when Overview Bible has no icon for a book.
+function bookIconLetters(usfm, nameEN) {
+  if (usfm && /^[0-9a-z]{2,4}$/i.test(usfm)) return usfm.toUpperCase();
+  return (bookAbbrev[usfm] || nameEN || usfm || "?").replace(/\s+/g, "").slice(0, 4).toUpperCase();
+}
 async function loadTopBookIcon() {
   const badge = document.getElementById("chBookIcon");
   const style = getIconStyle();
+  badge.classList.remove("bookicon-fallback", "bookicon-bw");
   if (style === "off") { badge.style.display = "none"; badge.innerHTML = ""; requestAnimationFrame(alignRails); return; }
   badge.style.display = "flex";
   badge.innerHTML = "";
+  const reqBook = current.book;
+  // Lettered tile — the book's abbreviation, in brand tint or greyscale per the
+  // Color / B&W setting.
+  const lettered = () => {
+    if (current.book !== reqBook) return;
+    badge.classList.add("bookicon-fallback");
+    if (getIconOBVariant() === "bw") badge.classList.add("bookicon-bw");
+    badge.textContent = bookIconLetters(current.book, current.bookName);
+  };
+  if (style === "letters") { lettered(); requestAnimationFrame(alignRails); return; }
+  // style === "overview": the API's Overview Bible set, color or B&W. Books it
+  // has no icon for (most of the deuterocanon) fall back to a lettered tile.
   try {
-    const data = await apiJSONCached(`/icons/${current.book}?style=${style}`);
+    const data = await apiJSONCached(`/icons/${current.book}?style=${getIconOBVariant()}`);
+    if (current.book !== reqBook) return;
     if (data.url) badge.innerHTML = `<img src="${escHtml(data.url)}" alt="${escHtml(data.name_en || current.bookName)}">`;
-  } catch (e) { /* no icon on file for this book — leave the badge blank */ }
+    else lettered();
+  } catch (e) { lettered(); }
   requestAnimationFrame(alignRails);
 }
 
@@ -1279,11 +1632,11 @@ let audioNarrations = [];
 // does — otherwise every chapter change (refreshAudioAvailability runs on
 // every loadChapter) would silently reset back to the first narration.
 let selectedNarrations = {};
-const AUDIO_PLAY_SVG = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5.5v13l11-6.5-11-6.5Z"/></svg>`;
-const AUDIO_PAUSE_SVG = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg>`;
+const AUDIO_PLAY_SVG = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><path d="M8 5.5v13l11-6.5-11-6.5Z"/></svg>`;
+const AUDIO_PAUSE_SVG = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg>`;
 function setAudioPlayingUI(playing) {
   const pb = document.getElementById("playBtn");
-  if (pb) pb.innerHTML = playing ? AUDIO_PAUSE_SVG : AUDIO_PLAY_SVG;
+  if (pb) { pb.innerHTML = playing ? AUDIO_PAUSE_SVG : AUDIO_PLAY_SVG; pb.setAttribute("aria-label", playing ? "Pause narration" : "Play narration"); }
   // < 1180px: body.audio-playing turns #readNavRow into the player (css) —
   // hides the chip + #audioDot and swaps #audioPlayer in. Pausing (the player's
   // own button, or a chapter change) clears it and the chip returns.
@@ -1291,8 +1644,9 @@ function setAudioPlayingUI(playing) {
 }
 function setAudioProgressUI(frac) {
   const f = Math.max(0, Math.min(1, frac || 0));
-  const sf = document.getElementById("scrubFill");
-  if (sf) sf.style.width = f * 100 + "%";
+  const sr = document.getElementById("scrubRange");
+  // Don't fight the user while they're dragging/arrowing the slider.
+  if (sr && document.activeElement !== sr) sr.value = String(Math.round(f * 1000));
   // #audioDot's ring (circumference 2·π·14 ≈ 88) doubles as a glanceable
   // progress indicator while the row is collapsed to just the dot.
   const ring = document.querySelector("#audioDot .rnr-ring-f");
@@ -1304,13 +1658,57 @@ function resetAudioPlayerUI() {
   // timeupdate from the old media could repaint the #audioDot ring with stale
   // progress after we've zeroed it. toggleAudio reassigns them on next load.
   el.ontimeupdate = null; el.onended = null; el.onloadedmetadata = null;
+  // A sleep-timer fade left mid-flight by a chapter change would strand el.volume
+  // at a reduced level — the element is reused, so every later chapter (continuous
+  // play included) would then play at a fraction of full volume until a reload.
+  cancelAudioFade();
   el.pause(); el.removeAttribute("src");
+  audioMintAt = 0;
+  audioReminting = false; audioLastRemintAt = 0;
+  audioFileConfirmed = false; audioMissingChecked = false;
   document.getElementById("audioPlayer").dataset.loaded = "0";
   setAudioProgressUI(0);
+  const sr = document.getElementById("scrubRange");
+  if (sr) { sr.disabled = true; sr.value = "0"; sr.setAttribute("aria-valuetext", "0:00 of 0:00"); }
   document.getElementById("audioCur").textContent = "0:00";
   document.getElementById("audioDur").textContent = "0:00";
   setAudioPlayingUI(false);
+  clearAudioChapterGap();
 }
+// Some versions carry narration for only part of the canon (a NT-only Greek
+// text, say). The audio catalog exposes a total chapter_count but no per-book
+// coverage map, so a missing chapter is only knowable once its mint 404s
+// (audio_not_found). Rather than a transient toast that vanishes, swap the
+// player's controls for a plain line for that chapter — reset on chapter change
+// by resetAudioPlayerUI. (Gap logged in NOTES.md — not a client-side guess.)
+function markAudioChapterGap() {
+  const wrap = document.getElementById("audioPlayer");
+  const msg = document.getElementById("audioMsg");
+  wrap.classList.add("audio-gap");
+  wrap.style.display = "flex";
+  if (msg) {
+    msg.textContent = `Narration isn’t available for this chapter${current.versionTitle ? " in " + current.versionTitle : ""}.`;
+    msg.hidden = false;
+  }
+  document.body.classList.add("audio-gap");
+}
+function clearAudioChapterGap() {
+  const wrap = document.getElementById("audioPlayer");
+  const msg = document.getElementById("audioMsg");
+  if (wrap) wrap.classList.remove("audio-gap");
+  if (msg) { msg.hidden = true; msg.textContent = ""; }
+  document.body.classList.remove("audio-gap");
+}
+// One-time: seeking via the range input (keyboard arrows/Home/End or a drag).
+(function initAudioScrub() {
+  const sr = document.getElementById("scrubRange");
+  if (!sr) return;
+  sr.addEventListener("input", () => {
+    const el = document.getElementById("audioEl");
+    if (!el || !el.duration) return;
+    el.currentTime = (Number(sr.value) / 1000) * el.duration;
+  });
+})();
 async function refreshAudioAvailability() {
   resetAudioPlayerUI();
   const wrap = document.getElementById("audioPlayer");
@@ -1367,33 +1765,138 @@ function selectNarration(audioId) {
   resetAudioPlayerUI();
   if (wasOpen) document.body.classList.add("audio-playing");
 }
+/* ── signed narration URLs expire ──
+   GET /audio/… returns a short-lived signed URL plus `expires_in`; the API
+   expects the client to mint a fresh one when it lapses (this is the documented
+   contract, not an API shortcoming to work around). We record when the current
+   URL was minted and swap in a fresh one — playhead preserved — before a stale
+   URL can 403 on resume, with a reactive retry on `error` as a backstop. The
+   listener never notices; only a console note marks that it happened. */
+let audioMintAt = 0;
+let audioTTLms = 3600000;
+let audioReminting = false;
+let audioLastRemintAt = 0;
+// Per-chapter: has the media element actually loaded this chapter's file, and
+// have we already spent our one "maybe the URL just expired" retry on a file
+// that won't load. A mint call can 200 with a signed URL whose media object
+// then 404s — some versions carry audio for only part of the canon and the
+// mint side doesn't verify the file exists (#294). Both reset per chapter.
+let audioFileConfirmed = false;
+let audioMissingChecked = false;
+
+async function mintNarrationUrl() {
+  const el = document.getElementById("audioEl");
+  const wrap = document.getElementById("audioPlayer");
+  const data = await apiJSON(`/audio/${current.audioId || current.version}/${current.book}/${current.chapter}`);
+  el.src = data.file;
+  audioMintAt = Date.now();
+  audioTTLms = (Number(data.expires_in) || 3600) * 1000;
+  wrap.dataset.loaded = "1";
+}
+// Within 90s of (or past) the stated expiry — assume the next byte fetch 403s.
+function narrationUrlStale() {
+  return audioMintAt > 0 && Date.now() - audioMintAt > Math.max(0, audioTTLms - 90000);
+}
+// Re-fetch the URL in place, keeping position and play state. Loop-guarded: one
+// attempt in flight at a time, 5s cooldown between attempts.
+async function remintNarrationUrl(forcePlay) {
+  const el = document.getElementById("audioEl");
+  if (audioReminting || Date.now() - audioLastRemintAt < 5000) return false;
+  audioReminting = true; audioLastRemintAt = Date.now();
+  const at = el.currentTime || 0;
+  const resume = forcePlay || !el.paused;
+  try {
+    await mintNarrationUrl();
+    // Race load against error/timeout so a fresh URL that also 404s doesn't
+    // hang this forever (leaving audioReminting stuck for later chapters).
+    await new Promise((res, rej) => {
+      const done = fn => () => { el.removeEventListener("loadedmetadata", ok); el.removeEventListener("error", bad); clearTimeout(t); fn(); };
+      const ok = done(res), bad = done(() => rej(new Error("load_error")));
+      const t = setTimeout(bad, 8000);
+      el.addEventListener("loadedmetadata", ok, { once: true });
+      el.addEventListener("error", bad, { once: true });
+      el.load();
+    });
+    audioFileConfirmed = true;
+    if (at > 0) { try { el.currentTime = at; } catch (e) {} }
+    if (resume) { setAudioPlayingUI(true); await el.play().catch(() => {}); }
+    console.debug(`[audio] re-minted expired narration URL, resumed at ${Math.round(at)}s`);
+    return true;
+  } catch (e) {
+    console.debug("[audio] narration re-mint failed:", e && e.message);
+    return false;
+  } finally {
+    audioReminting = false;
+  }
+}
+async function remintOrMarkGap() {
+  audioMissingChecked = true;
+  try { await mintNarrationUrl(); document.getElementById("audioEl").load(); }
+  catch (e) { setAudioPlayingUI(false); markAudioChapterGap(); }
+}
+(function initNarrationResilience() {
+  const el = document.getElementById("audioEl");
+  if (!el) return;
+  el.addEventListener("loadedmetadata", () => { audioFileConfirmed = true; });
+  el.addEventListener("error", () => {
+    const wrap = document.getElementById("audioPlayer");
+    if (!wrap || wrap.dataset.loaded !== "1") return;
+    // The signed URL minted fine but its media object won't load. If the file
+    // has never loaded this chapter, this is a missing narration file, not a
+    // stale URL — one fresh mint in case it genuinely just expired, then the
+    // inline "not available for this chapter" note rather than re-minting a
+    // 404 on a loop.
+    if (!audioFileConfirmed) {
+      if (audioMissingChecked) { setAudioPlayingUI(false); markAudioChapterGap(); }
+      else remintOrMarkGap();
+      return;
+    }
+    if (document.body.classList.contains("audio-playing")) remintNarrationUrl();
+  });
+})();
+
 async function toggleAudio() {
   const el = document.getElementById("audioEl");
   const wrap = document.getElementById("audioPlayer");
   if (wrap.dataset.loaded !== "1") {
     try {
-      const data = await apiJSON(`/audio/${current.audioId || current.version}/${current.book}/${current.chapter}`);
-      el.src = data.file;
-      wrap.dataset.loaded = "1";
+      await mintNarrationUrl();
       el.ontimeupdate = () => {
         document.getElementById("audioCur").textContent = fmtTime(el.currentTime);
         setAudioProgressUI(el.duration ? el.currentTime / el.duration : 0);
+        const sr = document.getElementById("scrubRange");
+        if (sr && el.duration) sr.setAttribute("aria-valuetext", `${fmtTime(el.currentTime)} of ${fmtTime(el.duration)}`);
       };
-      el.onloadedmetadata = () => { document.getElementById("audioDur").textContent = fmtTime(el.duration); };
+      el.onloadedmetadata = () => {
+        document.getElementById("audioDur").textContent = fmtTime(el.duration);
+        const sr = document.getElementById("scrubRange");
+        if (sr) { sr.disabled = false; sr.setAttribute("aria-valuetext", `0:00 of ${fmtTime(el.duration)}`); }
+      };
       el.onended = handleAudioEnded;
     } catch (e) {
-      if (e.message !== "no_api_key") toast("No narration available for this version/chapter");
+      if (e.message === "no_api_key") return;
+      // 404 audio_not_found = this version has no narration file for this
+      // chapter (partial-canon coverage) — a persistent inline note, not a toast.
+      if (e.status === 404) { markAudioChapterGap(); return; }
+      toast("Couldn't load narration — try again");
       return;
     }
   }
-  if (el.paused) { el.play(); setAudioPlayingUI(true); }
-  else { el.pause(); setAudioPlayingUI(false); }
-}
-function seekAudio(e) {
-  const el = document.getElementById("audioEl");
-  if (!el.duration) return;
-  const rect = document.getElementById("scrubTrack").getBoundingClientRect();
-  el.currentTime = ((e.clientX - rect.left) / rect.width) * el.duration;
+  if (el.paused) {
+    if (narrationUrlStale()) {
+      setAudioPlayingUI(true);
+      if (!await remintNarrationUrl(true)) { setAudioPlayingUI(false); toast("Couldn't play narration — try again"); }
+      return;
+    }
+    setAudioPlayingUI(true);
+    el.play().catch(async () => {
+      // A missing-file 404 (URL minted OK, media object 404s) surfaces through
+      // the media `error` listener as the inline gap note — don't also toast.
+      // A rejection with no el.error (e.g. autoplay blocked) still falls through.
+      if (el.error && !audioFileConfirmed) return;
+      if (!await remintNarrationUrl(true)) { setAudioPlayingUI(false); toast("Couldn't play narration — try again"); }
+    });
+  } else { el.pause(); setAudioPlayingUI(false); }
 }
 
 /* ── continuous play + sleep timer ──
@@ -1402,10 +1905,30 @@ function seekAudio(e) {
    continuous play. */
 let audioAutoresume = false;
 let sleepTimer = { mode: null, endAt: 0, tick: null }; // mode: null | "eoc" | "timed"
+// The sleep-timer volume fade (fireSleepTimer) is the only thing that ever
+// touches el.volume. Tracked at module scope so a new timer, an "Off", or a
+// chapter change can cancel a fade in progress and put the volume back to full —
+// otherwise an interrupted or overlapping fade leaves the reused <audio> element
+// permanently quiet.
+let audioFadeTimer = null;
+function cancelAudioFade() {
+  if (audioFadeTimer) { clearInterval(audioFadeTimer); audioFadeTimer = null; }
+  const el = document.getElementById("audioEl");
+  if (el) el.volume = 1;
+}
 function handleAudioEnded() {
   if (sleepTimer.mode === "eoc") { clearSleepTimer(); setAudioPlayingUI(false); toast("Sleep timer — stopped"); return; }
+  // Played to the end with no sleep timer running = you listened to it. A timed
+  // timer still counting down means you're winding down — don't credit chapters
+  // that play out while you're dozing off.
+  if (getMarkReadOnListen() && !sleepTimer.mode && typeof markChapterRead === "function") markChapterRead({ fromAudio: true });
+  // Continuous play follows goAdjacentChapter's own canon walk — across a book
+  // boundary (Malachi 4 → Matthew 1, Titus 3 → Philemon 1) too, not just within
+  // a book — and only halts when there's no next chapter left in the canon.
   const maxCh = chapterMeta.length ? chapterMeta[chapterMeta.length - 1].chapter : current.chapter;
-  if (getAudioContinuous() && current.chapter < maxCh) { audioAutoresume = true; goAdjacentChapter(1); return; }
+  const bIdx = (typeof bookList !== "undefined" && bookList) ? bookList.findIndex(b => b.usfm === current.book) : -1;
+  const hasNext = current.chapter < maxCh || (bIdx !== -1 && bIdx < bookList.length - 1);
+  if (getAudioContinuous() && hasNext) { audioAutoresume = true; goAdjacentChapter(1); return; }
   setAudioPlayingUI(false);
 }
 function openSleepTimer() {
@@ -1420,6 +1943,7 @@ function openSleepTimer() {
 function setSleepTimer(opt) {
   closeModal("sleepTimerScrim");
   clearInterval(sleepTimer.tick); sleepTimer.tick = null;
+  cancelAudioFade(); // undo a fade already in progress if the timer is changed/cancelled mid-fade
   if (opt === "off") { sleepTimer.mode = null; sleepTimer.min = 0; syncSleepTimerBtn(); return; }
   if (opt === "eoc") { sleepTimer.mode = "eoc"; sleepTimer.min = 0; syncSleepTimerBtn(); return; }
   sleepTimer.mode = "timed"; sleepTimer.min = opt; sleepTimer.endAt = Date.now() + opt * 60000;
@@ -1433,6 +1957,7 @@ function setSleepTimer(opt) {
 function clearSleepTimer() {
   clearInterval(sleepTimer.tick);
   sleepTimer = { mode: null, endAt: 0, tick: null, min: 0 };
+  cancelAudioFade();
   syncSleepTimerBtn();
 }
 // At zero: ease the volume down over ~4s rather than a hard cut, then pause.
@@ -1441,17 +1966,22 @@ function fireSleepTimer() {
   syncSleepTimerBtn();
   const el = document.getElementById("audioEl");
   if (el.paused) return;
-  const v0 = el.volume, steps = 16;
+  cancelAudioFade(); // clears any prior fade and resets volume to 1 — the baseline these steps count down from
+  const steps = 16;
   let i = 0;
-  const fade = setInterval(() => {
+  audioFadeTimer = setInterval(() => {
     i++;
-    el.volume = Math.max(0, v0 * (1 - i / steps));
-    if (i >= steps) { clearInterval(fade); el.pause(); el.volume = v0; setAudioPlayingUI(false); toast("Sleep timer — paused"); }
+    el.volume = Math.max(0, 1 - i / steps);
+    if (i >= steps) { cancelAudioFade(); el.pause(); setAudioPlayingUI(false); toast("Sleep timer — paused"); }
   }, 250);
 }
 function syncSleepTimerBtn(msLeft) {
   const btn = document.getElementById("btnSleepTimer");
   if (!btn) return;
+  // Without continuous play a chapter is only a few minutes of audio, so the
+  // 15/30/45/60-minute options are meaningless and "stop at end of chapter" is
+  // already the default — hide the control until continuous play is on.
+  btn.style.display = getAudioContinuous() ? "inline-flex" : "none";
   const lbl = btn.querySelector(".st-label");
   if (sleepTimer.mode === "timed") {
     const s = Math.max(0, Math.ceil((msLeft != null ? msLeft : sleepTimer.endAt - Date.now()) / 1000));
@@ -1514,10 +2044,15 @@ function applyDictionaryMarks(words) {
     let last = 0, m;
     while ((m = re.exec(node.nodeValue))) {
       if (m.index > last) frag.appendChild(document.createTextNode(node.nodeValue.slice(last, m.index)));
-      const span = document.createElement("span");
+      // A <button>, not a <span>: clicking opens the dictionary modal, so it
+      // has to be keyboard-operable. Styled back down to inline dotted-underline
+      // text in css (.dict-term).
+      const span = document.createElement("button");
+      span.type = "button";
       span.className = "dict-term";
       span.textContent = m[0];
       span.dataset.term = m[0];
+      span.setAttribute("aria-label", `${m[0]} — dictionary`);
       frag.appendChild(span);
       last = m.index + m[0].length;
     }
@@ -1556,7 +2091,15 @@ function showFloatingTooltip(el, html) {
   tip.style.left = left + "px";
   tip.style.top = top + "px";
 }
-function hideFloatingTooltip() { document.getElementById("dictTooltip").classList.remove("show"); }
+let _tipHideTimer = null;
+let _tipOwner = null; // the element the tooltip is currently describing
+function _tipCancelHide() { if (_tipHideTimer) { clearTimeout(_tipHideTimer); _tipHideTimer = null; } }
+function _tipScheduleHide() { _tipCancelHide(); _tipHideTimer = setTimeout(hideFloatingTooltip, 200); }
+function hideFloatingTooltip() {
+  _tipCancelHide();
+  document.getElementById("dictTooltip").classList.remove("show");
+  if (_tipOwner) { if (_tipOwner.hasAttribute("aria-expanded")) _tipOwner.setAttribute("aria-expanded", "false"); _tipOwner = null; }
+}
 function showDictTooltip(el) {
   const term = el.dataset.term;
   const def = termDefCache.get(term.toLowerCase()) || "";
@@ -1567,19 +2110,48 @@ function showDictTooltip(el) {
 // mechanic from that one visual style, so it can be reused on differently-
 // styled elements too (e.g. the pill-button cross-reference list in Verse
 // Tools, which needs its own button look, not a dotted-underline citelink).
-document.addEventListener("mouseover", e => {
-  const cite = e.target.closest("[data-cite-id]");
+// Hover OR keyboard focus shows the preview (CLAUDE.md's citation rule +
+// WCAG 1.4.13 / 2.1.1). A short close delay — cancelled if the pointer moves
+// onto the tooltip itself — keeps it hoverable; Escape dismisses it (main.js).
+function showRefPreview(target) {
+  _tipCancelHide();
+  const cite = target.closest("[data-cite-id]");
   if (cite && cite.dataset.citeId) {
     const d = citePreviewData.get(cite.dataset.citeId);
-    if (d) showFloatingTooltip(cite, `<div class="dt-term">${escHtml(d.ref)}</div>${escHtml(d.preview)}`);
+    if (d) { showFloatingTooltip(cite, `<div class="dt-term">${escHtml(d.ref)}</div>${escHtml(d.preview)}`); _tipOwner = cite; if (cite.hasAttribute("aria-expanded")) cite.setAttribute("aria-expanded", "true"); }
     return;
   }
-  const el = e.target.closest(".dict-term");
-  if (el) showDictTooltip(el);
+  const dt = target.closest(".dict-term");
+  if (dt) { showDictTooltip(dt); _tipOwner = dt; }
+}
+// Click / Enter on a citation button toggles its preview (touch + keyboard).
+document.addEventListener("click", e => {
+  const cite = e.target.closest("button.citelink[data-cite-id]");
+  if (!cite) return;
+  if (cite.getAttribute("aria-expanded") === "true") hideFloatingTooltip();
+  else showRefPreview(cite);
+});
+document.addEventListener("mouseover", e => {
+  const t = e.target.closest("[data-cite-id], .dict-term");
+  if (t) showRefPreview(t);
 });
 document.addEventListener("mouseout", e => {
-  if (e.target.closest("[data-cite-id]") || e.target.closest(".dict-term")) hideFloatingTooltip();
+  if (e.target.closest("[data-cite-id], .dict-term")) _tipScheduleHide();
 });
+document.addEventListener("focusin", e => {
+  const t = e.target.closest("[data-cite-id], .dict-term");
+  if (t) showRefPreview(t);
+  else if (!e.target.closest("#dictTooltip")) hideFloatingTooltip();
+});
+document.addEventListener("focusout", e => {
+  if (e.target.closest("[data-cite-id], .dict-term")) _tipScheduleHide();
+});
+(function () {
+  const tip = document.getElementById("dictTooltip");
+  if (!tip) return;
+  tip.addEventListener("mouseenter", _tipCancelHide);
+  tip.addEventListener("mouseleave", _tipScheduleHide);
+})();
 
 /* ── citation preview — the general "any prose from the API may contain
    Scripture references" requirement (see CLAUDE.md's development rules).
@@ -1591,6 +2163,21 @@ document.addEventListener("mouseout", e => {
    character can't break out of an HTML attribute. ── */
 const citePreviewData = new Map();
 let citePreviewSeq = 0;
+// A citation spanning many verses (John 3:1-10) still gets a hover preview
+// (#257) — but the popup shows only the opening verses with a "+N more" tail,
+// not the whole passage, which stops being a glanceable "check this verse"
+// aid. Past CITE_LINK_MAX_VERSES in one citation it's left as plain text —
+// too broad to preview usefully at all.
+const CITE_PREVIEW_MAX_VERSES = 4;
+const CITE_LINK_MAX_VERSES = 40;
+function rangePreviewText(verseTexts, totalCount) {
+  const total = totalCount || verseTexts.length;
+  let shown = verseTexts.slice(0, CITE_PREVIEW_MAX_VERSES).join(" ").trim();
+  // Keep room for the "+N more" tail inside registerCiteId's own length cap.
+  if (shown.length > 240) shown = shown.slice(0, 240).replace(/\s+\S*$/, "") + "…";
+  const more = total - Math.min(verseTexts.length, CITE_PREVIEW_MAX_VERSES);
+  return more > 0 ? `${shown} [+${more} more ${more === 1 ? "verse" : "verses"}]` : shown;
+}
 // Shared by every hover-preview call site regardless of how it learned the
 // ref/text — a citation parsed out of prose (linkifyCitations), a reference
 // resolved lazily on hover (Timeline), or a reference that was already
@@ -1602,6 +2189,18 @@ function registerCiteId(ref, previewText) {
   const id = "cp" + (++citePreviewSeq);
   citePreviewData.set(id, { ref, preview });
   return id;
+}
+// The one place a .citelink span is built. Focusable + self-describing: the
+// aria-label carries the reference and its verse text, so a keyboard/screen-
+// reader user gets the preview straight from the element without depending on
+// the pointer-positioned tooltip. `raw` is the citation as it appeared in the
+// prose. Not role="link" — a citelink previews, it doesn't navigate.
+function citelinkHTML(raw, ref, previewText, id) {
+  // A <button> (not a styled span): activating it toggles the preview — which
+  // makes it work on touch too, not just hover/focus — and the aria-label
+  // carries the reference + verse text so a screen reader needs no popup.
+  const label = escAttr(((ref ? ref + ": " : "") + (previewText || "")).slice(0, 400));
+  return `<button type="button" class="citelink" aria-label="${label}" aria-expanded="false" data-cite-id="${id}">${escHtml(raw)}</button>`;
 }
 async function linkifyCitations(text, version) {
   if (!text || !text.trim()) return escHtml(text || "");
@@ -1646,15 +2245,15 @@ async function linkifyCitations(text, version) {
     const start = typeof m.start === "number" ? m.start : 0;
     if (start < last) return;
     const verses = m.data || [];
-    // A bare "Book chapter" match (no verse) or a wide range previews poorly
-    // as a hover popup — too much text for "hover to check a verse" to stay
-    // useful — so those are left as plain, unlinked text.
-    if (!m.verse || !verses.length || verses.length > 6) return;
+    // A bare "Book chapter" match (no verse) has nothing to preview; a very
+    // wide range (past CITE_LINK_MAX_VERSES) is left as plain text. Everything
+    // in between links, with the preview truncated to the opening verses.
+    if (!m.verse || !verses.length || verses.length > CITE_LINK_MAX_VERSES) return;
     html += escHtml(text.slice(last, start));
-    const verseText = verses.map(v => v.text).join(" ").trim();
+    const verseText = rangePreviewText(verses.map(v => v.text), verses.length);
     const ref = `${m.name_en} ${m.chapter}:${m.verse}${m.verse_end ? "-" + m.verse_end : ""}`;
     const id = registerCiteId(ref, verseText);
-    html += `<span class="citelink" data-cite-id="${id}">${escHtml(m.raw)}</span>`;
+    html += citelinkHTML(m.raw, ref, verseText, id);
     last = m.end;
   });
   html += escHtml(text.slice(last));
@@ -1775,14 +2374,16 @@ async function linkifyPreParsedCitations(text, citations) {
   if (!text) return escHtml(text || "");
   // Same "too wide to preview usefully" cutoff linkifyCitations applies,
   // plus a bare chapter-only match (no m.verse) has nothing to preview.
-  const matches = (citations || []).filter(m => m.verse && (m.verse_end || m.verse) - m.verse + 1 <= 6);
+  const matches = (citations || []).filter(m => m.verse && (m.verse_end || m.verse) - m.verse + 1 <= CITE_LINK_MAX_VERSES);
   if (!matches.length) return escHtml(text);
 
+  // Only the opening verses of each range are previewed, so only those need
+  // fetching — a 30-verse citation shouldn't pull 30 verses to show 4.
   const refs = [];
   const seen = new Set();
+  const previewEnd = m => Math.min(m.verse_end || m.verse, m.verse + CITE_PREVIEW_MAX_VERSES - 1);
   matches.forEach(m => {
-    const end = m.verse_end || m.verse;
-    for (let v = m.verse; v <= end; v++) {
+    for (let v = m.verse; v <= previewEnd(m); v++) {
       const key = `${m.book}.${m.chapter}.${v}`;
       if (!seen.has(key)) { seen.add(key); refs.push({ book: m.book, chapter: m.chapter, verse: v }); }
     }
@@ -1794,17 +2395,17 @@ async function linkifyPreParsedCitations(text, citations) {
   matches.forEach(m => {
     const start = m.start || 0;
     if (start < last) return;
-    const end = m.verse_end || m.verse;
     const verseTexts = [];
-    for (let v = m.verse; v <= end; v++) {
+    for (let v = m.verse; v <= previewEnd(m); v++) {
       const t = previewByRef[`${m.book}.${m.chapter}.${v}`];
       if (t) verseTexts.push(t);
     }
     if (!verseTexts.length) return;
     html += escHtml(text.slice(last, start));
     const ref = `${m.name_en} ${m.chapter}:${m.verse}${m.verse_end ? "-" + m.verse_end : ""}`;
-    const id = registerCiteId(ref, verseTexts.join(" ").trim());
-    html += `<span class="citelink" data-cite-id="${id}">${escHtml(m.raw)}</span>`;
+    const joined = rangePreviewText(verseTexts, (m.verse_end || m.verse) - m.verse + 1);
+    const id = registerCiteId(ref, joined);
+    html += citelinkHTML(m.raw, ref, joined, id);
     last = m.end;
   });
   html += escHtml(text.slice(last));
@@ -1826,11 +2427,32 @@ async function fetchVersePreviews(refs, version) {
   version = version || current.version;
   const refStrings = refs.map(r => `${r.book}.${r.chapter}.${r.verse}`);
   const out = {};
+  let notFound = [];
   try {
     const bd = await apiJSONCached(`/bibles/${version}/verses?refs=${refStrings.join(",")}`);
-    const notFound = new Set(bd.not_found || []);
-    refStrings.filter(r => !notFound.has(r)).forEach((r, i) => { if (bd.data[i]) out[r] = bd.data[i].text; });
+    notFound = bd.not_found || [];
+    const nf = new Set(notFound);
+    refStrings.filter(r => !nf.has(r)).forEach((r, i) => { if (bd.data[i]) out[r] = bd.data[i].text; });
   } catch (e) { /* preview text is a nice-to-have; refs still work without it */ }
+  // A deuterocanonical ref (1 Maccabees, Sirach…) won't resolve against a
+  // 66-book reading version — GET /bibles/{version}/verses has no cross-canon
+  // fallback the way GET /parse/citations does (#265, gap logged in NOTES.md).
+  // Retry exactly the refs the batch call dropped through the citation
+  // resolver, which auto-falls-back to an apocrypha-carrying edition. One
+  // extra call, only when something was unresolved.
+  if (notFound.length) {
+    try {
+      const asText = notFound.map(r => r.replace(/\.(\d+)\.(\d+)$/, " $1:$2")).join("; ");
+      const d = await apiJSONCached(`/parse/citations?text=${encodeURIComponent(asText)}&hydrate=true&version=${encodeURIComponent(version)}`);
+      (d.citations || []).forEach(c => {
+        const first = c.verse, end = c.verse_end || c.verse;
+        (c.data || []).forEach(v => {
+          const vn = v.verse_number ?? v.verse;
+          if (vn >= first && vn <= end) out[`${c.book}.${c.chapter}.${vn}`] = v.text;
+        });
+      });
+    } catch (e) { /* still just a nice-to-have */ }
+  }
   return out;
 }
 
@@ -1956,7 +2578,10 @@ function clearVerseSelection() {
 function closeVerseTools() { clearVerseSelection(); }
 function renderVerseSelectionUI() {
   document.querySelectorAll(".verse-span").forEach(el => {
-    el.classList.toggle("vsel", selectedVerses.includes(Number(el.dataset.verse)));
+    const on = selectedVerses.includes(Number(el.dataset.verse));
+    el.classList.toggle("vsel", on);
+    const vn = el.querySelector(".vnum");
+    if (vn) vn.setAttribute("aria-pressed", on ? "true" : "false");
   });
   // Keeps the Notes drawer's "Attach <ref>" footer button in sync with the
   // current selection (both selectVerse and clearVerseSelection route here).
@@ -1995,7 +2620,7 @@ function getHighlights() {
   if (migrated) setHighlights(m);
   return m;
 }
-function setHighlights(m) { localStorage.setItem("iqb_highlights", JSON.stringify(m)); }
+function setHighlights(m) { localStorage.setItem("iqb_highlights", JSON.stringify(m)); if (typeof updateLibraryCounts === "function") updateLibraryCounts(); }
 // Value is { createdAt, groupId } — groupId ties every verse bookmarked in a
 // single action (one contiguous or disjoint selection) into one My Library
 // entry instead of one card per verse. Older saves stored a bare timestamp,
@@ -2016,7 +2641,7 @@ function getBookmarks() {
   if (migrated) setBookmarks(m);
   return m;
 }
-function setBookmarks(m) { localStorage.setItem("iqb_bookmarks", JSON.stringify(m)); }
+function setBookmarks(m) { localStorage.setItem("iqb_bookmarks", JSON.stringify(m)); if (typeof updateLibraryCounts === "function") updateLibraryCounts(); }
 // Shared by bookmarks and highlights — a single verse-tools action stamps one
 // groupId on every verse it touches, so My Library shows it as one entry.
 function newAnnotationGroupId() { return "g_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
@@ -2068,7 +2693,7 @@ function getNotes() {
   if (changed) setNotes(raw);
   return raw;
 }
-function setNotes(arr) { localStorage.setItem("iqb_notes", JSON.stringify(arr)); }
+function setNotes(arr) { localStorage.setItem("iqb_notes", JSON.stringify(arr)); if (typeof updateLibraryCounts === "function") updateLibraryCounts(); }
 function newNoteId() { return "n_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 
 /* ── notebooks: named groups a note can belong to (notebookId), local-only.
@@ -2444,7 +3069,7 @@ async function showCommentaryTool() {
   const preferred = sources.find(s => s.name === "mhenry") || sources.find(s => s.name === "gill") || sources[0];
   body.innerHTML =
     (scoped ? "" : `<div class="tool-hint" style="margin-bottom:10px">No source has an entry for this exact verse — showing everything that covers ${escHtml(bookNameByUsfm[book] || book)}.</div>`) +
-    `<select id="vtCommentarySelect" class="vt-source-select" onchange="loadCommentaryText(this.value)">` +
+    `<select id="vtCommentarySelect" aria-label="Commentary source" class="vt-source-select" onchange="loadCommentaryText(this.value)">` +
     sources.map(s => `<option value="${escHtml(s.name)}"${s.name === preferred.name ? " selected" : ""}>${escHtml(s.author_name)}</option>`).join("") +
     `</select><div id="vtCommentaryText" style="margin-top:14px"></div>`;
   loadCommentaryText(preferred.name);

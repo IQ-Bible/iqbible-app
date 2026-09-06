@@ -6,7 +6,7 @@
    illustration pack (Schnorr, see getIllustPack below) is Old Testament-
    only, so a New Testament default would never show any imagery out of
    the box. */
-let current = { version: "eng_kjv", versionTitle: "King James Version", book: "GEN", bookName: "Genesis", chapter: 1, verse: null, verseEnd: null, audioId: null, textDirection: "ltr" };
+let current = { version: "eng_kjv", versionTitle: "King James Version", book: "GEN", bookName: "Genesis", chapter: 1, verse: null, verseEnd: null, audioId: null, textDirection: "ltr", lang: "en" };
 let catalog = null;
 let bookList = [];
 let chapterMeta = [];
@@ -49,9 +49,113 @@ function escHtml(s) { return (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt
 // escHtml alone isn't safe inside a "-quoted HTML attribute (it doesn't touch
 // quote chars) — use this instead wherever free text lands in one.
 function escAttr(s) { return escHtml(s).replace(/"/g, "&quot;"); }
-function openModal(id) { document.getElementById(id).classList.add("show"); }
-function closeModal(id) { document.getElementById(id).classList.remove("show"); }
+// Turn an API enum/marker token ("unknown_place", "multiple_locations") into
+// display text ("Unknown place", "Multiple locations") — the values are
+// correct API responses, they just read like an error rendered raw.
+function humanizeToken(s) {
+  return (s || "").replace(/_/g, " ").replace(/^\s*./, c => c.toUpperCase());
+}
+/* ── modal dialog manager ──────────────────────────────────────────────────
+   openModal/closeModal are still "toggle .show", but now also give the modal
+   real dialog semantics (role, aria-modal, a label from its heading), move
+   focus in on open and back to the trigger on close, hold focus inside while
+   open (trap), and make everything behind it inert. Every .modalscrim in the
+   app goes through here, so this is the one place it's handled. */
+const FOCUSABLE_SEL = 'a[href],area[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),iframe,audio[controls],video[controls],[tabindex]:not([tabindex="-1"]),[contenteditable="true"]';
+// Page-level regions that get inert-ed while any modal is open (they sit
+// outside every .modalscrim). #toast / #dictTooltip stay live on purpose.
+const INERT_REGION_IDS = ["topbar", "profilePanel", "shell", "mobileFooterNav", "moreMenuSheet", "discoverHub", "notesLauncher", "notesDrawer", "keyBanner"];
+let _modalFocusStack = [];
+// The element that actually holds the dialog's content + focusables. Usually
+// the .modal inside the scrim; #cardsSheetScrim is the odd one out — its
+// content lives in a separate #rightRail element (data-dialog-content).
+function _dialogEl(scrim) {
+  return scrim.querySelector(".modal, .tour-welcome-box")
+    || (scrim.dataset.dialogContent && document.getElementById(scrim.dataset.dialogContent))
+    || scrim;
+}
+function _visibleFocusables(root) {
+  return [...root.querySelectorAll(FOCUSABLE_SEL)].filter(el => el.offsetParent !== null || el === document.activeElement);
+}
+function _topOpenModal() {
+  const open = [...document.querySelectorAll(".modalscrim.show")];
+  return open[open.length - 1] || null;
+}
+// When a dialog's content lives *inside* a region we'd otherwise inert wholesale
+// (#cardsSheetScrim's content is #rightRail, which sits inside #shell), we can't
+// just inert the region — inert propagates to every descendant with no way for
+// one to opt back in. Track that region so we can inert its other branches
+// individually and undo it cleanly on the next sync.
+let _splitInertEl = null;
+function _syncModalInert() {
+  const top = _topOpenModal();
+  const liveDlg = top ? _dialogEl(top) : null;
+  if (_splitInertEl) { [..._splitInertEl.children].forEach(ch => { ch.inert = false; }); _splitInertEl = null; }
+  INERT_REGION_IDS.forEach(rid => {
+    const el = document.getElementById(rid);
+    if (!el) return;
+    if (liveDlg && el !== liveDlg && el.contains(liveDlg)) {
+      el.inert = false;
+      [...el.children].forEach(ch => { ch.inert = ch !== liveDlg && !ch.contains(liveDlg); });
+      _splitInertEl = el;
+    } else {
+      el.inert = !!top;
+    }
+  });
+  // Stacked pickers (e.g. the version picker opened from inside another modal):
+  // only the topmost stays interactive.
+  document.querySelectorAll(".modalscrim").forEach(s => { s.inert = !!top && s !== top && s.classList.contains("show"); });
+}
+function openModal(id) {
+  const scrim = document.getElementById(id);
+  if (!scrim || scrim.classList.contains("show")) { if (scrim) scrim.classList.add("show"); return; }
+  const dlg = _dialogEl(scrim);
+  if (!dlg.getAttribute("role")) dlg.setAttribute("role", "dialog");
+  dlg.setAttribute("aria-modal", "true");
+  if (!dlg.hasAttribute("aria-label") && !dlg.hasAttribute("aria-labelledby")) {
+    const h = dlg.querySelector(".mhead h2, .overlay-title, h1, h2");
+    if (h) { if (!h.id) h.id = id + "__title"; dlg.setAttribute("aria-labelledby", h.id); }
+  }
+  _modalFocusStack.push(document.activeElement);
+  scrim.classList.add("show");
+  _syncModalInert();
+  requestAnimationFrame(() => {
+    if (dlg.contains(document.activeElement)) return; // a caller already placed focus
+    const pick = dlg.querySelector("[autofocus],[data-autofocus]") || _visibleFocusables(dlg)[0] || dlg;
+    if (pick === dlg && !dlg.hasAttribute("tabindex")) dlg.tabIndex = -1;
+    try { pick.focus({ preventScroll: true }); } catch (e) {}
+  });
+}
+function closeModal(id) {
+  const scrim = document.getElementById(id);
+  if (!scrim) return;
+  const wasOpen = scrim.classList.contains("show");
+  scrim.classList.remove("show");
+  if (!wasOpen) return;
+  _syncModalInert();
+  const prev = _modalFocusStack.pop();
+  if (prev && prev.isConnected && typeof prev.focus === "function" && !prev.closest("[inert]")) {
+    try { prev.focus({ preventScroll: true }); } catch (e) {}
+  }
+}
+// Focus trap — keeps Tab inside the topmost open modal.
+document.addEventListener("keydown", e => {
+  if (e.key !== "Tab") return;
+  const top = _topOpenModal();
+  if (!top) return;
+  const dlg = _dialogEl(top);
+  const f = _visibleFocusables(dlg);
+  if (!f.length) { e.preventDefault(); dlg.focus?.(); return; }
+  const first = f[0], last = f[f.length - 1];
+  if (e.shiftKey && (document.activeElement === first || !dlg.contains(document.activeElement))) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+}, true);
 function fmtTime(s) { if (!isFinite(s)) return "0:00"; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, "0")}`; }
+// Honour the OS "reduce motion" setting for JS-driven animation (CSS handles
+// its own via the @media block in css/styles.css).
+function prefersReducedMotion() {
+  return window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
 
 /* ── brand-styled confirm / prompt (#uiDialogScrim) — window.confirm and
    window.prompt look like nothing else in the app and can't be themed, so
@@ -267,12 +371,18 @@ function showKeyBanner() {
   // actually saved. Without it, opening Settings from the gate re-exposed
   // Search/Explore/etc. via the still-clickable nav rail.
   document.body.classList.add("no-key-lockdown");
-  // init() returns before ever loading a chapter when no key is set, so
-  // the spinner index.html ships as readingText's initial content would
-  // otherwise spin forever behind the banner, reading as "stuck loading"
-  // rather than "waiting for you to add a key."
+  // pointer-events:none (the css lockdown) doesn't take the topbar / nav rail
+  // out of the tab order — inert does, so a keyboard user can't tab into the
+  // visually-blocked chrome behind the gate.
+  ["topbar", "navrail", "mobileFooterNav", "profileTrigger"].forEach(rid => { const el = document.getElementById(rid); if (el) el.inert = true; });
   const rt = document.getElementById("readingText");
   if (rt) rt.innerHTML = "";
+  // Move focus into the gate — its first link, or the "Open Settings" button.
+  requestAnimationFrame(() => {
+    const kb = document.getElementById("keyBanner");
+    const f = kb && kb.querySelector("a[href], button");
+    if (f) try { f.focus(); } catch (e) {}
+  });
 }
 function hideKeyBanner() { document.getElementById("keyBanner").classList.remove("show"); }
 
@@ -288,11 +398,14 @@ function openSettings() {
   document.getElementById("settingsIllustSelect").value = getIllustPack();
   document.getElementById("settingsIllustBW").checked = getIllustBW();
   document.getElementById("settingsIconSelect").value = getIconStyle();
+  document.getElementById("settingsIconVariant").value = getIconOBVariant();
+  syncIconVariantField();
   document.getElementById("settingsFontSlider").value = getFontSize();
   document.getElementById("settingsUiFontSlider").value = getUiFontSize();
   document.getElementById("settingsExportReminder").checked = getExportReminderEnabled();
   document.getElementById("settingsReadStamp").checked = getReadStampEnabled();
   document.getElementById("settingsAudioContinuous").checked = getAudioContinuous();
+  document.getElementById("settingsMarkReadOnListen").checked = getMarkReadOnListen();
   renderSettingsCompareChips();
   switchMainView("settings");
 }
@@ -352,9 +465,40 @@ function setReadStampEnabled(v) { localStorage.setItem("iqb_read_stamp_enabled",
 // playing. Default-off. Stops at the end of the book; a running sleep timer
 // (js/reader.js) overrides it.
 function getAudioContinuous() { return localStorage.getItem("iqb_audio_continuous") === "1"; }
-function setAudioContinuous(v) { localStorage.setItem("iqb_audio_continuous", v ? "1" : "0"); }
-function getIconStyle() { return localStorage.getItem("iqb_icon_style") || "bw"; }
-function setIconStyle(v) { localStorage.setItem("iqb_icon_style", v); loadTopBookIcon(); }
+function setAudioContinuous(v) {
+  localStorage.setItem("iqb_audio_continuous", v ? "1" : "0");
+  // The sleep timer only makes sense with continuous play — turning it off
+  // cancels any running timer and hides the control (syncSleepTimerBtn).
+  if (!v && typeof clearSleepTimer === "function") clearSleepTimer();
+  else if (typeof syncSleepTimerBtn === "function") syncSleepTimerBtn();
+}
+// Count a chapter as read once its narration plays to the end (handleAudioEnded,
+// js/reader.js). Default off. Deliberately skipped while a sleep timer is
+// running — chapters that play out while you're dozing off shouldn't count.
+function getMarkReadOnListen() { return localStorage.getItem("iqb_mark_read_on_listen") === "1"; }
+function setMarkReadOnListen(v) { localStorage.setItem("iqb_mark_read_on_listen", v ? "1" : "0"); }
+// Book icons. iqb_icon_style used to hold off|color|bw; it now holds
+// off|overview|letters, with the Overview Bible color/B&W choice split out into
+// iqb_icon_ob_variant. The two legacy values are migrated on read (no write) so
+// an existing "bw" preference keeps meaning "Overview Bible, black & white".
+function getIconStyle() {
+  const v = localStorage.getItem("iqb_icon_style");
+  if (v === "color" || v === "bw") return "overview";
+  return v || "overview";
+}
+function getIconOBVariant() {
+  const legacy = localStorage.getItem("iqb_icon_style");
+  if (legacy === "color" || legacy === "bw") return legacy;
+  return localStorage.getItem("iqb_icon_ob_variant") || "bw";
+}
+function setIconStyle(v) { localStorage.setItem("iqb_icon_style", v); syncIconVariantField(); loadTopBookIcon(); }
+function setIconOBVariant(v) { localStorage.setItem("iqb_icon_ob_variant", v); loadTopBookIcon(); }
+// Color / B&W applies to both the Overview Bible artwork and the lettered
+// tiles (brand tint vs greyscale) — only "Off" has nothing to vary.
+function syncIconVariantField() {
+  const f = document.getElementById("settingsIconVariantField");
+  if (f) f.hidden = getIconStyle() === "off";
+}
 function getFontSize() { return parseInt(localStorage.getItem("iqb_font_size"), 10) || 20; }
 function setFontSize(px) {
   localStorage.setItem("iqb_font_size", px);

@@ -66,7 +66,10 @@ If you want anonymous end users to skip that step (a consumer app rather than a 
   whatever language/audio filter is currently active in the list)
 - Full chapter reading with paragraph markers, a drop cap, and inline Schnorr illustrations
 - Inline story titles (e.g. "The Flood") resolved from free-text references
-- Inline audio narration playback where available, with a narrator picker when a version has more than one recorded
+- Inline audio narration playback where available, with a narrator picker when a version has more
+  than one recorded. Narration URLs are short-lived signed links, so the app re-requests one
+  transparently (keeping your place) if it lapses while a chapter is paused — the listener never
+  sees a broken player
 - **Search**: full-text verse search with all five match modes (all/any words, exact phrase, prefix,
   raw boolean), Testament/Book/Chapter/Verse-range filters, an Exclude-words field, canonical or
   relevance sort, and a "Searching in" translation selector independent of your reading version
@@ -108,6 +111,70 @@ If you want anonymous end users to skip that step (a consumer app rather than a 
 - **Take a Tour**: a guided walkthrough that spotlights the app's main features in place, offered once
   on first visit and re-launchable any time from the new **Help** page (getting-started steps, a
   feature guide, and an FAQ)
+- **Accessibility**: built to WCAG 2.2 AA — full keyboard operation (skip link, focus-visible
+  outlines, verse numbers and citations as real controls, an arrow-key audio scrubber), focus-managed
+  dialogs with `inert` backgrounds, a theme-aware palette that meets contrast in both modes, per-part
+  `lang`, and `prefers-reduced-motion` / `forced-colors` support
+
+## Working on the code
+
+The whole app is `index.html`, `css/styles.css`, and the `js/*.js` files — no server, no build
+step, no framework, no npm dependencies. That's deliberate: the value here is being a minimal,
+honest example you can read start to finish, so anything you can learn by reading the source you
+shouldn't need a toolchain to change. Edit a file, reload the browser.
+
+The one runtime dependency is **Leaflet**, loaded from a plain `<script>`/`<link>` in `index.html`
+for the place-map lightbox only — it can request English-labeled map tiles, which the OpenStreetMap
+embed can't. Don't reach for another library without a similarly narrow reason.
+
+### File layout
+
+Scripts load in a fixed order as plain `<script>` tags (not modules). A `let`/`const` at the top
+level of one file is a global visible to every file loaded after it — so **order matters if you add
+a file**: place it after everything it depends on.
+
+| File | What's in it |
+|---|---|
+| `js/config.js` | The constants a fork actually edits — `BASE_PATH` (GitHub Pages subpath), `FEATURE_SEARCH_ALL_VERSIONS`, `APP_VERSION` (offline version fallback) — plus the `api.iqbible.com` endpoint and the hosted-instance switch. |
+| `js/api.js` | Shared mutable state (loaded first, so it exists before anything reads it), the API-key and `localStorage` helpers, the `apiFetch` / `apiJSON` wrappers every request goes through, Settings, and `openModal` / `closeModal`. |
+| `js/catalog.js` | Version / book / chapter pickers; the ISO-639-3 → BCP-47 language map. |
+| `js/reader.js` | Chapter rendering, inline illustrations and story titles, the book icon, the audio player, the chapter-context row — plus the shared verse-preview helpers (`linkifyCitations`, `registerCiteId`, `fetchVersePreviews`). |
+| `js/search.js` | The full-text search overlay (Verses and People tabs). |
+| `js/notes.js`, `js/notesdrawer.js` | The My Library overlay (Notes / Bookmarks / Highlights / History) and the dockable Notes drawer. |
+| `js/devotionals.js`, `js/profile.js`, `js/share.js`, `js/explore.js`, `js/study.js`, `js/plans.js`, `js/progress.js` | One feature area each — devotionals, the profile popover, Share Tools, Explore, Study Tools, Reading Plans, My Progress. |
+| `js/router.js` | Deep-link path parsing (`/gen/1/1`) and keeping the URL in sync via `pushState` / `popstate`. |
+| `js/tour.js` | The guided tour; `TOUR_STEPS` targets nav-rail and topbar elements by CSS selector. |
+| `js/main.js` | Global event wiring and the init sequence. Loaded last — it assumes every function above already exists. |
+
+`404.html` is a copy of `index.html` (GitHub Pages serves it for deep links on a cold load).
+**Edit both**, or the SPA fallback drifts out of sync.
+
+### Conventions
+
+- **Keep the docs in sync.** Any user-visible change → update this README, the in-app **Help** page
+  (`#helpView` in `index.html` / `404.html`), `TOUR_STEPS` in `js/tour.js` if a nav item changed,
+  and `CHANGELOG.md` (an entry under `[Unreleased]`, [keepachangelog](https://keepachangelog.com)
+  style). The version shown in the app is read from `CHANGELOG.md`'s newest `## [x.y.z]` header at
+  load (`setAppVersionText`, `js/main.js`); `APP_VERSION` in `js/config.js` is only the offline
+  fallback — bump it when you cut a version.
+- **Every Bible-verse reference in the UI must be hover/click-previewable.** For references embedded
+  in prose (commentary, definitions, notes a visitor types), run the text through
+  `linkifyCitations(text)`. For a reference you already know the book / chapter / verse of (a card,
+  a list row, a modal button), use `registerCiteId(ref, previewText)` or batch a list through
+  `fetchVersePreviews(refs)`. A bare reference with no preview is a bug.
+- **Accessibility: the app targets WCAG 2.2 AA.** [`ACCESSIBILITY.md`](ACCESSIBILITY.md) records the
+  audit and the method (axe-core, headless Chrome). Any new interactive element needs real semantics
+  (a `<button>` or an ARIA role, never a bare `<div onclick>`), an accessible name, a visible
+  `:focus-visible` ring, a ≥24px target, full keyboard operation, contrast that holds in both
+  themes, and `prefers-reduced-motion` respected.
+- **Comments explain _why_, not _what_** — a non-obvious API quirk, a browser gotcha, a deliberate
+  tradeoff. Match the sparse style already in the files.
+- **There's no test suite.** Verify a change by opening the app in a browser with a real API key and
+  clicking through the views you touched.
+
+This app is a worked example of building *honestly* on the API: where the API's data or endpoints
+don't fully support what a feature wants, the app leaves that visibly limited rather than papering
+over it with client-side guesswork.
 
 ## License
 

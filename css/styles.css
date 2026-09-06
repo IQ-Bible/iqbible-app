@@ -23,7 +23,9 @@
   --r-pill:999px; --r-card:16px; --r-control:12px; --r-sm:8px;
 
   --bg:#f7f6fc; --surface:#fff; --surface-2:#f2effa;
-  --ink:#1a1330; --ink-soft:#2b2145; --muted:#6b6480; --muted2:#a09bb3;
+  /* --muted2 darkened from #a09bb3 (≈2.5:1) to clear 4.5:1 on --bg/--surface —
+     it carries real text (placeholders, empty states, card metadata). */
+  --ink:#1a1330; --ink-soft:#2b2145; --muted:#6b6480; --muted2:#6a6382;
   --divider:rgba(109,40,217,.16);
   --shadow:rgba(45,27,88,.12); --shadow-lg:rgba(45,27,88,.18);
   --overlay-scrim:rgba(247,246,252,.94);
@@ -46,7 +48,7 @@
   --read-check:#4ade80;
 
   --bg:#120c1f; --surface:#1c1430; --surface-2:#241a3a;
-  --ink:#f1ecfb; --ink-soft:#d9d0ef; --muted:#a79cc4; --muted2:#736a90;
+  --ink:#f1ecfb; --ink-soft:#d9d0ef; --muted:#a79cc4; --muted2:#9188ad; /* was #736a90 (≈4.1:1) */
   --divider:rgba(157,107,240,.24);
   --shadow:rgba(0,0,0,.4); --shadow-lg:rgba(0,0,0,.55);
   --overlay-scrim:rgba(15,10,26,.92);
@@ -57,6 +59,35 @@ body{ font-family:var(--font-ui); background:var(--bg); color:var(--ink); overfl
 a{ color:var(--brand); }
 button{ font-family:inherit; cursor:pointer; }
 ::selection{ background:rgba(109,40,217,.18); }
+
+/* ── accessibility: visible keyboard focus everywhere (WCAG 2.4.7) ──
+   A consistent ring on top of whatever the UA draws. Components that set
+   outline:none for their own focus treatment (.ncard, .nd-preview, inputs
+   with a border-colour swap) keep it; this is the floor for everything else. */
+:focus-visible{ outline:2px solid var(--brand); outline-offset:2px; border-radius:3px; }
+input:focus-visible,textarea:focus-visible,select:focus-visible{ outline:2px solid var(--brand); outline-offset:1px; }
+/* Skip past the nav/topbar to the reading column (WCAG 2.4.1). */
+.skip-link{ position:fixed; top:10px; left:10px; z-index:700; background:var(--surface); color:var(--brand); border:2px solid var(--brand); border-radius:var(--r-control); padding:10px 18px; font-family:var(--font-ui); font-weight:700; font-size:.85rem; text-decoration:none; transform:translateY(-160%); transition:transform .15s ease; }
+.skip-link:focus{ transform:translateY(0); }
+#readMain:focus{ outline:none; }
+.sr-only{ position:absolute !important; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+/* Links sitting inside a run of body text need a non-colour cue (WCAG 1.4.1);
+   chrome links (nav, wordmarks, cards) style themselves and are exempt. */
+.dictbody p a,.hint a,.view-desc a,.about-runs a,.help-faq-a a,.about-callout-body a,
+#keyBanner p a,#dataBackupBanner p a,.navfoot-ver a,.emptynote a,.tool-hint a{ text-decoration:underline; }
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; scroll-behavior:auto !important; }
+  html{ scroll-behavior:auto; }
+}
+/* Windows High Contrast / forced-colors: keep a focus ring the OS can see, and
+   don't let backdrop blur wash a modal into its scrim. */
+@media (forced-colors:active){
+  :focus-visible{ outline:2px solid Highlight; outline-offset:2px; }
+  .modalscrim,#keyBanner{ backdrop-filter:none; -webkit-backdrop-filter:none; background:rgba(0,0,0,.5); }
+  .modal,.tour-welcome-box,#notesDrawer,#profilePanel,#moreMenuSheet,#discoverHub,.dict-tooltip{ border:1px solid CanvasText; }
+  .filter-chip.active,.lib-tab.active,.dicttab.on{ border:2px solid Highlight; }
+}
 
 /* ── layout shell ── */
 #app{ height:100vh; display:flex; flex-direction:column; overflow:hidden; }
@@ -86,11 +117,11 @@ button{ font-family:inherit; cursor:pointer; }
 .aa-label span{ font-size:.62rem; }
 /* Mobile-only topbar controls — hidden on desktop, where the reading header
    carries the version pick and the two separate font/theme icons stay. */
-/* The translation pill lives in the top bar at every width now; the reading
-   header's own #btnPickVersion is retired (kept in the DOM, hidden). */
+/* Desktop: the translation pick sits in the reading header (#btnPickVersion,
+   right after "Book Chapter"). Mobile: it's the #topVersionBtn pill in the top
+   bar (the slim header has no room). reader.js keeps both labels in sync. */
 #displayBtn{ display:none; } /* mobile-only "Aa" — shown < 1180px */
-#btnPickVersion{ display:none; }
-#topVersionBtn{ display:flex; align-items:center; gap:4px; flex-shrink:0; padding:5px 10px; border:1px solid var(--brand-line); border-radius:var(--r-pill); background:var(--brand-soft); color:var(--brand); font-family:var(--font-ui); font-weight:700; font-size:.64rem; letter-spacing:.08em; text-transform:uppercase; white-space:nowrap; max-width:min(38vw,220px); overflow:hidden; }
+#topVersionBtn{ display:none; align-items:center; gap:4px; flex-shrink:0; padding:5px 10px; border:1px solid var(--brand-line); border-radius:var(--r-pill); background:var(--brand-soft); color:var(--brand); font-family:var(--font-ui); font-weight:700; font-size:.64rem; letter-spacing:.08em; text-transform:uppercase; white-space:nowrap; max-width:min(38vw,220px); overflow:hidden; }
 #topVersionBtn:hover{ border-color:var(--brand); background:var(--brand-soft); }
 #topVersionBtn svg{ width:8px; height:8px; flex-shrink:0; stroke:currentColor; }
 
@@ -159,19 +190,19 @@ button{ font-family:inherit; cursor:pointer; }
    topbar/footer (body.chrome-hidden below) — a horizontal swipe on the
    reading column still works too (initReaderGestures, js/reader.js). ── */
 .iconbtn.cardsheet-trigger{ display:none; }
-#btnChapterCtx{ display:none; } /* mobile-only ⓘ — shown < 1180px */
+#chapterChips{ display:none; } /* mobile-only chapter-context chip row — shown < 1180px */
 #readNavRow{ display:none; } /* mobile-only bottom control row — shown < 1180px */
 #mobileFooterNav{ display:none; }
 #moreMenuSheet{ display:none; }
 #discoverHub{ display:none; }
 .rightrail-sheethead{ display:none; }
 @media (max-width:1180px){
-  /* The 2×2 grid button, the desktop ⓘ book-info button, the in-header version
-     pick (now in the topbar) and the old chip row are all replaced on mobile by
-     the slim header's single #btnChapterCtx ⓘ + the bottom #readNavRow.
-     (#notesLauncher is hidden further down — after its own base rule.) */
-  .iconbtn.cardsheet-trigger,#btnBookInfo,#btnPickVersion{ display:none; }
-  #btnChapterCtx{ display:flex; }
+  /* The 2×2 grid button and the in-header version pick move off the slim mobile
+     header — chapter context goes to #chapterChips + #readNavRow, and the
+     version pick to the top bar's #topVersionBtn pill. (#notesLauncher is
+     hidden further down — after its own base rule.) */
+  .iconbtn.cardsheet-trigger,#btnPickVersion{ display:none; }
+  #topVersionBtn{ display:flex; }
 
   #mobileFooterNav{ display:flex; position:fixed; left:0; right:0; bottom:0; height:var(--mfn-h); background:var(--surface); border-top:1px solid var(--divider); z-index:410; padding-bottom:env(safe-area-inset-bottom,0); box-shadow:0 -2px 10px var(--shadow); }
   .mfn-item{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; background:none; border:none; color:var(--muted); font-family:var(--font-ui); font-weight:600; font-size:.56rem; letter-spacing:0; }
@@ -180,10 +211,11 @@ button{ font-family:inherit; cursor:pointer; }
   /* Notes is a drawer, not a view, so navMenuClick never marks it active. */
   body.notes-drawer-open #mfnNotesBtn{ color:var(--brand); }
 
-  /* Slim reading header — one tight non-wrapping row: book icon, "Book Chapter"
-     as a compact tappable label (carets dropped — the whole thing is tappable,
-     and the bottom #readNavRow is the primary picker anyway), the single ⓘ, and
-     the read stamp. Version pick is in the topbar; nothing wraps here. */
+  /* Slim reading header — one tight non-wrapping row: book icon (tap to change
+     book), "Book Chapter" as a compact tappable label (carets dropped — the
+     whole thing is tappable, and the bottom #readNavRow is the primary picker
+     anyway), and the read stamp. Version pick is in the topbar; nothing wraps
+     here. Chapter context moved to #chapterChips, the row just below. */
   .chhead{ flex-wrap:nowrap; gap:8px; align-items:center; padding:20px 0 12px; }
   /* z-index above #readNavRow (15): .chhead's sticky stacking context would
      otherwise trap its child #audioPlayer (the fixed in-row player) below the
@@ -192,11 +224,30 @@ button{ font-family:inherit; cursor:pointer; }
      base `.chhead{ z-index:6 }` regardless of source order. */
   #readCol .chhead{ z-index:20; }
   .chtitlewrap{ flex-wrap:nowrap; align-items:baseline; gap:0 5px; min-width:0; overflow:hidden; }
-  .chhead .titlepick{ font-size:1.15rem; font-weight:800; letter-spacing:-.02em; padding:2px 3px; margin:0 -3px; white-space:nowrap; }
+  .chhead .titlepick{ font-size:1.15rem; font-weight:800; letter-spacing:-.02em; padding:5px 6px; margin:0 -2px; min-height:24px; white-space:nowrap; }
+  .chhead #btnPickBook{ margin-left:-5px; }
+  .chhead #btnPickChapter{ min-width:24px; justify-content:center; }
   .chhead .titlepick svg{ display:none; }
   .bookicon-badge{ width:34px; height:34px; }
-  #btnChapterCtx{ align-self:center; margin-left:3px; }
-  #btnChapterCtx svg{ width:15px; height:15px; }
+
+  /* ── #chapterChips — the chapter-context row, just below the slim header:
+     a quiet strip of muted glyphs (Places / People / Prophecy / Timeline —
+     each with a count — plus "About", which opens the full sheet). No pill,
+     no fill, no scroll — page-turn swipes own the horizontal axis, so every
+     glyph it can show fits statically (they do at 320px). Normal flow, so it
+     scrolls out of view as you read into the text. One hairline underneath is
+     the only structural mark; muted monochrome keeps it clear of the
+     weight-800 title above and the serif text below. */
+  #chapterChips{ display:flex; align-items:center; gap:12px; padding:2px 0 11px;
+    margin:-2px 0 5px; min-height:44px; border-bottom:1px solid var(--divider); }
+  #chapterChips[hidden]{ display:none; }
+  #chapterChips .ctxchip{ display:inline-flex; align-items:center; gap:5px; flex-shrink:0;
+    padding:7px 6px; border-radius:var(--r-sm); color:var(--muted); background:none; border:0;
+    font-family:var(--font-ui); font-weight:700; transition:color .15s,background-color .15s; }
+  #chapterChips .ctxchip:hover{ background:var(--brand-soft); }
+  #chapterChips .ctxchip:active{ color:var(--brand); }
+  #chapterChips .ctxchip svg{ width:16px; height:16px; flex-shrink:0; fill:none; stroke:currentColor; }
+  #chapterChips .ctxchip .ct{ font-size:.66rem; font-variant-numeric:tabular-nums; letter-spacing:.01em; }
   /* Read stamp: JS (positionReadStamp) moves it into .chhead here so it sits
      inline at the right of the row instead of on its own line below. Condensed
      "Read MM/DD/YY" label; the verbose weekday+time form is desktop-only. */
@@ -260,7 +311,6 @@ button{ font-family:inherit; cursor:pointer; }
   #rightRail .railcard{ aspect-ratio:auto; }
   #rightRail .railcard--compact{ padding:14px; gap:8px; }
   #rightRail .railcard--compact .rc-body{ white-space:normal; }
-  #rightRail .railcard--feature .rc-body{ -webkit-line-clamp:none; line-clamp:none; display:block; }
 }
 
 /* ── auto-hiding chrome (below 1180px) — the topbar, the sticky chapter
@@ -296,8 +346,39 @@ button{ font-family:inherit; cursor:pointer; }
 .navitem{ display:block; width:100%; text-align:left; background:none; border:none; border-left:2px solid transparent; font-family:var(--font-ui); font-weight:600; font-size:.82rem; letter-spacing:-.005em; color:var(--muted); line-height:1.4; padding:10px 12px; border-radius:0 var(--r-sm) var(--r-sm) 0; transition:background .15s,color .15s,border-color .15s; }
 .navitem:hover{ background:var(--brand-soft); color:var(--brand); }
 .navitem.active{ color:var(--brand); border-left-color:var(--brand); background:var(--brand-soft); font-weight:600; }
+/* A nav item that opens a tabbed overlay (Explore / Study Tools / My Library)
+   discloses those tabs as a submenu — a single-open accordion (.expanded, set
+   in js/main.js's syncNavGroups) driven by the caret or by navigating into the
+   section. A collapsed .navsub is inert, so no :focus-within reveal is needed. */
+.navgroup{ display:flex; flex-direction:column; }
+.navgroup-head{ position:relative; display:flex; align-items:center; }
+.navgroup-head .navitem{ flex:1; padding-right:30px; } /* clear the caret toggle (absolute, right:0 width:28px) */
+.navgroup[data-navgroup="library"] .navgroup-head .navitem{ padding-right:52px; } /* + the count pill */
+/* Absolute (not a flex sibling) so the full-width .navitem's active/hover band
+   sits behind it — the pill then reads as embedded in the highlight, same as the
+   sub-item pills, rather than a detached chip floating past the row's edge. */
+.navgroup-head .nav-count{ position:absolute; right:32px; top:50%; transform:translateY(-50%); }
+.navsub-toggle{ position:absolute; right:0; top:0; bottom:0; width:28px; display:flex; align-items:center; justify-content:center; background:none; border:none; color:var(--muted); border-radius:0 var(--r-sm) var(--r-sm) 0; transition:background .15s,color .15s; }
+.navsub-toggle:hover{ background:var(--brand-soft); color:var(--brand); }
+.navsub-caret{ width:12px; height:12px; transition:transform .18s ease; }
+.navgroup.expanded .navsub-caret{ transform:rotate(90deg); }
+.navsub{ overflow:hidden; max-height:0; transition:max-height .2s ease; }
+.navgroup.expanded .navsub{ max-height:340px; }
+.navsubitem{ position:relative; display:block; width:100%; text-align:left; background:none; border:none; font-family:var(--font-ui); font-weight:500; font-size:.76rem; letter-spacing:-.005em; color:var(--muted); line-height:1.4; padding:6px 12px 6px 24px; border-radius:0 var(--r-sm) var(--r-sm) 0; transition:background .15s,color .15s; }
+.navsubitem:hover{ background:var(--brand-soft); color:var(--brand); }
+.navsubitem.active{ color:var(--brand); background:var(--brand-soft); }
+/* The active marker bar is inset from the rail edge (parent .navitem's bar sits
+   flush at 0) so a highlighted tab reads as nested under its section, not level
+   with it. */
+.navsubitem.active::before{ content:""; position:absolute; left:12px; top:4px; bottom:4px; width:2px; border-radius:1px; background:var(--brand); }
+/* Count pills — My Library only (parent totals Notes+Bookmarks+Highlights;
+   History is uncounted). js/notes.js's updateLibraryCounts fills them and
+   toggles [hidden] at zero. Deliberately quiet — a neutral chip, not a brand
+   badge — so it reads as a detail, not a call to action. */
+.nav-count{ flex:none; min-width:15px; padding:0 5px; border-radius:var(--r-pill); background:var(--surface-2); color:var(--muted); font-size:.63rem; font-weight:600; font-variant-numeric:tabular-nums; text-align:center; line-height:16px; }
+.navsubitem .nav-count{ position:absolute; right:10px; top:50%; transform:translateY(-50%); }
 .navdivider{ border:none; border-top:1px solid var(--divider); margin:10px 12px; }
-.navfooter{ margin-top:auto; padding:16px 12px 0; font-size:.64rem; line-height:1.6; color:var(--muted); opacity:.85; }
+.navfooter{ margin-top:auto; padding:16px 12px 0; font-size:.64rem; line-height:1.6; color:var(--muted); }
 .wm-link{ color:inherit; text-decoration:none; }
 /* Version line as a small tracked-caps kicker (à la .ndl-k) — sits under the
    credit line, static, not a control. */
@@ -313,16 +394,25 @@ button{ font-family:inherit; cursor:pointer; }
 /* flex-shrink:0 so an overflowing stack scrolls #rightRail rather than
    squashing the cards to label-only. */
 .railcard{ flex-shrink:0; border:1px solid var(--divider); border-radius:var(--r-control); background:var(--surface); box-shadow:0 2px 10px var(--shadow); padding:14px; display:flex; flex-direction:column; gap:8px; overflow:hidden; }
-.railcard--media,.railcard--feature{ aspect-ratio:1/1; }
-.railcard--feature .rc-body{ display:-webkit-box; -webkit-line-clamp:5; line-clamp:5; -webkit-box-orient:vertical; }
+/* The media itself owns a fixed 4:3 box (see .rc-media) so the image is
+   never squashed — the card as a whole grows to fit label + one-line
+   caption + that box, rather than a fixed 1:1 card cropping the photo to
+   a sliver whenever the caption wrapped to two lines. */
+.rc-media:empty{ display:none; } /* a thumbnail that 404s removes itself + drops railcard--media; don't leave a gap */
 .railcard--compact{ padding:11px 13px; gap:3px; }
 .railcard--compact .rc-body{ white-space:nowrap; text-overflow:ellipsis; }
-.rc-dim{ opacity:.6; }
+/* Excerpt cards (About Chapter, About <book>) — a fixed two-line taste of the
+   real prose with an ellipsis, at every width; the card opens the full text. */
+.railcard--excerpt{ padding:12px 13px; gap:4px; }
+.railcard--excerpt .rc-body{ display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical; white-space:normal; }
+.rc-dim{ color:var(--muted); } /* was opacity:.6 on --muted text → ~3:1; the "+N" prefix already reads as secondary */
 .railcard.clickable{ cursor:pointer; transition:border-color .15s,box-shadow .15s; }
 .railcard.clickable:hover{ border-color:var(--brand-line); box-shadow:0 4px 16px var(--shadow-lg); }
-.railcard .rc-label{ font-family:var(--font-ui); font-size:.6rem; letter-spacing:.12em; text-transform:uppercase; color:var(--brand); }
+.railcard .rc-label{ font-family:var(--font-ui); font-size:.6rem; letter-spacing:.12em; text-transform:uppercase; color:var(--brand); display:flex; align-items:center; gap:5px; }
+.railcard .rc-label svg{ width:13px; height:13px; flex-shrink:0; fill:none; stroke:currentColor; stroke-width:2; }
 .railcard .rc-body{ font-size:.78rem; line-height:1.5; color:var(--muted); overflow:hidden; }
-.rc-media{ flex:1; min-height:0; border-radius:var(--r-sm); overflow:hidden; }
+.railcard--media .rc-body{ white-space:nowrap; text-overflow:ellipsis; } /* one line — the image is the point of this card, don't let a long place list eat its height */
+.rc-media{ aspect-ratio:4/3; border-radius:var(--r-sm); overflow:hidden; }
 .rc-thumb{ width:100%; height:100%; display:block; object-fit:cover; border:none; }
 
 /* ── places modal ── */
@@ -441,7 +531,7 @@ button{ font-family:inherit; cursor:pointer; }
 /* Kept visually secondary (small, muted) — "Today's Devotional" below is
    the focus; this row is only for the rare case of deliberately browsing
    away from today. */
-.devo-daynav{ display:flex; align-items:center; gap:6px; margin-top:10px; opacity:.7; }
+.devo-daynav{ display:flex; align-items:center; gap:6px; margin-top:10px; }
 .devo-daynav input[type=date]{ flex:1; background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-control); padding:5px 8px; font-family:var(--font-ui); font-size:.7rem; color:var(--ink); outline:none; }
 .devo-title{ font-family:var(--font-ui); font-weight:800; letter-spacing:-.02em; font-size:1.5rem; color:var(--ink); margin:18px 0 12px; }
 .devo-tabs{ display:flex; gap:8px; margin-bottom:18px; }
@@ -477,8 +567,10 @@ button{ font-family:inherit; cursor:pointer; }
 .timeline-event{ font-size:.95rem; line-height:1.5; color:var(--ink-soft); }
 /* Secular world-history anchors (kind:"context") — present for a feel of the
    era, visually secondary to the biblical events. */
-.timeline-entry.tl-context{ opacity:.72; }
+/* Secondary styling via the muted date + the "context" tag, not an opacity
+   wash that drops the text below 4.5:1. */
 .timeline-entry.tl-context .timeline-date{ color:var(--muted); }
+.timeline-entry.tl-context .timeline-event{ color:var(--muted); }
 .tl-context-tag{ font-size:.5rem; letter-spacing:.08em; padding:1px 5px; border-radius:var(--r-pill); background:var(--surface-2); color:var(--muted); }
 .tl-approx{ font-style:italic; }
 /* "You're reading" marker slotted into the timeline at the current chapter. */
@@ -494,12 +586,18 @@ button{ font-family:inherit; cursor:pointer; }
 .ci-sources{ margin-top:16px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
 .ci-sources .person-section-label{ margin-bottom:0; margin-right:2px; }
 
-#readMain{ flex:1; min-width:0; overflow-y:auto; padding:0 32px 100px; display:flex; flex-direction:column; align-items:center; position:relative; }
+#readMain{ flex:1; min-width:0; overflow-y:auto; scrollbar-gutter:stable; padding:0 32px 100px; display:flex; flex-direction:column; align-items:center; position:relative; }
 /* Extra bottom clearance for #mobileFooterNav below 1180px — placed here
    (not in the mobile-nav rule block further up) since an override with the
    same specificity as this base rule only wins by appearing later in the
    file; a media query alone doesn't beat plain source order. */
 @media (max-width:1180px){ #readMain{ padding-bottom:calc(40px + var(--mfn-h) + var(--readnavrow-h)); } }
+/* #readMain is a centered flex column, so an un-sized child shrink-wraps its
+   content — while the chapter text is just the loading spinner that collapses
+   #readViewGroup to ~the title's width and the sticky .chhead visibly jumps
+   from centered to full-width when the verses land. Pin it to the column width
+   so the header holds still across a chapter/book change. */
+#readViewGroup{ width:100%; max-width:700px; }
 #readCol{ width:100%; max-width:700px; padding-top:40px; }
 
 /* ── no-API-key gate — a full-screen blocking overlay (not a .mainview
@@ -511,6 +609,7 @@ button{ font-family:inherit; cursor:pointer; }
 #keyBanner{ display:none; position:fixed; inset:0; z-index:590; align-items:center; justify-content:center; padding:24px; background:rgba(26,19,48,.32); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); }
 #keyBanner.show{ display:flex; }
 #keyBanner .kb-box{ width:100%; max-width:440px; background:var(--surface); border:1px solid var(--divider); border-radius:var(--r-control); padding:26px; text-align:center; box-shadow:0 20px 50px var(--shadow-lg); }
+#keyBanner .kb-heading{ font-family:var(--font-ui); font-weight:800; font-size:1.05rem; letter-spacing:-.01em; color:var(--ink); margin-bottom:10px; }
 #keyBanner p{ color:var(--muted); font-size:.95rem; margin-bottom:12px; }
 #keyBanner button{ font-family:var(--font-ui); font-weight:700; font-size:.68rem; letter-spacing:0; color:var(--on-brand); background:var(--brand); border:none; border-radius:var(--r-control); padding:9px 18px; }
 #keyBanner button:hover{ background:var(--brand-2); }
@@ -550,6 +649,15 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 .chhead{ display:flex; align-items:center; gap:16px; position:sticky; top:0; z-index:6; background:var(--bg); margin:-40px 0 0; padding:40px 0 20px; }
 .bookicon-badge{ width:52px; height:52px; border-radius:var(--r-card); flex-shrink:0; display:flex; align-items:center; justify-content:center; overflow:hidden; }
 .bookicon-badge img{ width:100%; height:100%; object-fit:cover; }
+/* #chBookIcon is a <button> (tap → book picker); the rest are plain divs. */
+button.bookicon-badge{ padding:0; border:0; background:none; cursor:pointer; font:inherit; transition:box-shadow .15s,transform .1s; }
+button.bookicon-badge:hover{ box-shadow:0 0 0 2px var(--brand-line); }
+button.bookicon-badge:active{ transform:scale(.96); }
+/* Lettered tile — the book's abbreviation, either as the "Lettered" icon style
+   (all books) or the fallback when Overview Bible has no icon for a book. */
+.bookicon-badge.bookicon-fallback{ background:var(--brand-soft); color:var(--brand); font-family:var(--font-ui); font-weight:800; font-size:.82rem; letter-spacing:-.02em; }
+/* B&W lettered tile — greyscale version of the same look (Color / B&W setting). */
+.bookicon-badge.bookicon-fallback.bookicon-bw{ background:var(--surface-2); color:var(--muted); }
 .chtitlewrap{ flex:0 1 auto; display:flex; align-items:baseline; flex-wrap:wrap; gap:2px 5px; min-width:0; }
 .titlepick{ display:flex; align-items:center; gap:5px; padding:2px 8px; margin:0 -8px; border-radius:var(--r-sm); background:none; border:none; font-family:var(--font-ui); font-size:1.7rem; font-weight:800; letter-spacing:-.02em; color:var(--ink); transition:background .15s; }
 .titlepick:hover{ background:var(--brand-soft); }
@@ -574,9 +682,6 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 .verpick:hover{ background:var(--brand-soft); color:var(--brand); }
 .verpick svg{ width:9px; height:9px; stroke:var(--muted); flex-shrink:0; }
 #btnPickNarration svg{ flex-shrink:0; }
-/* Sits just after the flush "Book Chapter" title. */
-.bookinfo-btn{ align-self:center; width:20px; height:20px; flex-shrink:0; margin:0 0 0 4px; border-radius:var(--r-pill); background:none; border:none; color:var(--muted); font-size:1rem; line-height:1; display:flex; align-items:center; justify-content:center; transition:background .15s,color .15s; }
-.bookinfo-btn:hover{ background:var(--brand-soft); color:var(--brand); }
 .iconbtn{ width:38px; height:38px; border-radius:var(--r-sm); display:flex; align-items:center; justify-content:center; background:var(--surface-2); border:1px solid var(--divider); color:var(--brand); flex-shrink:0; transition:background .15s; }
 .iconbtn:hover{ background:var(--brand-soft); }
 .iconbtn svg{ width:17px; height:17px; }
@@ -616,6 +721,9 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
   .rnr-dot{ position:relative; width:36px; height:36px; flex-shrink:0; background:none; border:none; padding:0; display:none; }
   body.has-audio .rnr-dot{ display:block; }
   body.audio-playing .rnr-dot{ display:none; }
+  /* Chapter with no narration file (#294): no dot, and the in-row player is
+     shown holding just the muted "not available" line. */
+  body.audio-gap .rnr-dot{ display:none; }
   .rnr-dot svg{ position:absolute; inset:0; width:100%; height:100%; }
   .rnr-ring-t{ stroke:var(--divider); }
   .rnr-ring-f{ stroke:var(--brand); stroke-linecap:round; transform:rotate(-90deg); transform-origin:center; }
@@ -632,15 +740,27 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
   .chapternav.next{ left:48px; right:auto; }
   body.chrome-hidden .chapternav{ transform:translateY(calc(100% + var(--mfn-h))); }
 
-  /* Audio player: hidden until playback starts (then it fills the chip/dot area
-     of #readNavRow). !important beats the inline `display` that
-     refreshAudioAvailability sets for the desktop inline player. */
+  /* Audio player: fills the chip/dot area of #readNavRow while playing. It's
+     laid out (invisible + inert) whenever the chapter has narration so the
+     Play/pause change can cross-fade — a display:none element can't transition.
+     !important beats the inline `display` that refreshAudioAvailability sets for
+     the desktop inline player. */
   #audioPlayer{ position:fixed; left:calc(var(--rnr-arrow-w) - 6px); right:14px; width:auto; margin:0; transform:none;
     bottom:calc(var(--mfn-h) + env(safe-area-inset-bottom,0)); height:var(--readnavrow-h); z-index:17;
     background:var(--surface); border:0; border-radius:0; box-shadow:none; padding:0;
-    flex-direction:row; align-items:center; display:none !important; transition:transform .28s ease; }
-  body.audio-playing #audioPlayer{ display:flex !important; }
-  #audioPlayer .audio-controls-row{ flex:1; width:auto; max-width:none; min-height:0; padding:0; gap:7px; }
+    flex-direction:row; align-items:center; display:none !important;
+    opacity:0; visibility:hidden; pointer-events:none;
+    transition:transform .28s ease, opacity .22s ease, visibility 0s linear .22s; }
+  body.has-audio #audioPlayer{ display:flex !important; }
+  body.audio-playing #audioPlayer,
+  body.audio-gap #audioPlayer{ opacity:1; visibility:visible; pointer-events:auto;
+    transition:transform .28s ease, opacity .22s ease, visibility 0s; }
+  body.audio-gap #audioPlayer{ display:flex !important; }
+  body.audio-gap .audio-msg{ font-size:.68rem; padding:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  /* min-width:0 lets the row shrink to the fixed player width instead of its
+     content's min size — without it the range input keeps an intrinsic ~129px
+     and shoves the voice + sleep-timer buttons off the right edge. */
+  #audioPlayer .audio-controls-row{ flex:1; width:auto; max-width:none; min-width:0; min-height:0; padding:0; gap:7px; }
   #audioPlayer .playbtn{ width:30px; height:30px; }
   #audioPlayer .time{ font-size:.6rem; }
   /* The tight in-row player drops the trailing duration (the scrubber conveys
@@ -650,6 +770,16 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
   #btnPickNarration svg{ width:11px; height:11px; }
   .audio-sleep{ padding:4px 6px; font-size:.56rem; }
   .audio-sleep svg{ width:12px; height:12px; }
+}
+
+/* On a narrow phone the in-row player's fixed-size controls (play, elapsed time,
+   voice picker, sleep timer) plus a min-width scrubber overrun the row and push
+   the voice + clock off the right edge. Drop the elapsed-time readout (the
+   scrubber thumb conveys position; the duration is already dropped above) and
+   let the scrubber shrink further so both buttons stay on-screen down to 320px. */
+@media (max-width:400px){
+  #audioPlayer #audioCur{ display:none; }
+  #audioPlayer #scrubRange{ min-width:28px; }
 }
 
 /* ── audio player — inline in the chapter header, right after the version
@@ -663,14 +793,23 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
    longer adds any height (it transforms the row in place on Play). */
 .inline-audio{ flex:1; min-width:180px; display:flex; flex-direction:column; gap:5px; }
 .audio-controls-row{ display:flex; align-items:center; gap:10px; width:100%; }
+/* Per-chapter "no narration file" state (#294) — swaps the controls for a line
+   of muted text; the player keeps its footprint so the header doesn't jump. */
+.inline-audio.audio-gap .audio-controls-row{ display:none; }
+.audio-msg{ font-family:var(--font-ui); font-size:.72rem; color:var(--muted); padding:3px 2px; }
 .playbtn{ width:34px; height:34px; border-radius:var(--r-pill); flex-shrink:0; background:linear-gradient(135deg,var(--brand),var(--brand-2)); display:flex; align-items:center; justify-content:center; color:var(--on-brand); border:none; }
 .inline-audio .time{ font-family:var(--font-ui); font-size:.65rem; color:var(--muted); flex-shrink:0; }
-#scrubTrack{ flex:1; height:4px; border-radius:var(--r-pill); background:var(--divider); position:relative; cursor:pointer; }
-#scrubFill{ position:absolute; left:0; top:0; bottom:0; width:0%; border-radius:var(--r-pill); background:var(--brand); pointer-events:none; }
+/* Native <input type=range> so seeking is keyboard-operable (arrows / Home /
+   End) and screen-reader-announced (aria-valuetext = timecode). accent-color
+   keeps it on-brand without a custom track/thumb to maintain. */
+#scrubRange{ flex:1; min-width:60px; height:16px; margin:0; padding:0; accent-color:var(--brand); background:transparent; cursor:pointer; }
+#scrubRange:disabled{ cursor:default; opacity:.55; }
 
 /* Sleep-timer button in the audio player. Idle: a plain clock. Running: filled,
    with the MM:SS (or "Ch") remaining next to it. */
-.audio-sleep{ display:inline-flex; align-items:center; gap:4px; flex-shrink:0; padding:4px 7px; border:1px solid var(--divider); border-radius:var(--r-pill); background:var(--surface-2); color:var(--muted); font-family:var(--font-ui); font-weight:700; font-size:.6rem; letter-spacing:.02em; font-variant-numeric:tabular-nums; }
+/* Hidden until syncSleepTimerBtn (js/reader.js) shows it — only with "keep
+   playing into the next chapter" on. */
+.audio-sleep{ display:none; align-items:center; gap:4px; flex-shrink:0; padding:4px 7px; border:1px solid var(--divider); border-radius:var(--r-pill); background:var(--surface-2); color:var(--muted); font-family:var(--font-ui); font-weight:700; font-size:.6rem; letter-spacing:.02em; font-variant-numeric:tabular-nums; }
 .audio-sleep svg{ width:13px; height:13px; }
 .audio-sleep .st-label:empty{ display:none; }
 .audio-sleep.on{ border-color:var(--brand); background:var(--brand); color:#fff; }
@@ -683,10 +822,34 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 
 /* ── reading text ── */
 #readingText{ font-family:var(--font-reading); font-size:var(--reading-font-size,20px); line-height:1.85; color:var(--ink-soft); font-weight:300; }
-#readingText p{ margin:0 0 22px; }
+/* 13px top: half of .story-title-heading's own top margin. A chapter that opens
+   with a story-title heading and one that opens straight into verse 1 then start
+   their first line at the same height (the heading's margin-top collapses with
+   this one). Paragraph breaks mid-chapter (¶) still separate by the 22px bottom. */
+#readingText p{ margin:13px 0 22px; }
 #readingText::after{ content:""; display:block; clear:both; }
-.vnum{ font-size:.65rem; font-weight:600; color:var(--brand); vertical-align:super; margin-right:3px; font-family:var(--font-ui); user-select:none; cursor:pointer; }
+/* Swipe pager peek pane (js/reader.js, initReaderGestures) — a fixed, opaque
+   panel that carries the adjacent chapter's verses in from the edge while a
+   chapter-turn swipe drags. Sits below the sticky header and the fixed side
+   arrows, above the bottom nav chrome; JS sets `top` to the header's bottom
+   and `transform` to track the finger. Only ever visible mid-gesture. */
+.chapter-peek{ position:fixed; top:56px; left:0; right:0; bottom:0; z-index:12; background:var(--bg); overflow:hidden; will-change:transform; }
+/* full-bleed opaque container; JS sizes .chapter-peek-inner to #readingText's
+   measured box (margin-left + width) so wrapping matches to the word. */
+.chapter-peek-inner{ height:100%; overflow:hidden; }
+/* Match #readingText so a dragged verse sits at the same height as the verse
+   it's sliding in beside. No top margin on the first line: #readingText p's own
+   13px top margin collapses out of its (overflow:visible) box, but .chapter-peek
+   is a block formatting context, so the same margin here would NOT collapse and
+   would push the peek's verses 13px lower than the page's. */
+.chapter-peek-body{ font-family:var(--font-reading); font-size:var(--reading-font-size,20px); line-height:1.85; color:var(--ink-soft); font-weight:300; }
+.chapter-peek-body p{ margin:0 0 22px; }
+.chapter-peek-body>:first-child{ margin-top:0; } /* #readingText's first child collapses its top margin out (overflow:visible); this BFC would keep it, offsetting the peek's first verse / story heading */
+.chapter-peek-body[dir="rtl"]{ direction:rtl; text-align:right; }
+.chapter-peek-body .spin{ margin:36px auto; }
+.vnum{ font-size:.65rem; font-weight:600; color:var(--brand); vertical-align:super; margin-right:3px; font-family:var(--font-ui); user-select:none; cursor:pointer; background:none; border:0; padding:0 1px; line-height:1; }
 .vnum:hover{ text-decoration:underline; }
+.vnum:focus-visible{ outline:2px solid var(--brand); outline-offset:1px; border-radius:2px; }
 .paramark{ color:var(--brand); font-weight:600; margin-right:6px; user-select:none; }
 .dropcap{ float:left; font-family:var(--font-reading); font-size:68px; line-height:.78; font-weight:600; color:var(--brand); padding:5px 9px 0 0; }
 
@@ -701,7 +864,9 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 #readingText[dir="rtl"] .paramark{ margin-right:0; margin-left:6px; }
 #readingText[dir="rtl"] .dropcap{ float:right; padding:5px 0 0 9px; }
 
-.inline-illust{ float:right; width:38%; max-width:260px; margin:4px 0 14px 22px; }
+/* A <span> (display:block), not a <div> — so the figure is valid inside a <p>
+   whether rendered as a string (chapterVersesHTML) or DOM-inserted (pack change). */
+.inline-illust{ display:block; float:right; width:38%; max-width:260px; margin:4px 0 14px 22px; }
 .inline-illust.illust-left{ float:left; margin:4px 22px 14px 0; }
 .inline-illust img{ width:100%; height:auto; border-radius:var(--r-sm); display:block; box-shadow:0 12px 28px var(--shadow); cursor:zoom-in; border:1px solid var(--divider); }
 /* Settings > Black & White Illustrations — a plain CSS grayscale filter, no
@@ -709,17 +874,18 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
    opened from an inline illustration (the .illust-view class openImageView
    adds for that case), not for a Places/Atlas photo opened the same way. */
 :root.illust-bw .inline-illust img,:root.illust-bw #imageViewImg.illust-view{ filter:grayscale(1); }
-.inline-illust .cap{ font-family:var(--font-ui); font-size:.65rem; letter-spacing:.03em; color:var(--muted); margin-top:8px; line-height:1.6; font-style:italic; }
+.inline-illust .cap{ display:block; font-family:var(--font-ui); font-size:.65rem; letter-spacing:.03em; color:var(--muted); margin-top:8px; line-height:1.6; font-style:italic; }
 @media (max-width:640px){ .inline-illust{ float:none; width:100%; max-width:none; margin:0 0 18px; } }
 
-.story-title-heading{ clear:both; font-family:var(--font-reading); font-style:italic; font-size:1.3rem; font-weight:500; color:var(--brand); margin:26px 0 10px; }
+.story-title-heading{ clear:both; font-family:var(--font-reading); font-style:italic; font-size:1.3rem; font-weight:500; color:var(--brand); margin:13px 0 10px; }
 
 /* Words with a dictionary entry (markDictionaryTerms, in reader.js) — a
    subtle dotted underline rather than a background/color change, so it
    reads as "more info available" without competing with the dropcap/verse
    numbering for attention. Title attribute carries the definition itself. */
-.dict-term{ border-bottom:1px dotted var(--brand-line); cursor:pointer; }
+.dict-term{ border-bottom:1px dotted var(--brand-line); cursor:pointer; background:none; border-left:0; border-right:0; border-top:0; padding:0; font:inherit; color:inherit; letter-spacing:inherit; }
 .dict-term:hover{ background:var(--brand-soft); }
+.dict-term:focus-visible{ outline:2px solid var(--brand); outline-offset:2px; }
 
 /* Custom brand-styled tooltip (replaces the native title attribute) —
    positioned at runtime above the hovered term (showDictTooltip, in
@@ -735,7 +901,7 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 .dicttabs{ display:flex; gap:6px; margin-top:14px; flex-wrap:wrap; }
 .dicttab{ font-family:var(--font-ui); font-size:.6rem; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); background:var(--surface-2); border:1px solid transparent; border-radius:var(--r-pill); padding:6px 12px; }
 .dicttab:hover{ color:var(--brand); }
-.dicttab.on{ color:var(--brand); background:rgba(109,40,217,.14); border-color:var(--brand); }
+.dicttab.on{ color:var(--brand); background:rgba(109,40,217,.14); border-color:var(--brand); font-weight:700; }
 .dictbody{ flex:1; min-height:0; padding:20px 24px 24px; overflow-y:auto; overflow-x:hidden; overflow-wrap:anywhere; }
 /* .place-meta defaults to white-space:nowrap (fine for the short Places-modal
    line); in book info the author/date string can be long enough to force a
@@ -744,8 +910,9 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 .dictbody .dd-def{ font-size:1rem; line-height:1.7; color:var(--ink-soft); }
 .dictbody .dd-meta{ font-family:var(--font-ui); font-size:.62rem; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin-bottom:12px; }
 .dictbody .dd-empty{ color:var(--muted); font-style:italic; }
-.citelink{ border-bottom:1px dotted var(--brand-line); cursor:help; }
+.citelink{ background:none; border:0; border-bottom:1px dotted var(--brand-line); padding:0; font:inherit; color:inherit; letter-spacing:inherit; line-height:inherit; cursor:help; }
 .citelink:hover{ background:var(--brand-soft); }
+.citelink:focus-visible{ background:var(--brand-soft); outline:2px solid var(--brand); outline-offset:2px; }
 
 /* ── verse selection + Verse Tools ── */
 .verse-span{ cursor:pointer; }
@@ -793,11 +960,18 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
    Cross-refs/Commentary/Compare/Topics), giving a clean 5x2 grid instead of
    a lopsided 5+4. Cells are short (fixed height, not aspect-ratio:1/1) so
    the whole panel stays compact. */
-.vtgrid{ display:grid; grid-template-columns:repeat(5,1fr); gap:6px; padding:12px 18px; flex-shrink:0; }
-.vtcell{ height:32px; border-radius:var(--r-control); }
-.vtcolors{ display:flex; align-items:center; justify-content:center; gap:4px; background:var(--surface-2); border:1px solid transparent; padding:0; }
-.vtswatch{ width:13px; height:13px; padding:0; border-radius:var(--r-pill); border:1.5px solid transparent; flex-shrink:0; }
-.vtswatch:hover{ transform:scale(1.15); }
+/* minmax(0,1fr), not 1fr: a plain 1fr track won't shrink below its
+   content's min-width, so on a narrow phone (iPhone SE, Z Fold cover
+   screen) the "Commentary"/"Language" cells forced the grid wider than
+   the panel and Copy/Compare spilled off-canvas. minmax(0,…) lets the
+   tracks divide the width evenly and the labels wrap/clip inside. */
+.vtgrid{ display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:6px; padding:12px 18px; flex-shrink:0; }
+.vtcell{ height:32px; border-radius:var(--r-control); min-width:0; overflow:hidden; }
+.vtcolors{ display:flex; align-items:center; justify-content:center; gap:8px; background:var(--surface-2); border:1px solid transparent; padding:0; }
+/* 22px dot + 8px gap keeps the 24px minimum-target circles (WCAG 2.5.8) from
+   overlapping between adjacent swatches. */
+.vtswatch{ width:22px; height:22px; padding:0; border-radius:var(--r-pill); border:2px solid transparent; flex-shrink:0; }
+.vtswatch:hover{ transform:scale(1.12); }
 .vtswatch.on{ box-shadow:0 0 0 2px var(--brand); }
 .vtswatch.hl-yellow{ background:#eab308; } .vtswatch.hl-green{ background:#22c55e; }
 .vtswatch.hl-blue{ background:#3b82f6; } .vtswatch.hl-pink{ background:#ec4899; }
@@ -807,6 +981,15 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
    no permanent "Choose a tool above" placeholder eating a row of space. */
 .vtp-body{ flex:1; min-height:0; overflow-y:auto; padding:0 18px; border-top:none; }
 .vtp-body:not(:empty){ padding:14px 18px 18px; border-top:1px solid var(--divider); }
+/* Narrow phones: 5 tool cells across leaves each label ~40px wide, too
+   tight for "Commentary"/"Orig. Language" — fall back to a 3-wide grid
+   with the swatch row on its own full line, and let cells grow to fit a
+   wrapped 2-line label instead of clipping. */
+@media (max-width:420px){
+  .vtgrid{ grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .vtcolors{ grid-column:1/-1; height:32px; }
+  .vtcell{ height:auto; min-height:34px; overflow:visible; }
+}
 
 .vt-note-input{ width:100%; min-height:100px; background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-control); padding:12px; font-family:var(--font-ui); font-size:.95rem; color:var(--ink); outline:none; resize:vertical; }
 .vt-note-input:focus{ border-color:var(--brand); }
@@ -913,7 +1096,7 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 .msearch .mclear,.overlay-input-wrap .mclear{ display:none; align-items:center; justify-content:center; border:none; background:none; color:var(--muted); cursor:pointer; padding:0; flex-shrink:0; border-radius:50%; }
 .msearch .mclear:hover,.overlay-input-wrap .mclear:hover{ background:var(--brand-soft); color:var(--brand); }
 .msearch input:not(:placeholder-shown) ~ .mclear,.overlay-input-wrap input:not(:placeholder-shown) ~ .mclear{ display:flex; }
-.msearch .mclear{ width:18px; height:18px; font-size:1rem; line-height:1; }
+.msearch .mclear{ width:24px; height:24px; font-size:1rem; line-height:1; }
 .overlay-input-wrap .mclear{ width:28px; height:28px; font-size:1.3rem; line-height:1; }
 .mfilters{ display:flex; gap:8px; margin-top:12px; }
 .mfilter-check{ display:inline-flex; align-items:center; gap:8px; font-family:var(--font-ui); font-size:.8rem; color:var(--ink-soft); cursor:pointer; user-select:none; }
@@ -942,9 +1125,11 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 .vrow:hover{ background:var(--surface-2); }
 .vrow.on{ background:rgba(109,40,217,.12); }
 .vrow > *:first-child{ flex:1; min-width:0; }
-.vrow .vt{ font-size:.92rem; font-weight:600; color:var(--ink); }
+.vrow-main{ display:block; flex:1; min-width:0; text-align:left; background:none; border:none; padding:0; font:inherit; color:inherit; cursor:pointer; border-radius:var(--r-sm); }
+.vrow-main:hover{ color:inherit; }
+.vrow .vt{ display:block; font-size:.92rem; font-weight:600; color:var(--ink); }
 .vrow .vd{ font-family:var(--font-ui); font-size:.62rem; letter-spacing:.03em; color:var(--muted); margin-top:2px; display:flex; align-items:center; gap:6px; }
-.fav-star{ background:none; border:none; font-size:1.05rem; line-height:1; color:var(--muted2); padding:4px; cursor:pointer; flex-shrink:0; border-radius:50%; }
+.fav-star{ display:flex; align-items:center; justify-content:center; min-width:26px; min-height:26px; background:none; border:none; font-size:1.05rem; line-height:1; color:var(--muted2); padding:4px; cursor:pointer; flex-shrink:0; border-radius:50%; }
 .fav-star:hover{ color:var(--brand); background:var(--brand-soft); }
 .fav-star.on{ color:#e8a838; }
 .audiobadge{ display:inline-flex; align-items:center; gap:3px; color:var(--brand); flex-shrink:0; }
@@ -972,6 +1157,10 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 .setfield label{ display:block; font-family:var(--font-ui); font-size:.62rem; letter-spacing:.1em; text-transform:uppercase; color:var(--brand); margin-bottom:8px; }
 .setfield input{ width:100%; background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-control); padding:10px 13px; font-family:var(--font-ui); font-size:.95rem; color:var(--ink); outline:none; }
 .setfield input:focus{ border-color:var(--brand); }
+/* The API-key field is type=text (keeps it clear of Chrome's password manager,
+   see index.html) — mask it visually. -webkit-text-security covers Chromium +
+   Safari; Firefox has no equivalent and shows the key in the clear. */
+#settingsKeyInput{ -webkit-text-security:disc; }
 .setfield .hint{ font-size:.78rem; color:var(--muted); margin-top:6px; }
 .setfield .hint a{ color:var(--brand); }
 .setfield select{ width:100%; background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-control); padding:10px 13px; font-family:var(--font-ui); font-size:.95rem; color:var(--ink); outline:none; appearance:none; -webkit-appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b6480' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 12px center; background-size:11px; }
@@ -1051,8 +1240,9 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 .cal-weekday-row{ display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:4px; margin-bottom:2px; }
 .cal-weekday{ font-family:var(--font-ui); font-size:.56rem; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); text-align:center; padding-bottom:6px; }
 .cal-grid{ display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:6px; }
-.cal-daycell{ background:var(--surface); border:1px solid var(--divider); border-radius:var(--r-sm); padding:6px 7px; min-height:88px; display:flex; flex-direction:column; cursor:pointer; transition:border-color .15s; }
+.cal-daycell{ width:100%; text-align:left; font:inherit; color:inherit; appearance:none; -webkit-appearance:none; background:var(--surface); border:1px solid var(--divider); border-radius:var(--r-sm); padding:6px 7px; min-height:88px; display:flex; flex-direction:column; cursor:pointer; transition:border-color .15s; }
 .cal-daycell:hover{ border-color:var(--brand-line); }
+.cal-refline{ display:block; }
 .cal-daycell.cal-outside{ background:transparent; border-color:transparent; cursor:default; }
 .cal-daycell.cal-done{ background:var(--brand-soft); }
 .cal-daycell.cal-missed{ background:rgba(217,119,6,.06); }
@@ -1101,7 +1291,10 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 .cen-btn{ display:flex; align-items:center; gap:10px; padding:12px 14px; background:var(--surface); border:1px solid var(--divider); border-radius:var(--r-control); color:var(--ink); text-align:left; transition:border-color .15s,background .15s; }
 .cen-btn:hover:not(:disabled){ border-color:var(--brand-line); background:var(--brand-soft); }
 .cen-btn:disabled{ opacity:.4; }
-.cen-btn.cen-next{ flex-direction:row-reverse; text-align:right; }
+/* Next button's markup is already label-then-chevron, so it just needs pushing
+   to the cell's right edge — row-reverse here would put the chevron before the
+   label (which is the bug this replaces). */
+.cen-btn.cen-next{ justify-content:flex-end; text-align:right; }
 .cen-btn svg{ width:18px; height:18px; flex-shrink:0; color:var(--brand); }
 .cen-lbl{ display:flex; flex-direction:column; line-height:1.3; min-width:0; }
 .cen-next .cen-lbl{ align-items:flex-end; }
@@ -1120,7 +1313,7 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 .mainview-narrow .dictbody{ padding:20px 0 24px; }
 .overlay-inner{ display:flex; flex-direction:column; }
 .overlay-topbar{ display:flex; align-items:center; justify-content:space-between; padding:20px 32px; border-bottom:1px solid var(--divider); flex-shrink:0; }
-.overlay-title{ font-family:var(--font-ui); font-size:.6rem; letter-spacing:.3em; text-transform:uppercase; color:var(--brand); }
+.overlay-title{ font-family:var(--font-ui); font-size:.6rem; font-weight:600; letter-spacing:.3em; text-transform:uppercase; color:var(--brand); margin:0; }
 .overlay-close{ background:none; border:none; color:var(--muted); font-size:1.4rem; cursor:pointer; line-height:1; padding:4px 8px; border-radius:var(--r-sm); }
 .overlay-close:hover{ color:var(--brand); background:var(--brand-soft); }
 
@@ -1165,6 +1358,15 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 .help-faq-item{ background:var(--surface); border:1px solid var(--divider); border-radius:var(--r-control); padding:14px 18px; margin-bottom:10px; }
 .help-faq-q{ font-weight:600; font-size:.86rem; color:var(--ink); margin-bottom:4px; }
 .help-faq-a{ font-size:.8rem; line-height:1.55; color:var(--muted); }
+
+/* ── Accessibility statement (#accessibilityView) ── */
+.a11y-body .about-hero{ margin-bottom:6px; }
+.a11y-body p{ font-size:.9rem; line-height:1.7; color:var(--ink-soft); margin:0 0 14px; }
+.a11y-body ul{ margin:0 0 14px; padding-left:22px; }
+.a11y-body li{ font-size:.9rem; line-height:1.65; color:var(--ink-soft); margin-bottom:8px; }
+.a11y-body kbd{ font-family:var(--font-ui); font-size:.78em; font-weight:600; background:var(--surface-2); border:1px solid var(--divider); border-bottom-width:2px; border-radius:4px; padding:1px 5px; color:var(--ink); white-space:nowrap; }
+.navfoot-btn{ background:none; border:0; padding:0; font:inherit; color:inherit; text-decoration:underline; cursor:pointer; }
+.navfoot-btn:hover{ color:var(--brand); }
 
 /* ── My Progress ── */
 .progress-stats{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:30px; }
@@ -1241,7 +1443,10 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 #notesTagChips .filter-chip{ flex-shrink:0; }
 .filter-label{ font-family:var(--font-ui); font-size:.58rem; letter-spacing:.15em; text-transform:uppercase; color:var(--muted); }
 .filter-chip{ display:inline-flex; align-items:center; gap:6px; font-family:var(--font-ui); font-size:.6rem; letter-spacing:.1em; text-transform:uppercase; background:rgba(109,40,217,.08); border:1px solid rgba(109,40,217,.2); color:var(--ink); padding:5px 13px; border-radius:var(--r-pill); }
-.filter-chip:hover,.filter-chip.active{ background:rgba(109,40,217,.18); border-color:var(--brand); color:var(--brand); }
+.filter-chip:hover{ background:rgba(109,40,217,.14); border-color:var(--brand-line); }
+/* .active adds a non-colour cue (weight) so the selected chip is distinguishable
+   from a merely hovered one and doesn't rely on colour alone (WCAG 1.4.1). */
+.filter-chip.active{ background:rgba(109,40,217,.18); border-color:var(--brand); color:var(--brand); font-weight:700; }
 .overlay-results-area{ flex:1; overflow-y:auto; padding:0 32px 40px; }
 .overlay-results-inner{ max-width:780px; margin:0 auto; }
 .overlay-results-meta{ font-family:var(--font-ui); font-size:.6rem; letter-spacing:.18em; text-transform:uppercase; color:var(--muted); margin-bottom:20px; }
@@ -1298,9 +1503,11 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 .history-section{ margin-top:18px; }
 .history-section:first-child{ margin-top:0; }
 .history-section-label{ max-width:780px; margin:0 auto 9px; font-family:var(--font-ui); font-size:.58rem; letter-spacing:.15em; text-transform:uppercase; color:var(--muted); }
-.history-chip{ display:inline-flex; align-items:center; gap:7px; font-family:var(--font-ui); font-size:.78rem; font-weight:500; color:var(--ink-soft); background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-pill); padding:6px 8px 6px 14px; cursor:pointer; }
-.history-chip:hover{ border-color:var(--brand-line); color:var(--brand); }
-.history-star{ color:var(--muted2); font-size:.9rem; line-height:1; padding:2px; border-radius:50%; }
+.history-chip{ display:inline-flex; align-items:center; gap:2px; font-family:var(--font-ui); font-size:.78rem; font-weight:500; color:var(--ink-soft); background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-pill); padding:2px 4px 2px 10px; }
+.history-chip:hover{ border-color:var(--brand-line); }
+.history-chip-main{ background:none; border:none; font:inherit; color:inherit; cursor:pointer; padding:4px 4px; border-radius:var(--r-sm); min-height:24px; }
+.history-chip-main:hover{ color:var(--brand); }
+.history-star{ display:flex; align-items:center; justify-content:center; min-width:24px; min-height:24px; background:none; border:none; color:var(--muted2); font-size:.9rem; line-height:1; padding:2px; border-radius:50%; cursor:pointer; }
 .history-chip:hover .history-star{ color:var(--brand); }
 .history-chip.saved .history-star{ color:#e8a838; }
 .history-clear{ font-family:var(--font-ui); font-size:.68rem; font-weight:600; color:var(--muted); background:none; border:none; cursor:pointer; margin-left:auto; }
@@ -1328,7 +1535,8 @@ body.no-key-lockdown #topbar, body.no-key-lockdown #navrail, body.no-key-lockdow
 /* ── My Library: tab row + card extras + export/import toolbar ── */
 .lib-tabs{ max-width:780px; margin:0 auto 16px; display:flex; align-items:center; justify-content:center; gap:8px; }
 .lib-tab{ font-family:var(--font-ui); font-size:.62rem; letter-spacing:.12em; text-transform:uppercase; background:rgba(109,40,217,.08); border:1px solid rgba(109,40,217,.2); color:var(--ink); padding:6px 16px; border-radius:var(--r-pill); }
-.lib-tab:hover,.lib-tab.active{ background:rgba(109,40,217,.18); border-color:var(--brand); color:var(--brand); }
+.lib-tab:hover{ background:rgba(109,40,217,.14); border-color:var(--brand-line); }
+.lib-tab.active{ background:rgba(109,40,217,.18); border-color:var(--brand); color:var(--brand); font-weight:700; }
 .notes-toolbar{ max-width:780px; margin:16px auto 0; display:flex; align-items:center; justify-content:center; gap:8px; }
 .notes-toolbar button{ font-family:var(--font-ui); font-weight:600; font-size:.6rem; letter-spacing:0; padding:7px 14px; border-radius:var(--r-pill); border:1px solid var(--brand-line); background:transparent; color:var(--brand); }
 .notes-toolbar button:hover{ background:var(--brand); color:var(--on-brand); }
@@ -1557,12 +1765,14 @@ details.bg-accordion{ border:1px solid var(--divider); border-radius:var(--r-con
      the zoom-in affordance/tap target isn't worth it on a small screen. */
   .inline-illust img{ pointer-events:none; cursor:default; }
 
-  /* Explore/Library tab rows (6 and 4 tabs respectively) are wider than a
-     narrow viewport and don't wrap; let the row itself scroll horizontally
-     (same pattern as #notesTagChips) instead of forcing #readMain to. */
+  /* Explore/Study/Library tab rows (6 / 5 / 4 tabs) are wider than a narrow
+     viewport. Wrap to as many rows as needed rather than scrolling the strip
+     horizontally — a horizontally-scrolled strip hides tabs at the end
+     (Harmony, Topics) so a jump straight to one from Discover lands on a tab
+     the user can't see is active without scrolling. */
   .overlay-search-area{ padding:24px 16px 16px; }
   .overlay-results-area{ padding:0 16px 32px; }
-  .lib-tabs{ justify-content:flex-start; flex-wrap:nowrap; overflow-x:auto; padding-bottom:4px; }
+  .lib-tabs{ flex-wrap:wrap; gap:6px; }
   .lib-tab{ flex-shrink:0; }
 
   /* Filters panel collapses behind a tap on narrow viewports — six fields
@@ -1707,6 +1917,18 @@ details.bg-accordion{ border:1px solid var(--divider); border-radius:var(--r-con
 .nd-toolbar{ display:flex; align-items:center; gap:4px; flex-shrink:0; }
 .nd-tb{ min-width:28px; height:28px; padding:0 7px; border-radius:var(--r-sm); border:1px solid var(--divider); background:var(--surface-2); color:var(--muted); font-family:var(--font-ui); font-size:.82rem; line-height:1; display:flex; align-items:center; justify-content:center; }
 .nd-tb:hover{ border-color:var(--brand-line); color:var(--brand); }
+/* "?" formatting help — pushed to the toolbar's trailing end, rounded so it
+   reads as a distinct affordance from the format buttons. */
+.nd-tb-help{ margin-left:auto; border-radius:var(--r-pill); font-weight:700; }
+#ndMdHelpScrim{ z-index:560; } /* clears #notesDrawer's mobile 430; below .dict-tooltip / #toast (600) — see #uiDialogScrim */
+.md-help-body{ padding:14px 18px 18px; font-family:var(--font-ui); }
+.md-help-intro{ margin:0 0 12px; font-size:.86rem; color:var(--muted); line-height:1.5; }
+.md-help-table{ width:100%; border-collapse:collapse; font-size:.88rem; }
+.md-help-table td{ padding:6px 8px 6px 0; vertical-align:baseline; border-top:1px solid var(--divider); }
+.md-help-table tr:first-child td{ border-top:0; }
+.md-help-table td:first-child{ white-space:nowrap; width:1%; }
+.md-help-table code, .md-help-note code{ background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-sm); padding:1px 5px; font-size:.85em; }
+.md-help-note{ margin:14px 0 0; font-size:.84rem; color:var(--muted); line-height:1.55; }
 .nd-editor{ flex:1; width:100%; background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-control); padding:14px 16px; font-family:var(--font-ui); font-size:.95rem; line-height:1.7; color:var(--ink); outline:none; resize:none; }
 .nd-editor:focus{ border-color:var(--brand); }
 .nd-editor::placeholder{ color:var(--muted2); }
@@ -1761,7 +1983,9 @@ details.bg-accordion{ border:1px solid var(--divider); border-radius:var(--r-con
 .nd-nb-opt.nd-nb-new{ border-top:1px solid var(--divider); margin-top:3px; color:var(--brand); }
 .nd-tags{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-width:0; }
 .nd-tag{ display:flex; align-items:center; gap:4px; font-size:.68rem; font-weight:600; color:var(--ink-soft); background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-pill); padding:4px 6px 4px 11px; }
-.nd-tag button{ width:15px; height:15px; border:none; background:none; color:var(--muted); font-size:.95rem; line-height:1; padding:0; display:flex; align-items:center; justify-content:center; }
+/* 24px hit area (WCAG 2.5.8) pulled back with negative margin so the tag pill
+   keeps its size. */
+.nd-tag button{ width:24px; height:24px; margin:-6px -5px -6px -3px; border:none; background:none; color:var(--muted); font-size:.95rem; line-height:1; padding:0; display:flex; align-items:center; justify-content:center; }
 .nd-tag button:hover{ color:#dc2626; }
 .nd-tag-input{ background:none; border:none; outline:none; font-family:var(--font-ui); font-size:.72rem; color:var(--ink); width:84px; padding:5px 2px; }
 .nd-tag-input::placeholder{ color:var(--muted2); }

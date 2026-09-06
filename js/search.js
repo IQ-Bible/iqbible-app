@@ -524,7 +524,7 @@ function renderSearchHistory() {
   area.hidden = false;
   const chip = (e, isSaved) => {
     const jsQuery = escAttr(e.query).replace(/'/g, "\\'");
-    return `<button class="history-chip${isSaved ? " saved" : ""}" onclick="rerunSearchHistory('${jsQuery}','${e.tab}')">${escHtml(e.query)}<span class="history-star" onclick="event.stopPropagation(); toggleSaveSearch('${jsQuery}','${e.tab}')">${isSaved ? "★" : "☆"}</span></button>`;
+    return `<span class="history-chip${isSaved ? " saved" : ""}"><button type="button" class="history-chip-main" onclick="rerunSearchHistory('${jsQuery}','${e.tab}')">${escHtml(e.query)}</button><button type="button" class="history-star" onclick="toggleSaveSearch('${jsQuery}','${e.tab}')" aria-pressed="${isSaved}" aria-label="${isSaved ? "Unsave" : "Save"} this search">${isSaved ? "★" : "☆"}</button></span>`;
   };
   let html = "";
   if (saved.length) html += `<div class="history-section"><div class="history-section-label">Saved</div><div class="history-row">${saved.map(e => chip(e, true)).join("")}</div></div>`;
