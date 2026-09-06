@@ -1,16 +1,31 @@
-# Cloudflare Worker config for the API auth proxy — official hosted instance
-# only. See worker.js's header comment and ../README.md before deploying.
+# Cloudflare Worker config for the official hosted instance only. See
+# worker.js's header comment, ./README.md and ../README.md before deploying.
 
 name = "iqbible-app-proxy"
 main = "worker.js"
 compatibility_date = "2026-08-01"
 
-# Bound to just the API path on the hosted instance. Every other path on
-# app.iqbible.com is left alone and falls through to GitHub Pages (set up as
-# a proxied CNAME -> iq-bible.github.io in Cloudflare DNS).
+# The Worker needs to see two kinds of request: the API path, and page
+# navigations (so a shared Scripture deep link can be given a real link-preview
+# card). This pattern covers both. Every other path — including the static
+# assets — falls through to GitHub Pages untouched.
 routes = [
-  { pattern = "app.iqbible.com/api/v2/*", zone_name = "iqbible.com" }
+  { pattern = "app.iqbible.com/*", zone_name = "iqbible.com" }
 ]
+
+# IMPORTANT one-time dashboard step: the assets (/js/*, /css/*, /img/*,
+# /assets/*) do not need the Worker and the app's service worker keeps
+# revalidating them, so leaving them on this route burns request quota for
+# nothing. In the Cloudflare dashboard (Workers & Pages -> your worker ->
+# Settings -> Domains & Routes, or Rules -> ... depending on UI), add a route
+# for each of:
+#     app.iqbible.com/js/*
+#     app.iqbible.com/css/*
+#     app.iqbible.com/img/*
+#     app.iqbible.com/assets/*
+# with the Worker set to "None". worker.js also fast-paths these to origin if
+# one slips through, but the dashboard exclusion is what actually saves the
+# invocation. Skipping this doesn't break anything — it just costs more quota.
 
 # The shared key is NOT stored here — it's a Worker secret:
 #   npx wrangler secret put IQBIBLE_API_KEY

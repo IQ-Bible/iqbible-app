@@ -1101,11 +1101,14 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
           <button class="closebtn" onclick="closeModal('versionPickerScrim')" aria-label="Close">&times;</button>
         </div>
         <div class="msearch" id="langListSearch" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8"/></svg><input type="text" id="langSearchInput" placeholder="Filter languages…" oninput="renderLangList(this.value)" autocomplete="off"><button type="button" class="mclear" aria-label="Clear filter" onclick="clearSearchInput('langSearchInput')">&times;</button></div>
-        <button type="button" class="langsel" id="langSelBtn" onclick="openLangList()">
-          <svg class="langsel-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.6 3.9 5.8 3.9 9s-1.3 6.4-3.9 9c-2.6-2.6-3.9-5.8-3.9-9s1.3-6.4 3.9-9Z"/></svg>
-          <span class="langsel-stack"><span class="langsel-name" id="langSelName">All languages</span><span class="langsel-count" id="langSelCount"></span></span>
-          <svg class="langsel-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-        </button>
+        <div id="langSelGroup">
+          <span class="langsel-label" id="langSelLabel">Filter by language</span>
+          <button type="button" class="langsel" id="langSelBtn" onclick="openLangList()" aria-labelledby="langSelLabel langSelName">
+            <svg class="langsel-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.6 3.9 5.8 3.9 9s-1.3 6.4-3.9 9c-2.6-2.6-3.9-5.8-3.9-9s1.3-6.4 3.9-9Z"/></svg>
+            <span class="langsel-stack"><span class="langsel-name" id="langSelName">All languages</span><span class="langsel-count" id="langSelCount"></span></span>
+            <svg class="langsel-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+        </div>
         <div class="msearch" id="versionPickerSearch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8"/></svg><input type="text" id="versionSearchInput" placeholder="Search translations…" oninput="onVersionSearch()" autocomplete="off"><button type="button" class="mclear" aria-label="Clear search" onclick="clearSearchInput('versionSearchInput')">&times;</button></div>
         <div class="favrow" id="favRow" style="display:none"></div>
         <div class="mfilters" id="versionPickerFilters">

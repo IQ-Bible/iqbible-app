@@ -1116,6 +1116,7 @@ button.bookicon-badge:active{ transform:scale(.96); }
    #langRow chip strip, whose selected chip could scroll out of sight (a filter
    you can't see is a filter you forget, then fight when you search). Opens the
    language sub-screen; mirrors YouVersion's language button. */
+.langsel-label{ display:block; font-family:var(--font-ui); font-size:.7rem; font-weight:600; letter-spacing:.02em; color:var(--muted); margin-bottom:5px; }
 .langsel{ width:100%; display:flex; align-items:center; gap:11px; text-align:left; background:var(--surface-2); border:1px solid var(--divider); border-radius:var(--r-control); padding:11px 13px; color:var(--ink); margin-bottom:10px; }
 .langsel:hover{ border-color:var(--brand-line); }
 .langsel-globe{ width:17px; height:17px; color:var(--brand); flex-shrink:0; }

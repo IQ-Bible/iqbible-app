@@ -41,7 +41,8 @@ The app is an installable PWA: `manifest.webmanifest` and `sw.js` (a service wor
 only the app shell — HTML/CSS/JS/icons — and never the API) sit at the site root and need no build
 step. **Bump `CACHE_VERSION` in `sw.js` whenever you deploy** so visitors pick up the new assets.
 
-The hosted instance also runs a Cloudflare Worker (`cloudflare/`) in front of the API — see the next section.
+The hosted instance also runs a Cloudflare Worker (`cloudflare/`) in front of the site — it injects
+the shared API key and gives shared Scripture links a per-verse preview card. See the next section.
 
 `js/config.js` has the handful of constants a fork actually needs to touch — `BASE_PATH` for a
 GitHub Pages project-site subpath (see above), and `FEATURE_SEARCH_ALL_VERSIONS`: the Search
@@ -57,7 +58,7 @@ section) and would rather visitors not be able to trigger that many-request fan-
 
 The default behavior — each visitor enters their own key via Settings — is the correct one for most public deployments, and it's why the app works this way out of the box.
 
-If you want anonymous end users to skip that step (a consumer app rather than a developer tool), the key has to live somewhere the browser can't read it: a small server-side proxy that holds the credential and adds it to each request. The hosted instance at `app.iqbible.com` does exactly this with a Cloudflare Worker — see [`cloudflare/`](cloudflare/) for the whole thing (it's about 40 lines). That's a real, separate piece of infrastructure with its own trade-offs (you're now paying for everyone's usage, and a shared key behind a public proxy can still be abused), which is why the app itself still ships zero-backend and key-per-visitor by default.
+If you want anonymous end users to skip that step (a consumer app rather than a developer tool), the key has to live somewhere the browser can't read it: a small server-side proxy that holds the credential and adds it to each request. The hosted instance at `app.iqbible.com` does exactly this with a Cloudflare Worker — see [`cloudflare/`](cloudflare/) for the whole thing. (It also uses that Worker to give a shared verse link a real preview card, since a static SPA can't set per-page `<meta>` tags on its own.) That's a real, separate piece of infrastructure with its own trade-offs (you're now paying for everyone's usage, and a shared key behind a public proxy can still be abused), which is why the app itself still ships zero-backend and key-per-visitor by default.
 
 ## What it demonstrates
 
@@ -82,7 +83,8 @@ If you want anonymous end users to skip that step (a consumer app rather than a 
   the searched version's language (throttled, with a live progress line) — self-hosters can disable
   this in `js/config.js` if they'd rather not have visitors trigger a many-request search on a
   shared/proxied key
-- Shareable deep links (`/gen/1/1`) with browser back/forward support
+- Shareable deep links (`/gen/1/1`) with browser back/forward support — and, on the hosted
+  instance, a per-verse link-preview card when one is pasted into LinkedIn, Slack, iMessage, etc.
 - Per-chapter context: places (with maps), a raw people list with per-person detail lookups,
   prophecy fulfillment pairs, and a curated biblical timeline
 - Verse-level study tools: highlights/bookmarks/notes, original-language word data, cross-references,

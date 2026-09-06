@@ -163,7 +163,7 @@ function versionPickerShowVersions() {
   document.getElementById("versionPickerTitle").textContent = versionPickerTitleText();
   document.getElementById("versionPickerBack").hidden = true;
   document.getElementById("langListSearch").hidden = true;
-  document.getElementById("langSelBtn").hidden = false;
+  document.getElementById("langSelGroup").hidden = false;
   document.getElementById("versionPickerSearch").hidden = false;
   document.getElementById("versionPickerFilters").hidden = false;
   document.getElementById("versionList").hidden = false;
@@ -173,7 +173,7 @@ function versionPickerShowVersions() {
 function openLangList() {
   document.getElementById("versionPickerTitle").textContent = "Choose a language";
   document.getElementById("versionPickerBack").hidden = false;
-  document.getElementById("langSelBtn").hidden = true;
+  document.getElementById("langSelGroup").hidden = true;
   document.getElementById("versionPickerSearch").hidden = true;
   document.getElementById("versionPickerFilters").hidden = true;
   document.getElementById("favRow").style.display = "none";

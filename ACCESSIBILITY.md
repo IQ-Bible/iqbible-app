@@ -87,6 +87,13 @@ both search inputs (existing 24 px pattern, `aria-label`). Decorative SVGs (`.la
 wcag22aa) clean on `#versionPickerScrim` in both screens, light + dark, desktop + 390 px. Keyboard:
 selector → sub-screen → filter → pick → back, all operable; modal focus trap unaffected.
 
+**2026-09-06 — `.langsel` button caption.** Added a visible `.langsel-label` ("Filter by language",
+`--muted`, ≥4.5:1 both themes) above the button, wrapped label + button in `#langSelGroup` (the
+element `openLangList`/`versionPickerShowVersions` now toggle). The button's accessible name is now
+`aria-labelledby="langSelLabel langSelName"` — leads with the action ("Filter by language …")
+instead of just reading the current language. No new interactive elements. axe-core 4.10 clean on
+`#versionPickerScrim`, both themes.
+
 ## Accessibility statement page
 
 `#accessibilityView` (in `index.html` / `404.html`, wired through `js/main.js` +

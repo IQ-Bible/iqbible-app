@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file. This CHANGE
 
 ## [Unreleased]
 
+## [1.23.0] - 2026-09-06
+- **added:** Sharing a link to a chapter or verse (`app.iqbible.com/gen/32`, `/jhn/3/16`,
+  `/gal/5/14-16`) now unfurls a proper preview on LinkedIn, Slack, iMessage, Discord and anywhere
+  else that shows link previews — the reference as the title, the verse text, and a verse-card
+  image — instead of nothing. Hosted instance only; a self-hosted copy would need its own proxy in
+  front (as it already does for the API key).
+- **changed:** The translation picker's language button now carries a small "Filter by language"
+  caption above it, so its purpose is clear before you open it, and its screen-reader name leads
+  with that verb instead of just reading out the current language.
+
 ## [1.22.0] - 2026-09-06
 - **changed:** The translation picker's language filter is now one always-visible button at the top
   of the panel — showing the current language and how many versions it has — instead of a strip of
