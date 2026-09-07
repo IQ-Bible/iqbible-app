@@ -44,6 +44,16 @@ const DEFAULT_VERSION = "eng_kjv";
 // reach the Worker, skip straight to origin with no work.
 const STATIC_PREFIX = /^\/(?:js|css|img|assets|fonts)\//;
 
+// Deuterocanon / apocrypha USFM codes. A reference in one of these on a version
+// that doesn't carry the book resolves its name but returns no verse text — see
+// resolveCitation, which then retries against ?canon=catholic. Gated to this
+// set so a mistyped or unloaded version code for an ordinary book can't quietly
+// turn into a Douay-Rheims card.
+const DEUTEROCANON = new Set([
+  "TOB", "JDT", "ESG", "WIS", "SIR", "BAR", "LJE", "S3Y", "SUS", "BEL",
+  "1MA", "2MA", "3MA", "4MA", "1ES", "2ES", "MAN", "PS2", "ODA",
+]);
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -152,7 +162,10 @@ async function renderCard(ref, env, ctx) {
   if (cached) return cached;
 
   const meta = await resolveCitation(ref, ctx);
-  if (!meta || !meta.name_en) return null;
+  // No verse text means the reference doesn't resolve to a real verse (bad
+  // version code, or a chapter/verse past the end of the book). Don't fabricate
+  // a card — fall through to the normal 404 / SPA handling.
+  if (!meta || !meta.name_en || !meta.data || !meta.data.length) return null;
 
   // Same-zone subrequest — Cloudflare sends this to the GitHub Pages origin,
   // never back through this Worker, so there's no loop. 404.html is a copy of
@@ -192,8 +205,14 @@ async function renderCard(ref, env, ctx) {
   return out;
 }
 
+// HTMLRewriter's setAttribute writes the value as-is, so escape what would
+// break a double-quoted attribute (a verse with a `"` in it, an `&` in the
+// image URL) ourselves.
+const escAttr = (s) =>
+  String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+
 const setAttr = (name, value) => ({
-  element: (el) => el.setAttribute(name, value),
+  element: (el) => el.setAttribute(name, escAttr(value)),
 });
 
 // Book name + verse text for the card. The public GET /parse/citation is
@@ -211,9 +230,14 @@ async function resolveCitation(ref, ctx) {
   if (hit) return hit.json();
 
   let data = await parseCitation(citation, `version=${encodeURIComponent(ref.version)}`);
-  // A deuterocanon reference on a 66-book version resolves the name but has no
-  // verse text — let the API swap in a canon that carries the book.
-  if (data && data.count > 0 && (!data.data || !data.data.length)) {
+  // A deuterocanon reference on a version that doesn't carry the book resolves
+  // the name but returns no verse text — retry against a canon that has it.
+  // Only for deuterocanon books: for an ordinary book, "no text back" means a
+  // bad version code or a verse past the end of the book, not a canon gap.
+  if (
+    DEUTEROCANON.has(ref.book) &&
+    data && data.count > 0 && (!data.data || !data.data.length)
+  ) {
     const alt = await parseCitation(citation, "canon=catholic");
     if (alt && alt.data && alt.data.length) data = alt;
   }

@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file. This CHANGE
 
 ## [Unreleased]
 
+## [1.23.1] - 2026-09-06
+- **fixed:** Link-preview card follow-ups. A shared verse whose text contains a quotation mark no
+  longer breaks its own preview card. A link to a verse or chapter that doesn't exist (past the end
+  of the book) now returns a normal 404 instead of a card with a missing image. A link carrying a
+  translation code the API doesn't recognise no longer falls back to a preview in an unrelated
+  translation.
+
 ## [1.23.0] - 2026-09-06
 - **added:** Sharing a link to a chapter or verse (`app.iqbible.com/gen/32`, `/jhn/3/16`,
   `/gal/5/14-16`) now unfurls a proper preview on LinkedIn, Slack, iMessage, Discord and anywhere
