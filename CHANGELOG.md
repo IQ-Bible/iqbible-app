@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file. This CHANGE
 
 ## [Unreleased]
 
+## [1.24.1] - 2026-09-22
+- **removed:** `ACCESSIBILITY.md` — the WCAG 2.2 AA remediation log it kept is no longer needed
+  now that the pass it tracked (2026-09-05) is done; its five remaining follow-ups are now
+  individual GitHub issues instead of a standing notes file.
+
 ## [1.24.0] - 2026-09-22
 - **changed:** Cross-references (Verse Tools) now lead with the verse actually being
   cross-referenced, then a numbered list of each reference with its full verse text over its

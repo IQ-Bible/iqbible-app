@@ -164,11 +164,11 @@ a file**: place it after everything it depends on.
   `linkifyCitations(text)`. For a reference you already know the book / chapter / verse of (a card,
   a list row, a modal button), use `registerCiteId(ref, previewText)` or batch a list through
   `fetchVersePreviews(refs)`. A bare reference with no preview is a bug.
-- **Accessibility: the app targets WCAG 2.2 AA.** [`ACCESSIBILITY.md`](ACCESSIBILITY.md) records the
-  audit and the method (axe-core, headless Chrome). Any new interactive element needs real semantics
-  (a `<button>` or an ARIA role, never a bare `<div onclick>`), an accessible name, a visible
-  `:focus-visible` ring, a ≥24px target, full keyboard operation, contrast that holds in both
-  themes, and `prefers-reduced-motion` respected.
+- **Accessibility: the app targets WCAG 2.2 AA.** Verify with axe-core (headless Chrome) against
+  the `wcag2a`/`wcag2aa`/`wcag21a`/`wcag21aa`/`wcag22aa` rule sets. Any new interactive element
+  needs real semantics (a `<button>` or an ARIA role, never a bare `<div onclick>`), an accessible
+  name, a visible `:focus-visible` ring, a ≥24px target, full keyboard operation, contrast that
+  holds in both themes, and `prefers-reduced-motion` respected.
 - **Comments explain _why_, not _what_** — a non-obvious API quirk, a browser gotcha, a deliberate
   tradeoff. Match the sparse style already in the files.
 - **There's no test suite.** Verify a change by opening the app in a browser with a real API key and
