@@ -657,11 +657,14 @@ const CTX_ICONS = {
 // Prophecies, imageless Places, About <book>). iconKey (optional) picks a
 // CTX_ICONS glyph shown before the label. Keeps every card visible without
 // scrolling the rail.
-function railCard(label, body, onclick, extraClass, iconKey) {
+// count (optional) renders as a small pill at the end of the label row — e.g.
+// the Prophecies card's total match count.
+function railCard(label, body, onclick, extraClass, iconKey, count) {
   const cls = "railcard" + (onclick ? " clickable" : "") + (extraClass ? " " + extraClass : "");
   const click = onclick ? ` onclick="${onclick}"` : "";
   const icon = iconKey && CTX_ICONS[iconKey] ? CTX_ICONS[iconKey] : "";
-  return `<div class="${cls}"${click}><div class="rc-label">${icon}${escHtml(label)}</div><div class="rc-body">${body}</div></div>`;
+  const countHtml = count != null ? `<span class="rc-count">${count}</span>` : "";
+  return `<div class="${cls}"${click}><div class="rc-label">${icon}${escHtml(label)}${countHtml}</div><div class="rc-body">${body}</div></div>`;
 }
 // Standard slippy-map tile math (lon/lat -> the z/x/y tile that contains it)
 // — a plain raster image, not an interactive embed, for contexts too small
@@ -1025,14 +1028,25 @@ async function loadPropheciesCard() {
     const all = await getAllProphecies();
     const entries = propheciesEntriesForChapter(all, current.book, current.chapter);
     if (!entries.length) return null;
+    // The badge counts distinct prophecies (propheciesForChapter — same tally
+    // the modal lists), not entries — a prophecy with several fulfillments is
+    // several entries here (one per pairing line) but one prophecy.
+    const matchCount = propheciesForChapter(all, current.book, current.chapter).length;
     const e0 = entries[0];
     const previewByRef = await fetchVersePreviews([e0.ref]);
     const text = previewByRef[`${e0.ref.book}.${e0.ref.chapter}.${e0.ref.verse}`];
     const citeAttr = text ? ` data-cite-id="${registerCiteId(e0.citation, text)}"` : "";
     const body = `${escHtml(e0.prefix)}<span class="citelink"${citeAttr}>${escHtml(e0.citation)}</span>`
       + (entries.length > 1 ? ` <span class="rc-dim">+${entries.length - 1}</span>` : "");
-    return railCard("Prophecies", body, "openPropheciesModal()", "railcard--compact", "prophecy");
+    return railCard("Prophecies", body, "openPropheciesModal()", "railcard--compact", "prophecy", matchCount);
   } catch (e) { return null; }
+}
+// The API's Prophecy has no separate title field, only `description` — but
+// in practice it's already short and title-like ("Seed of a woman (virgin
+// birth)."), not a full sentence, so it doubles as one. Strip only the
+// trailing period; the text itself is shown verbatim, not rewritten.
+function prophecyTitle(desc) {
+  return (desc || "").replace(/\.\s*$/, "");
 }
 async function openPropheciesModal() {
   closeCardsSheet(); // else this modal opens beneath the still-open mobile Chapter Info sheet — see openPlacesModal
@@ -1045,22 +1059,36 @@ async function openPropheciesModal() {
   if (current.book !== book || current.chapter !== chapter) return;
   const matches = propheciesForChapter(all, book, chapter);
   if (!matches.length) { body.innerHTML = `<div class="dd-empty">No prophecies found for this chapter.</div>`; return; }
+  document.getElementById("propheciesTitle").textContent = `${matches.length} Prophecies in ${label}`;
   // Every match's origin *and* every fulfillment, batched into one preview
   // call rather than resolving each button separately.
   const allRefs = [];
   matches.forEach(p => { allRefs.push(p.origin); (p.fulfilled_in || []).forEach(f => allRefs.push(f)); });
   const previewByRef = await fetchVersePreviews(allRefs);
-  body.innerHTML = matches.map(p => {
+  // Each entry: numbered, led by the prophecy's title (its description), then
+  // the scripture in this chapter, then the fulfillment(s) — each reference a
+  // ref-row (verse text over its ref pill, same shape as the Cross-refs tool)
+  // so reading it doesn't mean hovering the pill or leaving the chapter.
+  body.innerHTML = matches.map((p, i) => {
     const originText = previewByRef[`${p.origin.book}.${p.origin.chapter}.${p.origin.verse}`];
     const originCite = originText ? ` data-cite-id="${registerCiteId(p.origin.citation, originText)}"` : "";
     const fulfillments = (p.fulfilled_in || []).map(f => {
       const text = previewByRef[`${f.book}.${f.chapter}.${f.verse}`];
       const citeAttr = text ? ` data-cite-id="${registerCiteId(f.citation, text)}"` : "";
-      return `<button class="prophecy-ref"${citeAttr} onclick="closeModal('propheciesScrim');jumpToVerse('${f.book}',${f.chapter},${f.verse})">${escHtml(f.citation)}</button>`;
+      return `<div class="ref-row">
+        <div class="ref-text">${text ? escHtml(text) : `<span class="rc-dim">Text unavailable</span>`}</div>
+        <button class="prophecy-ref"${citeAttr} onclick="closeModal('propheciesScrim');jumpToVerse('${f.book}',${f.chapter},${f.verse})">${escHtml(f.citation)}</button>
+      </div>`;
     }).join("");
     return `<div class="prophecy-entry">
-      <button class="prophecy-origin"${originCite} onclick="closeModal('propheciesScrim');jumpToVerse('${p.origin.book}',${p.origin.chapter},${p.origin.verse})">${escHtml(p.origin.citation)}</button>
-      <div class="prophecy-desc">${escHtml(p.description)}</div>
+      <div class="prophecy-title-row">
+        <span class="prophecy-num">${i + 1}</span>
+        <div class="prophecy-title">${escHtml(prophecyTitle(p.description))}</div>
+      </div>
+      <div class="ref-row">
+        <div class="ref-text">${originText ? escHtml(originText) : `<span class="rc-dim">Text unavailable</span>`}</div>
+        <button class="prophecy-origin"${originCite} onclick="closeModal('propheciesScrim');jumpToVerse('${p.origin.book}',${p.origin.chapter},${p.origin.verse})">${escHtml(p.origin.citation)}</button>
+      </div>
       <div class="prophecy-fulfillments"><span class="pf-label">Fulfilled in</span>${fulfillments}</div>
     </div>`;
   }).join("");
@@ -1376,14 +1404,15 @@ async function loadSidebarCards() {
    "About" chip that always shows and opens the full Chapter Info sheet.
    Reuses the same cached fetches loadSidebarCards makes — no extra calls.
    Glyphs are the shared CTX_ICONS set (also on the desktop rail cards). */
-// Icon + muted count, no text label — the label lives in aria-label/title only.
+// Icon on top, a small muted title underneath (+ count, when there is one) —
+// visible text, not just aria-label/title, so the row reads at a glance.
 function chapterChip(label, count, onclick, iconKey) {
   const aria = label === "About" ? "About this chapter"
     : count != null ? `${label} in this chapter (${count})`
     : `${label} for this chapter`;
-  return `<button class="ctxchip" onclick="${onclick}" aria-label="${aria}" title="${label}">`
+  return `<button class="ctxchip" onclick="${onclick}" aria-label="${aria}">`
     + CTX_ICONS[iconKey]
-    + (count != null ? `<span class="ct">${count}</span>` : "")
+    + `<span class="cc-label">${escHtml(label)}${count != null ? ` <span class="ct">${count}</span>` : ""}</span>`
     + "</button>";
 }
 async function renderChapterChips() {
@@ -1396,7 +1425,7 @@ async function renderChapterChips() {
   const [places, people, prophecy, chrono] = await Promise.all([
     apiJSONCached(`/geo/${reqBook}/${reqCh}`).then(d => (d.data || []).length).catch(() => 0),
     apiJSONCached(`/bible-people/${reqBook}/${reqCh}`).then(d => (d.data || []).length).catch(() => 0),
-    getAllProphecies().then(all => propheciesEntriesForChapter(all, reqBook, reqCh).length).catch(() => 0),
+    getAllProphecies().then(all => propheciesForChapter(all, reqBook, reqCh).length).catch(() => 0),
     getChronologyForChapter(reqBook, reqCh).catch(() => null),
   ]);
   if (current.book !== reqBook || current.chapter !== reqCh) return; // navigated away mid-fetch
@@ -1736,20 +1765,27 @@ async function refreshAudioAvailability() {
     if (audioNarrations.length > 1) { narrationBtn.style.display = "flex"; syncNarrationName(); }
   } catch (e) { /* discovery call failed — fall back to the version id itself as the audio id */ }
 }
+// The narrator's own name when the API has one; otherwise a plain "Voice N"
+// (1-indexed by list position) rather than the raw audio_id ("eng_kjv_2") —
+// that id is an internal slug, not something a listener picking a voice
+// should have to read.
+function narrationLabel(n, idx) {
+  return (n.narrator || n.name || `Voice ${idx + 1}`);
+}
 // The voice button's label — the current narrator's name (truncated), or
 // just "Voice" if the API didn't name them.
 function syncNarrationName() {
   const el = document.getElementById("narrationName");
   if (!el) return;
-  const n = audioNarrations.find(x => x.audio_id === current.audioId);
-  const name = (n && (n.narrator || n.name)) || "";
+  const idx = audioNarrations.findIndex(x => x.audio_id === current.audioId);
+  const name = idx >= 0 ? narrationLabel(audioNarrations[idx], idx) : "";
   el.textContent = name ? (name.length > 14 ? name.slice(0, 13) + "…" : name) : "Voice";
 }
 function openNarrationPicker() {
   const list = document.getElementById("narrationList");
-  list.innerHTML = audioNarrations.map(n => `
+  list.innerHTML = audioNarrations.map((n, i) => `
     <div class="vrow${n.audio_id === current.audioId ? " on" : ""}" onclick="selectNarration('${n.audio_id}')">
-      <div><div class="vt">${escHtml(n.narrator || n.audio_id)}</div></div>
+      <div><div class="vt">${escHtml(narrationLabel(n, i))}</div></div>
     </div>`).join("");
   openModal("narrationPickerScrim");
 }
@@ -2826,6 +2862,23 @@ function openVerseTools() {
   syncHighlightSwatchState();
   compareSessionExtra = [];
   document.getElementById("verseToolsPanel").classList.add("show");
+  updateCrossRefsCount();
+}
+// A count on the Cross-refs button itself, filled in as soon as the panel
+// opens rather than only after the tool is actually opened — apiJSONCached
+// means showCrossRefsTool (same endpoint, same first-selected verse) reuses
+// this response instead of fetching it twice.
+async function updateCrossRefsCount() {
+  const el = document.getElementById("crossRefsCount");
+  if (!el) return;
+  el.textContent = "";
+  const book = current.book, chapter = current.chapter, verse = selectedVerses[0];
+  try {
+    const d = await apiJSONCached(`/cross-references/${book}/${chapter}/${verse}`);
+    if (current.book !== book || current.chapter !== chapter || selectedVerses[0] !== verse) return; // selection moved on
+    const count = (d.data || []).length;
+    if (count) el.textContent = count;
+  } catch (e) { /* count is a nice-to-have; the button still works without it */ }
 }
 // Marks whichever swatch matches the selection's current highlight color
 // (only when every selected verse shares the exact same one) so re-opening
@@ -2995,19 +3048,45 @@ async function showCrossRefsTool() {
   const book = current.book, chapter = current.chapter, verse = selectedVerses[0];
   const body = document.getElementById("vtBody");
   body.innerHTML = `<div class="spin"></div>`;
+  // The verse actually being cross-referenced, shown first — its text is
+  // already on screen (this chapter is what's open), pulled straight from
+  // the rendered .verse-span rather than an extra fetch. Kept to just this
+  // one verse (not the whole selection) since /cross-references only ever
+  // looks up selectedVerses[0] below.
+  const srcSpan = document.querySelector(`.verse-span[data-verse="${verse}"]`);
+  let srcText = "";
+  if (srcSpan) {
+    const clone = srcSpan.cloneNode(true);
+    clone.querySelectorAll(".vnum,.paramark,.verse-badge").forEach(el => el.remove());
+    srcText = clone.textContent.trim();
+  }
+  const sourceHtml = `<div class="crossref-source">
+    <div class="crossref-source-ref">${escHtml(current.bookName)} ${chapter}:${verse}</div>
+    ${srcText ? `<div class="crossref-source-text">${escHtml(srcText)}</div>` : ""}
+  </div>`;
   try {
     const d = await apiJSONCached(`/cross-references/${book}/${chapter}/${verse}`);
     const refs = d.data || [];
-    if (!refs.length) { body.innerHTML = `<div class="dd-empty">No cross-references for this verse.</div>`; return; }
+    if (!refs.length) { body.innerHTML = sourceHtml + `<div class="dd-empty">No cross-references for this verse.</div>`; return; }
     const previewByRef = await fetchVersePreviews(refs.map(r => r.reference));
-    body.innerHTML = refs.map(r => {
+    // Full verse text underneath each ref, not just a link — so reading a
+    // cross-reference doesn't mean leaving this chapter, or hovering the
+    // pill, to find out what it actually says (per CLAUDE.md's citation
+    // preview rule, the ref itself still carries data-cite-id too).
+    body.innerHTML = sourceHtml + refs.map((r, i) => {
       const t = r.reference;
       const label = `${t.book} ${t.chapter}:${t.verse}${t.verse_end ? "-" + t.verse_end : ""}`;
       const text = previewByRef[`${t.book}.${t.chapter}.${t.verse}`];
       const citeAttr = text ? ` data-cite-id="${registerCiteId(label, text)}"` : "";
-      return `<button class="prophecy-ref"${citeAttr} style="margin:0 6px 8px 0" onclick="closeVerseTools();jumpToVerse('${t.book}',${t.chapter},${t.verse})">${escHtml(label)}</button>`;
+      return `<div class="ref-entry">
+        <span class="prophecy-num">${i + 1}</span>
+        <div class="ref-row">
+          <div class="ref-text">${text ? escHtml(text) : `<span class="rc-dim">Text unavailable</span>`}</div>
+          <button class="prophecy-ref"${citeAttr} onclick="closeVerseTools();jumpToVerse('${t.book}',${t.chapter},${t.verse})">${escHtml(label)}</button>
+        </div>
+      </div>`;
     }).join("");
-  } catch (e) { body.innerHTML = `<div class="dd-empty">Could not load cross-references.</div>`; }
+  } catch (e) { body.innerHTML = sourceHtml + `<div class="dd-empty">Could not load cross-references.</div>`; }
 }
 async function showTopicsTool() {
   const book = current.book, chapter = current.chapter, verse = selectedVerses[0];

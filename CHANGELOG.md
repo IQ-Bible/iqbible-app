@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file. This CHANGE
 
 ## [Unreleased]
 
+## [1.24.0] - 2026-09-22
+- **changed:** Cross-references (Verse Tools) now lead with the verse actually being
+  cross-referenced, then a numbered list of each reference with its full verse text over its
+  right-aligned citation pill — reading a cross-reference no longer means hovering the pill or
+  leaving the chapter to see what it says, and the Cross-refs button itself now shows how many
+  there are before you even open it. The Prophecies modal was redesigned the same way: each
+  prophecy is now numbered and titled (from its own description), followed by the scripture in this
+  chapter and its fulfillment(s), each with the same text-over-pill treatment; its header now reads
+  "13 Prophecies in John 12" rather than "Prophecies in John 12 (13)", and the chapter card shows
+  the same count as a badge. The audio voice picker labels an unnamed narration "Voice 1", "Voice
+  2", etc. instead of its raw internal id (e.g. `eng_kjv_2`). On mobile, the chapter-context icon
+  row (Places, People, Prophecy, Timeline, About) now shows a small title under each icon and
+  spreads them evenly across the row instead of clustering left; the right-rail card sheet's
+  preview text is smaller than the desktop rail's (the
+  modals it opens are unchanged).
+
+
 ## [1.23.1] - 2026-09-06
 - **fixed:** Link-preview card follow-ups. A shared verse whose text contains a quotation mark no
   longer breaks its own preview card. A link to a verse or chapter that doesn't exist (past the end
