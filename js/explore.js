@@ -192,6 +192,11 @@ async function renderTopicsListArea() {
    ranked or grouped by testament → book; Nave/Torrey citations are grouped
    under the source's own subheadings (`label`) in source order instead. */
 let topicsSort = "book"; // curated only: "book" | "rank"
+// "list" = each reference as a row with its verse text showing (readable on
+// touch, where there's no hover); "compact" = pills only, hover for the text.
+// A topic too big to have its text loaded up front is always compact.
+let topicsView = "list";
+const topicListMode = () => topicsView === "list" && !topicDetail.lazy;
 let topicDetail = null;  // {name, edition, citations, seeAlso}
 let topicDetailSeq = 0;
 const TOPIC_HYDRATE_MAX = 300;
@@ -199,10 +204,15 @@ const TOPIC_HYDRATE_MAX = 300;
 // list — used when landing straight on one topic (a shared
 // #explore/topics/love link, a Verse Tools topic chip), which would
 // otherwise fetch and render the whole list only to replace it.
+const topicHashTab = (name, edition) => `topics/${encodeURIComponent(name.toLowerCase())}${edition === "nave-torrey" ? "/nave-torrey" : ""}`;
 function openTopicFromLink(name, edition) {
   switchMainView("explore");
   exploreActiveTab = "topics";
   syncNavSub("explore", "topics");
+  // switchMainView/syncNavSub just reset the address to #explore/topics —
+  // put the topic back straight away so a slow or failed load (or a refresh
+  // mid-load) doesn't lose it from the link.
+  setMenuHash("explore", topicHashTab(name, edition));
   document.querySelectorAll("#exploreTabs .lib-tab").forEach(b => b.classList.toggle("active", b.dataset.tab === "topics"));
   document.getElementById("exploreDesc").textContent = EXPLORE_TAB_DESC.topics;
   openTopicDetail(name, edition);
@@ -233,27 +243,30 @@ async function openTopicDetail(name, edition) {
   topicDetail = { name: d.topic || name, edition: d.edition, citations: d.data || [], seeAlso: d.see_also || [], lazy };
   topicDetail.citations.forEach((c, i) => { c.i = i; });
   if (mainViewBeforeSwitch === "explore") {
-    setMenuHash("explore", `topics/${encodeURIComponent(topicDetail.name.toLowerCase())}${topicDetail.edition === "nave-torrey" ? "/nave-torrey" : ""}`);
+    setMenuHash("explore", topicHashTab(topicDetail.name, topicDetail.edition));
   }
   renderTopicDetail();
   body.parentElement.scrollTop = 0;
 }
 function setTopicsSort(mode) { topicsSort = mode; renderTopicDetail(); }
+function setTopicsView(mode) { topicsView = mode; renderTopicDetail(); }
 function renderTopicDetail() {
   const body = document.getElementById("exploreBody");
   const { name, edition, citations, seeAlso } = topicDetail;
   const ranked = edition === "iqbible" && citations.some(c => c.rank);
-  const sortRow = ranked ? `<div class="tool-filter-row" role="group" aria-label="Order references by">
-      <button class="filter-chip${topicsSort === "book" ? " active" : ""}" aria-pressed="${topicsSort === "book"}" onclick="setTopicsSort('book')">Book order</button>
-      <button class="filter-chip${topicsSort === "rank" ? " active" : ""}" aria-pressed="${topicsSort === "rank"}" onclick="setTopicsSort('rank')">Relevance</button>
-    </div>` : "";
+  const chipGroup = (label, key, cur, opts) => `<span class="topic-chipgroup" role="group" aria-label="${label}">${opts.map(([v, text]) =>
+    `<button class="filter-chip${cur === v ? " active" : ""}" aria-pressed="${cur === v}" onclick="${key}('${v}')">${text}</button>`).join("")}</span>`;
+  const controls = [];
+  if (ranked) controls.push(chipGroup("Order references by", "setTopicsSort", topicsSort, [["book", "Book order"], ["rank", "Relevance"]]));
+  if (citations.length && !topicDetail.lazy) controls.push(chipGroup("Layout", "setTopicsView", topicsView, [["list", "List"], ["compact", "Compact"]]));
+  const sortRow = controls.length ? `<div class="tool-filter-row">${controls.join("")}</div>` : "";
   // A pointer-only Nave/Torrey topic ("abarim" → "nebo") has no Scripture of
   // its own, just a "See X" — the empty state only applies when it has neither.
   const pointer = !citations.length && seeAlso.length;
   let list;
   if (!citations.length) list = pointer ? "" : `<div class="dd-empty">No citations for this topic.</div>`;
   else if (edition === "nave-torrey") list = topicLabelGroupsHTML(citations);
-  else if (ranked && topicsSort === "rank") list = `<div class="topic-pills">${[...citations].sort((a, b) => a.rank - b.rank).map(c => topicPillHTML(c)).join("")}</div>`;
+  else if (ranked && topicsSort === "rank") list = topicItemsHTML([...citations].sort((a, b) => a.rank - b.rank));
   else list = topicBookGroupsHTML(citations);
   const seeAlsoHtml = seeAlso.length ? `<div class="topic-see-also"><span>${pointer ? "See" : "See also"}</span>${seeAlso.map(n =>
     `<button class="topic-chip" data-topic="${escAttr(n)}" onclick="openTopicDetail(this.dataset.topic, 'nave-torrey')">${escHtml(n)}</button>`).join("")}</div>` : "";
@@ -268,16 +281,44 @@ function topicShortCitation(citation) {
   const m = citation.match(/^.+?\s(\d+(?::.*)?)$/);
   return m ? m[1] : citation;
 }
-function topicPillHTML(c, short) {
+// A citation the API returned with no verses (see iqbible-app#18) has nothing
+// to preview or jump to — shown as plainly unavailable rather than as a
+// working-looking pill that silently does nothing.
+const NO_VERSES_NOTE = "No verses available for this reference";
+function topicPillHTML(c, short, inRow) {
   const verses = c.verses || [];
-  const texts = verses.map(v => v.text).filter(Boolean);
-  let citeAttr = texts.length ? ` data-cite-id="${registerCiteId(c.citation, rangePreviewText(texts, verses.length))}"` : "";
-  if (!citeAttr && topicDetail.lazy && verses.length) citeAttr = ` data-ci="${c.i}" onmouseenter="resolveTopicPill(this)" onfocus="resolveTopicPill(this)"`;
-  const v = verses[0];
-  const jump = v ? ` onclick="closeExplore();jumpToVerse('${v.book}',${v.chapter},${v.verse})"` : "";
   const shown = short ? topicShortCitation(c.citation) : c.citation;
   const nameAttr = shown !== c.citation ? ` aria-label="${escAttr(c.citation)}"` : "";
-  return `<button class="prophecy-ref"${citeAttr}${nameAttr}${jump}>${escHtml(shown)}</button>`;
+  if (!verses.length) return `<button class="prophecy-ref" disabled title="${NO_VERSES_NOTE}"${nameAttr}>${escHtml(shown)}</button>`;
+  const v = verses[0];
+  // In a list row the text is already on screen and the click bubbles up to
+  // the row; a compact pill carries its own hover preview and click.
+  if (inRow) return `<button class="prophecy-ref"${nameAttr}>${escHtml(shown)}</button>`;
+  const texts = verses.map(x => x.text).filter(Boolean);
+  let citeAttr = texts.length ? ` data-cite-id="${registerCiteId(c.citation, rangePreviewText(texts, verses.length))}"` : "";
+  if (!citeAttr && topicDetail.lazy) citeAttr = ` data-ci="${c.i}" onmouseenter="resolveTopicPill(this)" onfocus="resolveTopicPill(this)"`;
+  return `<button class="prophecy-ref"${citeAttr}${nameAttr} onclick="closeExplore();jumpToVerse('${v.book}',${v.chapter},${v.verse})">${escHtml(shown)}</button>`;
+}
+// One reference as a row: verse text over its right-aligned pill (the same
+// shape Cross-refs and Prophecies use). The row is the pointer target; the
+// pill inside stays the real button for keyboard/screen-reader users.
+function topicRowHTML(c, short) {
+  const verses = c.verses || [];
+  const texts = verses.map(v => v.text).filter(Boolean);
+  const text = texts.length ? escHtml(rangePreviewText(texts, verses.length)) : `<span class="rc-dim">Text unavailable</span>`;
+  const v = verses[0];
+  const jump = v ? ` onclick="topicRowJump(event,'${v.book}',${v.chapter},${v.verse})"` : "";
+  return `<div class="ref-row topic-row${v ? " jumpable" : ""}"${jump}><div class="ref-text">${text}</div>${topicPillHTML(c, short, true)}</div>`;
+}
+function topicRowJump(e, book, chapter, verse) {
+  if (String(window.getSelection()).trim()) return; // selecting text to copy isn't a click-through
+  closeExplore();
+  jumpToVerse(book, chapter, verse);
+}
+function topicItemsHTML(cs, short) {
+  return topicListMode()
+    ? `<div class="topic-rows">${cs.map(c => topicRowHTML(c, short)).join("")}</div>`
+    : `<div class="topic-pills">${cs.map(c => topicPillHTML(c, short)).join("")}</div>`;
 }
 // Lazy path for a large topic: fetch just the verses a hover needs (the first
 // CITE_PREVIEW_MAX_VERSES — all the tooltip shows), once per pill.
@@ -295,7 +336,7 @@ async function resolveTopicPill(el) {
   if (el.matches(":hover, :focus")) showRefPreview(el);
 }
 function topicGroupHTML(heading, count, pillsHtml) {
-  return `<div class="topic-group"><h5 class="topic-group-head">${escHtml(heading)} <span>· ${count.toLocaleString("en-US")}</span></h5><div class="topic-pills">${pillsHtml}</div></div>`;
+  return `<div class="topic-group"><h5 class="topic-group-head">${escHtml(heading)} <span>· ${count.toLocaleString("en-US")}</span></h5>${pillsHtml}</div>`;
 }
 function topicBookGroupsHTML(citations) {
   const order = new Map(bookList.map((b, i) => [b.usfm, i]));
@@ -313,11 +354,11 @@ function topicBookGroupsHTML(citations) {
     const cs = byBook.get(usfm).sort((a, b) => firstVerse(a) - firstVerse(b));
     const b = bookList.find(x => x.usfm === usfm);
     const heading = b ? b.name : cs[0].citation.replace(/\s\d+(?::.*)?$/, "");
-    return topicGroupHTML(heading, cs.length, cs.map(c => topicPillHTML(c, true)).join(""));
+    return topicGroupHTML(heading, cs.length, topicItemsHTML(cs, true));
   }).join("");
   return section("Old Testament", books.filter(u => !NT_USFM.has(u))) +
     section("New Testament", books.filter(u => NT_USFM.has(u))) +
-    (unplaced.length ? `<h4 class="tool-group-label topic-testament">Other references</h4><div class="topic-pills">${unplaced.map(c => topicPillHTML(c)).join("")}</div>` : "");
+    (unplaced.length ? `<h4 class="tool-group-label topic-testament">Other references</h4>${topicItemsHTML(unplaced)}` : "");
 }
 function topicLabelGroupsHTML(citations) {
   const byLabel = new Map();
@@ -326,7 +367,7 @@ function topicLabelGroupsHTML(citations) {
     if (!byLabel.has(label)) byLabel.set(label, []);
     byLabel.get(label).push(c);
   });
-  return [...byLabel].map(([label, cs]) => topicGroupHTML(label, cs.length, cs.map(c => topicPillHTML(c)).join(""))).join("");
+  return [...byLabel].map(([label, cs]) => topicGroupHTML(label, cs.length, topicItemsHTML(cs))).join("");
 }
 
 /* ── Bible Atlas — GET /geo/places (search), GET /geo/places/{id} (detail

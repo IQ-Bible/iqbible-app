@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file. This CHANGE
 
 ## [Unreleased]
 
+## [1.26.0] - 2026-09-29
+- **changed:** A topic's references now read as a list — each reference is a row with its verse
+  text showing above its citation pill (the same shape as Cross-refs and Prophecies), so a
+  reference can be read without hovering, which never worked on a phone; click a row to open the
+  verse in context. A List / Compact toggle brings back the pill-only view, and topics too large to
+  load text up front (some have 2,700+ references) stay compact.
+- **changed:** A reference the API returns with no verses is now shown dimmed and unclickable
+  ("No verses available for this reference") instead of as a pill that silently does nothing.
+- **fixed:** Opening a shared topic link no longer briefly rewrites the address to
+  `#explore/topics`, which lost the topic if the page was refreshed or the load was slow.
+- **fixed:** The offline cache version (`sw.js`) had not been bumped since 1.20.0; it now matches
+  the release, so a deploy actually refreshes cached app files.
+
 ## [1.25.0] - 2026-09-29
 - **fixed:** Explore > Topics — many reference pills showed no verse on hover (only the first
   80 verses of a topic were ever loaded); every pill now previews its verses, loaded in the same

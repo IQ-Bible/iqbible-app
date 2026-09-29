@@ -1745,6 +1745,15 @@ h4.topic-testament{ margin:0; font-weight:600; }
 .topic-pills{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
 .topic-group .topic-pills{ margin-bottom:0; }
 .topic-pills .prophecy-ref{ min-height:24px; min-width:24px; }
+.topic-chipgroup{ display:inline-flex; gap:8px; flex-wrap:wrap; }
+.topic-chipgroup + .topic-chipgroup{ margin-left:8px; padding-left:16px; border-left:1px solid var(--divider); }
+@media (max-width:600px){ .topic-chipgroup + .topic-chipgroup{ margin-left:0; padding-left:0; border-left:none; } }
+.topic-rows{ display:flex; flex-direction:column; }
+.topic-row{ padding:10px 0; border-bottom:1px solid var(--divider); }
+.topic-row:last-child{ border-bottom:none; }
+.topic-row.jumpable{ cursor:pointer; }
+.topic-row.jumpable:hover .ref-text{ color:var(--ink); }
+.prophecy-ref:disabled{ opacity:.55; cursor:not-allowed; }
 .topic-see-also{ display:flex; flex-wrap:wrap; align-items:center; gap:3px; border-top:1px solid var(--divider); padding-top:14px; margin-top:6px; }
 .topic-see-also > span{ font-family:var(--font-ui); font-size:.7rem; color:var(--muted); margin-right:6px; }
 .tool-group-label{ font-family:var(--font-ui); font-size:.6rem; letter-spacing:.12em; text-transform:uppercase; color:var(--brand); padding:14px 0 6px; }
