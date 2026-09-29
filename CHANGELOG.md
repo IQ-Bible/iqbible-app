@@ -4,7 +4,8 @@ All notable changes to this project will be documented in this file. This CHANGE
 
 ## [Unreleased]
 
-## [1.25.0] - 2026-09-29- **fixed:** Explore > Topics — many reference pills showed no verse on hover (only the first
+## [1.25.0] - 2026-09-29
+- **fixed:** Explore > Topics — many reference pills showed no verse on hover (only the first
   80 verses of a topic were ever loaded); every pill now previews its verses, loaded in the same
   call as the topic itself.
 - **changed:** A topic's references are no longer one undivided wall of pills: curated topics are
