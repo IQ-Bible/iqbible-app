@@ -72,11 +72,12 @@ window.addEventListener("popstate", async () => {
    makes an already-open view's URL something you can copy and share. */
 const HASH_SLUGS = { search: "search", library: "my-library", explore: "explore", study: "study-tools", devotionals: "devotionals", share: "share-tools", settings: "settings", about: "about", accessibility: "accessibility", plans: "plans", help: "help", progress: "my-progress" };
 // A tabbed view (Explore/Study Tools/My Library) can carry its open tab as a
-// second segment: /gen/1#study-tools/word.
+// second segment: /gen/1#study-tools/word. Anything past that is the tab's
+// own sub-route — one topic is #explore/topics/love[/nave-torrey].
 function parseHashRoute() {
-  const [slug, tab] = (location.hash || "").slice(1).split("/");
+  const [slug, tab, ...rest] = (location.hash || "").slice(1).split("/");
   const key = Object.keys(HASH_SLUGS).find(k => HASH_SLUGS[k] === slug) || null;
-  return key ? { key, tab: tab || null } : null;
+  return key ? { key, tab: tab || null, rest } : null;
 }
 function setMenuHash(key, tab) {
   const slug = HASH_SLUGS[key] || "";
@@ -87,6 +88,13 @@ function setMenuHash(key, tab) {
 }
 function openHashRoute() {
   const r = parseHashRoute();
-  if (r) navMenuClick(r.key, r.tab);
+  if (!r) return;
+  if (r.key === "explore" && r.tab === "topics" && r.rest[0]) {
+    let name;
+    try { name = decodeURIComponent(r.rest[0]); } catch (e) { name = r.rest[0]; }
+    openTopicFromLink(name, r.rest[1] === "nave-torrey" ? "nave-torrey" : null);
+    return;
+  }
+  navMenuClick(r.key, r.tab);
 }
 window.addEventListener("hashchange", openHashRoute);

@@ -127,9 +127,9 @@ async function renderHarmonyDetail(section) {
     <div class="harmony-columns">${cols.join("")}</div>`;
 }
 
-/* ── Topics — GET /topics (list of names), GET /topics/{topic} (citation
-   list). List/edition-chip changes rebuild the whole tab; typed search only
-   touches #topicsListArea so the input never loses focus mid-keystroke. ── */
+/* ── Topics — GET /topics?counts=true (names + reference counts),
+   GET /topics/{topic} (citation list). List/edition-chip changes rebuild
+   the whole tab; typed search only touches #topicsListArea so the input never loses focus mid-keystroke. ── */
 let topicsListCache = {};
 let topicsEdition = "all";
 let topicsSearchTimer = null;
@@ -138,13 +138,18 @@ let topicsSearchTimer = null;
 // reader left it, not a freshly reset search/scroll.
 let topicsSearchValue = "";
 let topicsListScrollTop = 0;
+// ?counts=true turns each entry into {name, edition, citation_count,
+// verse_count} — edition matters under "all", where ~90 names appear once per
+// edition and each row has to open its own one.
 async function getTopicsList(edition) {
   if (!topicsListCache[edition]) {
-    try { const d = await apiJSON(`/topics?edition=${edition}`); topicsListCache[edition] = d.data || []; }
+    try { const d = await apiJSON(`/topics?edition=${edition}&counts=true`); topicsListCache[edition] = d.data || []; }
     catch (e) { topicsListCache[edition] = []; }
   }
   return topicsListCache[edition];
 }
+const TOPIC_EDITION_NAMES = { iqbible: "Curated", "nave-torrey": "Nave/Torrey" };
+const topicRefCount = n => `${n.toLocaleString("en-US")} reference${n === 1 ? "" : "s"}`;
 async function renderExploreTopicsList() {
   const body = document.getElementById("exploreBody");
   body.innerHTML = `<div class="spin"></div>`;
@@ -173,36 +178,155 @@ async function renderTopicsListArea() {
   if (!area) return;
   const input = document.getElementById("topicsSearchInput");
   const q = ((input && input.value) || "").trim().toLowerCase();
-  const names = await getTopicsList(topicsEdition);
-  const filtered = (q ? names.filter(n => n.toLowerCase().includes(q)) : names).slice(0, 300);
-  area.innerHTML = filtered.map(n => `<div class="vrow" onclick="openTopicDetail('${n.replace(/'/g, "\\'")}')"><div><div class="vt">${escHtml(n)}</div></div></div>`).join("")
-    || `<div class="dd-empty">No matching topics.</div>`;
+  const topics = await getTopicsList(topicsEdition);
+  const filtered = (q ? topics.filter(t => t.name.toLowerCase().includes(q)) : topics).slice(0, 300);
+  area.innerHTML = filtered.map(t => {
+    const meta = (t.citation_count ? topicRefCount(t.citation_count) : "Cross-reference") + (topicsEdition === "all" ? ` · ${TOPIC_EDITION_NAMES[t.edition] || t.edition}` : "");
+    return `<div class="vrow" data-topic="${escAttr(t.name)}" data-edition="${escAttr(t.edition)}" onclick="openTopicDetail(this.dataset.topic, this.dataset.edition)"><div><div class="vt">${escHtml(t.name)}</div><div class="vd">${escHtml(meta)}</div></div></div>`;
+  }).join("") || `<div class="dd-empty">No matching topics.</div>`;
 }
-async function openTopicDetail(name) {
+
+/* Topic detail. ?hydrate=true returns every verse's text inline, so each pill
+   gets its hover preview from the same call — no follow-up verse batches.
+   Curated citations carry a relevance `rank`, so they can be read either
+   ranked or grouped by testament → book; Nave/Torrey citations are grouped
+   under the source's own subheadings (`label`) in source order instead. */
+let topicsSort = "book"; // curated only: "book" | "rank"
+let topicDetail = null;  // {name, edition, citations, seeAlso}
+let topicDetailSeq = 0;
+const TOPIC_HYDRATE_MAX = 300;
+// The same Explore chrome switchExploreTab sets, minus rendering the topic
+// list — used when landing straight on one topic (a shared
+// #explore/topics/love link, a Verse Tools topic chip), which would
+// otherwise fetch and render the whole list only to replace it.
+function openTopicFromLink(name, edition) {
+  switchMainView("explore");
+  exploreActiveTab = "topics";
+  syncNavSub("explore", "topics");
+  document.querySelectorAll("#exploreTabs .lib-tab").forEach(b => b.classList.toggle("active", b.dataset.tab === "topics"));
+  document.getElementById("exploreDesc").textContent = EXPLORE_TAB_DESC.topics;
+  openTopicDetail(name, edition);
+}
+async function openTopicDetail(name, edition) {
+  const seq = ++topicDetailSeq;
   const backRow = `<div class="tool-back-row"><button onclick="switchExploreTab('topics')">‹ All Topics</button></div>`;
   const body = document.getElementById("exploreBody");
-  topicsListScrollTop = body.parentElement.scrollTop;
+  if (document.getElementById("topicsListArea")) topicsListScrollTop = body.parentElement.scrollTop;
   body.innerHTML = backRow + `<div class="spin"></div>`;
-  // GET /topics/{topic} only accepts "iqbible"/"nave-torrey", unlike the
-  // list endpoint — omitted, it already falls back sensibly on its own, so
-  // "all" (this tab's default edition filter) must never be sent through.
-  const editionParam = topicsEdition !== "all" ? `?edition=${topicsEdition}` : "";
-  let citations;
-  try { const d = await apiJSON(`/topics/${encodeURIComponent(name)}${editionParam}`); citations = d.data || []; }
-  catch (e) { body.innerHTML = backRow + `<div class="dd-empty">Could not load this topic.</div>`; return; }
-  const allRefs = [];
-  citations.forEach(c => (c.verses || []).forEach(v => allRefs.push(v)));
-  const previewByRef = await fetchVersePreviews(allRefs.slice(0, 80));
-  const html = citations.map(c => {
+  // GET /topics/{topic} only accepts "iqbible"/"nave-torrey" — omitted, it
+  // prefers the curated edition when a name exists in both.
+  const editionParam = edition === "iqbible" || edition === "nave-torrey" ? `&edition=${edition}` : "";
+  let d;
+  // Fetched plain first: hydrating the biggest topics (2,700+ citations) is a
+  // ~2 MB payload nobody reads, so only a topic small enough to show in full
+  // is re-requested with verse text; a large one loads each pill's preview on
+  // first hover instead (resolveTopicPill).
+  const base = `/topics/${encodeURIComponent(name)}?x=1${editionParam}`;
+  let lazy = false;
+  try {
+    d = await apiJSONCached(base);
+    if ((d.data || []).length <= TOPIC_HYDRATE_MAX) d = await apiJSONCached(`${base}&hydrate=true&version=${encodeURIComponent(current.version)}`);
+    else lazy = true;
+  }
+  catch (e) { if (seq === topicDetailSeq) body.innerHTML = backRow + `<div class="dd-empty">Could not load this topic.</div>`; return; }
+  if (seq !== topicDetailSeq) return;
+  topicDetail = { name: d.topic || name, edition: d.edition, citations: d.data || [], seeAlso: d.see_also || [], lazy };
+  topicDetail.citations.forEach((c, i) => { c.i = i; });
+  if (mainViewBeforeSwitch === "explore") {
+    setMenuHash("explore", `topics/${encodeURIComponent(topicDetail.name.toLowerCase())}${topicDetail.edition === "nave-torrey" ? "/nave-torrey" : ""}`);
+  }
+  renderTopicDetail();
+  body.parentElement.scrollTop = 0;
+}
+function setTopicsSort(mode) { topicsSort = mode; renderTopicDetail(); }
+function renderTopicDetail() {
+  const body = document.getElementById("exploreBody");
+  const { name, edition, citations, seeAlso } = topicDetail;
+  const ranked = edition === "iqbible" && citations.some(c => c.rank);
+  const sortRow = ranked ? `<div class="tool-filter-row" role="group" aria-label="Order references by">
+      <button class="filter-chip${topicsSort === "book" ? " active" : ""}" aria-pressed="${topicsSort === "book"}" onclick="setTopicsSort('book')">Book order</button>
+      <button class="filter-chip${topicsSort === "rank" ? " active" : ""}" aria-pressed="${topicsSort === "rank"}" onclick="setTopicsSort('rank')">Relevance</button>
+    </div>` : "";
+  // A pointer-only Nave/Torrey topic ("abarim" → "nebo") has no Scripture of
+  // its own, just a "See X" — the empty state only applies when it has neither.
+  const pointer = !citations.length && seeAlso.length;
+  let list;
+  if (!citations.length) list = pointer ? "" : `<div class="dd-empty">No citations for this topic.</div>`;
+  else if (edition === "nave-torrey") list = topicLabelGroupsHTML(citations);
+  else if (ranked && topicsSort === "rank") list = `<div class="topic-pills">${[...citations].sort((a, b) => a.rank - b.rank).map(c => topicPillHTML(c)).join("")}</div>`;
+  else list = topicBookGroupsHTML(citations);
+  const seeAlsoHtml = seeAlso.length ? `<div class="topic-see-also"><span>${pointer ? "See" : "See also"}</span>${seeAlso.map(n =>
+    `<button class="topic-chip" data-topic="${escAttr(n)}" onclick="openTopicDetail(this.dataset.topic, 'nave-torrey')">${escHtml(n)}</button>`).join("")}</div>` : "";
+  body.innerHTML = `<div class="tool-back-row"><button onclick="switchExploreTab('topics')">‹ All Topics</button></div>
+    <h3 class="topic-title">${escHtml(name)}</h3>
+    <div class="topic-meta">${escHtml(pointer ? "Cross-reference" : topicRefCount(citations.length))} · ${escHtml(TOPIC_EDITION_NAMES[edition] || edition)}</div>
+    ${sortRow}${list}${seeAlsoHtml}`;
+}
+// "1 Timothy 1:5,8-10" → "1:5,8-10" — under a book heading the book name on
+// every pill is just repetition. Falls back to the full citation.
+function topicShortCitation(citation) {
+  const m = citation.match(/^.+?\s(\d+(?::.*)?)$/);
+  return m ? m[1] : citation;
+}
+function topicPillHTML(c, short) {
+  const verses = c.verses || [];
+  const texts = verses.map(v => v.text).filter(Boolean);
+  let citeAttr = texts.length ? ` data-cite-id="${registerCiteId(c.citation, rangePreviewText(texts, verses.length))}"` : "";
+  if (!citeAttr && topicDetail.lazy && verses.length) citeAttr = ` data-ci="${c.i}" onmouseenter="resolveTopicPill(this)" onfocus="resolveTopicPill(this)"`;
+  const v = verses[0];
+  const jump = v ? ` onclick="closeExplore();jumpToVerse('${v.book}',${v.chapter},${v.verse})"` : "";
+  const shown = short ? topicShortCitation(c.citation) : c.citation;
+  const nameAttr = shown !== c.citation ? ` aria-label="${escAttr(c.citation)}"` : "";
+  return `<button class="prophecy-ref"${citeAttr}${nameAttr}${jump}>${escHtml(shown)}</button>`;
+}
+// Lazy path for a large topic: fetch just the verses a hover needs (the first
+// CITE_PREVIEW_MAX_VERSES — all the tooltip shows), once per pill.
+async function resolveTopicPill(el) {
+  if (el.dataset.citeId || el.dataset.ciBusy) return;
+  const c = topicDetail && topicDetail.citations[+el.dataset.ci];
+  if (!c) return;
+  el.dataset.ciBusy = "1";
+  const shown = c.verses.slice(0, CITE_PREVIEW_MAX_VERSES);
+  const byRef = await fetchVersePreviews(shown);
+  const texts = shown.map(v => byRef[`${v.book}.${v.chapter}.${v.verse}`]).filter(Boolean);
+  delete el.dataset.ciBusy;
+  if (!texts.length) return;
+  el.dataset.citeId = registerCiteId(c.citation, rangePreviewText(texts, c.verses.length));
+  if (el.matches(":hover, :focus")) showRefPreview(el);
+}
+function topicGroupHTML(heading, count, pillsHtml) {
+  return `<div class="topic-group"><h5 class="topic-group-head">${escHtml(heading)} <span>· ${count.toLocaleString("en-US")}</span></h5><div class="topic-pills">${pillsHtml}</div></div>`;
+}
+function topicBookGroupsHTML(citations) {
+  const order = new Map(bookList.map((b, i) => [b.usfm, i]));
+  const byBook = new Map();
+  const unplaced = [];
+  citations.forEach(c => {
     const v = c.verses && c.verses[0];
-    const text = v && previewByRef[`${v.book}.${v.chapter}.${v.verse}`];
-    const citeAttr = text ? ` data-cite-id="${registerCiteId(c.citation, text)}"` : "";
-    const jump = v ? ` onclick="closeExplore();jumpToVerse('${v.book}',${v.chapter},${v.verse})"` : "";
-    return `<button class="prophecy-ref" style="margin:0 6px 8px 0"${citeAttr}${jump}>${c.label ? escHtml(c.label) + ": " : ""}${escHtml(c.citation)}</button>`;
+    if (!v) { unplaced.push(c); return; }
+    if (!byBook.has(v.book)) byBook.set(v.book, []);
+    byBook.get(v.book).push(c);
+  });
+  const books = [...byBook.keys()].sort((a, b) => (order.has(a) ? order.get(a) : 999) - (order.has(b) ? order.get(b) : 999));
+  const firstVerse = c => c.verses[0].chapter * 1000 + c.verses[0].verse;
+  const section = (label, list) => !list.length ? "" : `<h4 class="tool-group-label topic-testament">${label}</h4>` + list.map(usfm => {
+    const cs = byBook.get(usfm).sort((a, b) => firstVerse(a) - firstVerse(b));
+    const b = bookList.find(x => x.usfm === usfm);
+    const heading = b ? b.name : cs[0].citation.replace(/\s\d+(?::.*)?$/, "");
+    return topicGroupHTML(heading, cs.length, cs.map(c => topicPillHTML(c, true)).join(""));
   }).join("");
-  body.innerHTML = backRow +
-    `<h3 style="font-family:var(--font-ui);font-weight:700;font-size:1.3rem;letter-spacing:-.01em;margin-bottom:14px">${escHtml(name)}</h3>
-    <div>${html || `<div class="dd-empty">No citations for this topic.</div>`}</div>`;
+  return section("Old Testament", books.filter(u => !NT_USFM.has(u))) +
+    section("New Testament", books.filter(u => NT_USFM.has(u))) +
+    (unplaced.length ? `<h4 class="tool-group-label topic-testament">Other references</h4><div class="topic-pills">${unplaced.map(c => topicPillHTML(c)).join("")}</div>` : "");
+}
+function topicLabelGroupsHTML(citations) {
+  const byLabel = new Map();
+  citations.forEach(c => {
+    const label = c.label || "General references";
+    if (!byLabel.has(label)) byLabel.set(label, []);
+    byLabel.get(label).push(c);
+  });
+  return [...byLabel].map(([label, cs]) => topicGroupHTML(label, cs.length, cs.map(c => topicPillHTML(c)).join(""))).join("");
 }
 
 /* ── Bible Atlas — GET /geo/places (search), GET /geo/places/{id} (detail

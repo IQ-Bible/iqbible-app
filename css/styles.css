@@ -1734,6 +1734,19 @@ button.bookicon-badge:active{ transform:scale(.96); }
    covers. ── */
 #exploreBody,#studyBody{ max-width:900px; margin:0 auto; }
 .tool-filter-row{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+/* Explore > Topics detail — references grouped under testament → book (or a
+   Nave/Torrey subheading) headings instead of one undivided wall of pills. */
+.topic-title{ font-family:var(--font-ui); font-weight:700; font-size:1.3rem; letter-spacing:-.01em; margin:0 0 2px; }
+.topic-meta{ font-family:var(--font-ui); font-size:.7rem; color:var(--muted); margin-bottom:14px; }
+h4.topic-testament{ margin:0; font-weight:600; }
+.topic-group{ margin-bottom:14px; }
+.topic-group-head{ font-family:var(--font-ui); font-weight:700; font-size:.8rem; color:var(--ink); margin:0 0 6px; }
+.topic-group-head span{ color:var(--muted); font-weight:500; }
+.topic-pills{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
+.topic-group .topic-pills{ margin-bottom:0; }
+.topic-pills .prophecy-ref{ min-height:24px; min-width:24px; }
+.topic-see-also{ display:flex; flex-wrap:wrap; align-items:center; gap:3px; border-top:1px solid var(--divider); padding-top:14px; margin-top:6px; }
+.topic-see-also > span{ font-family:var(--font-ui); font-size:.7rem; color:var(--muted); margin-right:6px; }
 .tool-group-label{ font-family:var(--font-ui); font-size:.6rem; letter-spacing:.12em; text-transform:uppercase; color:var(--brand); padding:14px 0 6px; }
 .tool-group-label:first-child{ padding-top:0; }
 .tool-hint{ font-size:.82rem; color:var(--muted); line-height:1.6; margin-bottom:16px; }

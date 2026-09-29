@@ -3096,7 +3096,7 @@ async function showTopicsTool() {
     const d = await apiJSONCached(`/topics/${book}/${chapter}/${verse}`);
     const topics = d.data || [];
     if (!topics.length) { body.innerHTML = `<div class="dd-empty">No topics for this verse.</div>`; return; }
-    body.innerHTML = topics.map(t => `<button class="topic-chip" onclick="jumpToTopicDetail('${t.name.replace(/'/g, "\\'")}')">${escHtml(t.name)}</button>`).join("");
+    body.innerHTML = topics.map(t => `<button class="topic-chip" data-topic="${escAttr(t.name)}" data-edition="${escAttr(t.edition || "")}" onclick="jumpToTopicDetail(this.dataset.topic, this.dataset.edition)">${escHtml(t.name)}</button>`).join("");
   } catch (e) { body.innerHTML = `<div class="dd-empty">Could not load topics.</div>`; }
 }
 // Reuses Explore > Topics' own detail view (openTopicDetail, js/explore.js)
@@ -3104,12 +3104,9 @@ async function showTopicsTool() {
 // this just gets the visitor there instead of calling switchExploreTab
 // first (which would fetch/render the full topic list only to immediately
 // replace it).
-function jumpToTopicDetail(name) {
+function jumpToTopicDetail(name, edition) {
   closeVerseTools();
-  switchMainView("explore");
-  exploreActiveTab = "topics";
-  document.querySelectorAll("#exploreTabs .lib-tab").forEach(b => b.classList.toggle("active", b.dataset.tab === "topics"));
-  openTopicDetail(name);
+  openTopicFromLink(name, edition);
 }
 // mhenry/gill are the two commentaries covering all 66 books (see
 // GET /commentaries' own doc comment) — preferred defaults, when the

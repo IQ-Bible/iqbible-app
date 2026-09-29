@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file. This CHANGE
 
 ## [Unreleased]
 
+## [1.25.0] - 2026-09-29- **fixed:** Explore > Topics — many reference pills showed no verse on hover (only the first
+  80 verses of a topic were ever loaded); every pill now previews its verses, loaded in the same
+  call as the topic itself.
+- **changed:** A topic's references are no longer one undivided wall of pills: curated topics are
+  grouped under Old/New Testament and book headings (with a per-book count and just the
+  chapter:verse on each pill), with a Book order / Relevance toggle for reading them most-relevant
+  first; Nave/Torrey topics are grouped under the source's own subheadings. A topic now shows how
+  many references it has, and links to its related "See also" topics.
+- **added:** The topic list shows each topic's reference count (and, under All, which edition it's
+  from — a name in both editions now opens the one you clicked).
+- **added:** An open topic is shareable — the address becomes e.g. `#explore/topics/love` (or
+  `#explore/topics/love/nave-torrey`), and opening that link goes straight to the topic.
+- **fixed:** A Nave/Torrey topic that is only a cross-reference (e.g. "abarim" → "nebo") no longer
+  says "No citations for this topic" — it shows the topic(s) it points to as links, and its row in
+  the topic list reads "Cross-reference" instead of "0 references".
+- **changed:** The largest topics (some have 2,700+ references) no longer download every verse's
+  text up front — their previews load on first hover instead, so opening them stays fast.
+
 ## [1.24.1] - 2026-09-22
 - **removed:** `ACCESSIBILITY.md` — the WCAG 2.2 AA remediation log it kept is no longer needed
   now that the pass it tracked (2026-09-05) is done; its five remaining follow-ups are now
