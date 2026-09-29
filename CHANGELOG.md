@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file. This CHANGE
 
 ## [Unreleased]
 
+## [1.26.2] - 2026-09-29
+- **changed:** Topic names now capitalize every word ("Son Of God", "Jesus, The Christ") instead of
+  only the first letter, so proper names like God and Christ come out right; small words such as
+  "Of" and "The" are capitalized too. Still display-only — the API returns them lower-case and
+  shared links keep the lower-case name.
+
 ## [1.26.1] - 2026-09-29
 - **changed:** Topic names now start with a capital letter in the topic list, on a topic's page, and
   on topic chips (the API returns them all lower-case; only the first letter is capitalized for

@@ -1746,8 +1746,8 @@ h4.topic-testament{ margin:0; font-weight:600; }
 .topic-pills{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
 .topic-group .topic-pills{ margin-bottom:0; }
 .topic-pills .prophecy-ref{ min-height:24px; min-width:24px; }
-/* The API returns every topic name lower-case ("aaron", "eternal life"); capitalize the first letter for display only — the data and the #explore/topics/... link stay as returned. Proper casing of the rest of a name is the API's to supply (iqbible-app issue). */
-#topicsListArea .vt::first-letter,.topic-title::first-letter,.topic-chip::first-letter{ text-transform:uppercase; }
+/* The API returns every topic name lower-case ("aaron", "son of god"); capitalize each word for display only — proper names (God, Christ) matter more than the small words this also capitalizes ("Of", "The"), and skipping those would need a word list. The data and the #explore/topics/... link stay as returned; proper casing is the API's to supply (iqbible-app#22). */
+#topicsListArea .vt,.topic-title,.topic-chip{ text-transform:capitalize; }
 .topic-chipgroup{ display:inline-flex; gap:8px; flex-wrap:wrap; }
 .topic-chipgroup + .topic-chipgroup{ margin-left:8px; padding-left:16px; border-left:1px solid var(--divider); }
 @media (max-width:600px){ .topic-chipgroup + .topic-chipgroup{ margin-left:0; padding-left:0; border-left:none; } }
