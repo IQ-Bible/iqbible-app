@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file. This CHANGE
 
 ## [Unreleased]
 
+## [1.26.1] - 2026-09-29
+- **changed:** Topic names now start with a capital letter in the topic list, on a topic's page, and
+  on topic chips (the API returns them all lower-case; only the first letter is capitalized for
+  display, and shared links keep the lower-case name).
+- **fixed:** Clickable list rows — topics, Harmony sections, Atlas places, audio narrations, and
+  people search results — showed the ordinary arrow cursor instead of the pointing hand.
+
 ## [1.26.0] - 2026-09-29
 - **changed:** A topic's references now read as a list — each reference is a row with its verse
   text showing above its citation pill (the same shape as Cross-refs and Prophecies), so a
