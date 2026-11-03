@@ -3,6 +3,8 @@
 All notable changes to this project will be documented in this file. This CHANGELOG follows SemVer, see https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
+- **added:** README now opens with a "Call the API in 60 seconds" section: a curl call and a Node
+  fetch call that read a chapter, with the key header and a note not to put a key in a public page.
 
 ## [1.26.2] - 2026-09-29
 - **changed:** Topic names now capitalize every word ("Son Of God", "Jesus, The Christ") instead of

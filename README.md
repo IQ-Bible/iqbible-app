@@ -8,6 +8,26 @@ Every feature here comes from a real API call. There's no server, no build step,
 
 The hosted instance runs at **[app.iqbible.com](https://app.iqbible.com)** — nothing to set up, just start reading. (It's backed by a shared API key so anonymous visitors don't have to get their own; see ["Deploying for other people"](#if-youre-deploying-for-other-people-to-use-not-just-yourself) for how that works and why your own deployment shouldn't copy it blindly.)
 
+## Call the API in 60 seconds
+
+Get a free key at [developer.iqbible.com](https://developer.iqbible.com) (50,000 requests a month, no card). Then read John 3 in the KJV:
+
+```sh
+curl -H "X-IQBible-API-Key: YOUR_KEY" https://api.iqbible.com/api/v2/bibles/eng_kjv/JHN/3
+```
+
+The same call from Node 18 or later:
+
+```js
+const res = await fetch("https://api.iqbible.com/api/v2/bibles/eng_kjv/JHN/3", {
+  headers: { "X-IQBible-API-Key": "YOUR_KEY" },
+});
+const { data } = await res.json();
+console.log(data.map((v) => v.text).join(" "));
+```
+
+This is the call the reader below makes for every chapter. Run it from a server or a script, not from a public web page, or your key is visible to every visitor. The full reference is at [api.iqbible.com/docs](https://api.iqbible.com/docs) and needs no account.
+
 ## Running it locally
 
 No build step, no dependencies — but you do need to serve it over HTTP from the project root. Any static file server works:
