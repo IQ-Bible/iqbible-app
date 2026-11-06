@@ -22,6 +22,8 @@ All notable changes to this project will be documented in this file. This CHANGE
   it comes from the API's own data (one `GET /ai/context` call); nothing is AI-generated. A
   Strong's number links to its full entry in Study Tools > Word Study, which now also opens from a
   link: `#study-tools/word/G25`.
+- **added:** The Take a Tour walkthrough has a Scroll the Bible step, right after Reading — it points
+  at the top-bar button on a phone and the left-nav link on desktop.
 - **added:** Moving between the main app and Scroll cross-fades in browsers that support it
   (skipped for reduced motion).
 - **fixed:** Tapping a verse reference in prose (a commentary or definition citation) on a phone
