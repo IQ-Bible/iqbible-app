@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file. This CHANGE
 
 ## [Unreleased]
 
+## [1.27.1] - 2026-11-06
+- **changed:** The Explain sheet in Scroll is now three collapsible sections — What it means, In
+  the original, Related verses — each showing a short peek until you open it, and starting
+  collapsed again on every verse. The commentary leads, since it answers "what does this verse
+  mean"; if the chosen source has no entry for the verse, that section drops to the bottom instead
+  of opening the sheet on an empty heading. Tapping anywhere on a collapsed peek opens it (not just
+  the heading), except on a citation, a reference button or a Strong's chip, which keep their own
+  action.
+- **changed:** In the original shows the verse as one line of Hebrew or Greek with a word count, and
+  opens to a list with each Hebrew or Greek word above its pronunciation, gloss, grammar and
+  Strong's number, instead of a grid of cards. Related verses shows the first two rows until opened.
+- **fixed:** The reference buttons in Explain's Related verses were too faint in dark mode; they now
+  use the main text color.
+
 ## [1.27.0] - 2026-11-06
 - **added:** Scroll the Bible, at `/scroll/` — read one verse at a time, just by scrolling. Each
   verse is a full-screen card; chapters load as you near either end, with a chapter title card at

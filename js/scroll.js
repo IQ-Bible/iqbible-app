@@ -476,11 +476,21 @@ scAudioEl.addEventListener("error", async () => {
    + 1 per section; "strongs" is left out, it only repeats what each original
    word already carries). Switching commentary source re-fetches just that
    section. Every verse reference shows its text inline and is previewable
-   (js/previews.js), per the app's citation rule. ── */
+   (js/previews.js), per the app's citation rule.
+
+   The sheet is three collapsible sections — What it means, In the original,
+   Related verses — each showing a short peek until opened, and all collapsed
+   again for the next verse. The commentary leads (it's what answers "what does
+   this verse mean"); if the chosen source has no entry for the verse it drops
+   to the bottom so the sheet never opens on an empty section. ── */
 const SC_COMMENTARIES = [{ id: "mhenry", name: "Matthew Henry" }, { id: "gill", name: "John Gill" }];
 const SC_COMM_KEY = "iqb_scroll_commentary";
 const SC_REFS_PAGE = 8;
-const scExplain = { ref: null, gen: 0, refs: [], shown: 0 };
+const SC_CHEVRON = `<svg class="sc-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>`;
+// open: which sections are expanded — { meaning, original, related }. Deliberately
+// not saved: every verse opens with all three collapsed. It only outlives a
+// re-render of the same sheet (switching commentary source).
+const scExplain = { ref: null, gen: 0, refs: [], shown: 0, open: {} };
 function scCommentarySource() {
   const s = localStorage.getItem(SC_COMM_KEY);
   return SC_COMMENTARIES.some(c => c.id === s) ? s : "mhenry";
@@ -492,62 +502,127 @@ function scOpenExplain() {
   const d = scCurVerse();
   if (!d) return;
   scExplain.ref = { book: d.book, bookName: d.bookName, chapter: +d.chapter, verse: +d.verse };
+  scExplain.open = {};
   scById("scExplainTitle").textContent = `${d.bookName} ${d.chapter}:${d.verse}`;
   openModal("scExplainScrim");
   scRenderExplain();
 }
-function scOriginalHtml(d) {
-  const words = (d.original || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
-  if (!words.length) return `<section class="sc-sec"><h3>In the original</h3><p class="sc-none">No original-language text for this verse.</p></section>`;
-  const lang = d.language || ""; // the API's own label ("hebrew" for the Old Testament, "greek" for the New)
-  const rtl = lang === "hebrew";
-  const items = words.map(w => {
-    const p = w.pronun && typeof w.pronun === "object" ? w.pronun : {};
-    const say = p.dic || p.sbl || "";
-    return `<div class="sc-ow"><div class="sc-ow-orig" lang="${rtl ? "he" : "grc"}" dir="${rtl ? "rtl" : "ltr"}">${escHtml(w.word)}</div>`
-      + (say ? `<div class="sc-ow-pron"${p.ipa ? ` title="${escAttr(p.ipa)}"` : ""}>${escHtml(say)}</div>` : "")
-      + (w.glossary ? `<div class="sc-ow-gloss">${escHtml(w.glossary)}</div>` : "")
-      + (w.strongs_id ? `<button type="button" class="sc-ow-strongs" onclick="scWordStudy('${escAttr(w.strongs_id)}')" aria-label="Full lexicon entry for ${escAttr(w.strongs_id)}">${escHtml(w.strongs_id)}</button>` : "")
-      + (w.morph ? `<div class="sc-ow-morph">${escHtml(w.morph)}</div>` : "") + `</div>`;
-  });
-  return `<section class="sc-sec"><h3>In the original${lang ? ` <span class="sc-tag">${escHtml(humanizeToken(lang))}</span>` : ""}</h3><div class="sc-ow-list"${rtl ? ' dir="rtl"' : ""}>${items.join("")}</div></section>`;
+
+/* ── collapsible sections ── */
+// variant: "clamp"  — the body is cut to a few lines (the commentary) with a fade;
+//          "rows"   — the body shows a head start and the rest is display:none until opened.
+// `pre` sits between the heading and the body and is always visible (the source switch);
+// `post` sits after the body (the attribution, the "show more" button).
+function scAccordion(id, variant, titleHtml, bodyHtml, { pre = "", post = "", fade = true } = {}) {
+  const open = !!scExplain.open[id];
+  return `<section class="sc-sec sc-acc${open ? " open" : ""}" id="scSec-${id}" data-sec="${id}" data-variant="${variant}">`
+    + `<h3><button type="button" class="sc-acc-head" aria-expanded="${open}" aria-controls="scBody-${id}" onclick="scToggleSec('${id}')"><span>${titleHtml}</span>${SC_CHEVRON}</button></h3>`
+    + pre
+    + `<div class="sc-acc-body" id="scBody-${id}">${bodyHtml}`
+    + (fade ? `<div class="sc-fade" aria-hidden="true"></div>` : "")
+    + `</div>` + post + `</section>`;
 }
+function scPlainSection(id, titleHtml, bodyHtml, pre = "") {
+  return `<section class="sc-sec" id="scSec-${id}" data-sec="${id}"><h3>${titleHtml}</h3>${pre}${bodyHtml}</section>`;
+}
+function scToggleSec(id) {
+  const sec = scById("scSec-" + id);
+  if (!sec) return;
+  const open = sec.classList.toggle("open");
+  const btn = sec.querySelector(".sc-acc-head");
+  if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
+  scExplain.open[id] = open;
+  scSyncPeekFocus(sec);
+}
+// A clamped body still holds the links that are cut off; keep them out of the
+// tab order while collapsed so focus can't land on text you can't see.
+function scSyncPeekFocus(sec) {
+  const body = sec && sec.querySelector(".sc-acc-body");
+  if (!body) return;
+  const clamped = sec.dataset.variant === "clamp" && !sec.classList.contains("open");
+  const edge = body.getBoundingClientRect().bottom + 1;
+  body.querySelectorAll("button, a").forEach(el => {
+    if (clamped && el.getBoundingClientRect().bottom > edge) el.setAttribute("tabindex", "-1");
+    else el.removeAttribute("tabindex");
+  });
+}
+// A clamped section whose text already fits in the peek has nothing to expand:
+// make it a plain heading rather than a button that does nothing.
+function scSettleSection(sec) {
+  if (!sec || sec.dataset.variant !== "clamp" || !sec.classList.contains("sc-acc")) return;
+  const body = sec.querySelector(".sc-acc-body");
+  const wasOpen = sec.classList.contains("open");
+  sec.classList.remove("open");
+  const fits = body.scrollHeight <= body.clientHeight + 4;
+  if (wasOpen) sec.classList.add("open");
+  if (!fits) { scSyncPeekFocus(sec); return; }
+  sec.querySelector("h3").textContent = sec.querySelector(".sc-acc-head > span").textContent;
+  const fade = sec.querySelector(".sc-fade");
+  if (fade) fade.remove();
+  sec.classList.remove("sc-acc", "open");
+  sec.dataset.variant = "plain";
+  body.querySelectorAll("[tabindex]").forEach(el => el.removeAttribute("tabindex"));
+}
+
+/* ── the three sections ── */
 async function scCommentaryHtml(entries, src) {
   const name = SC_COMMENTARIES.find(c => c.id === src).name;
   const chips = SC_COMMENTARIES.map(c => `<button type="button" class="sc-chip sc-chip-sm${c.id === src ? " on" : ""}" aria-pressed="${c.id === src}" onclick="scSetCommentary('${c.id}')">${c.name}</button>`).join("");
-  let inner;
-  if (!(entries || []).length) inner = `<p class="sc-none">${escHtml(name)} has no entry for this exact verse.</p>`;
-  else {
-    const paras = await Promise.all(entries.map(e => linkifyPreParsedCitations(e.text || "", e.citations)));
-    const title = entries[0].source_title;
-    inner = `<div class="sc-comm" id="scComm">${paras.map(p => `<p>${p}</p>`).join("")}</div>`
-      + `<button type="button" class="sc-textbtn" id="scCommMore" onclick="scToggleComm()" aria-expanded="false" aria-controls="scComm" hidden>Read more</button>`
-      + (title ? `<div class="sc-attrib">${escHtml(title)}</div>` : "");
-  }
-  return `<section class="sc-sec" id="scCommSec"><h3>What it means</h3><div class="sc-chips" role="group" aria-label="Commentary source">${chips}</div>${inner}</section>`;
+  const pre = `<div class="sc-chips" role="group" aria-label="Commentary source">${chips}</div>`;
+  if (!(entries || []).length) return scPlainSection("meaning", "What it means", `<p class="sc-none">${escHtml(name)} has no entry for this exact verse.</p>`, pre);
+  const paras = await Promise.all(entries.map(e => linkifyPreParsedCitations(e.text || "", e.citations)));
+  const title = entries[0].source_title;
+  return scAccordion("meaning", "clamp", "What it means", `<div class="sc-comm">${paras.map(p => `<p>${p}</p>`).join("")}</div>`,
+    { pre, post: title ? `<div class="sc-attrib">${escHtml(title)}</div>` : "" });
 }
-// Long entries start collapsed; the button only appears when there's actually more to show.
-function scFitCommentary() {
-  const el = scById("scComm"), more = scById("scCommMore");
-  if (el && more) more.hidden = !(el.scrollHeight > el.clientHeight + 4) && !el.classList.contains("open");
+function scOriginalHtml(d) {
+  const words = (d.original || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+  if (!words.length) return scPlainSection("original", "In the original", `<p class="sc-none">No original-language text for this verse.</p>`);
+  const lang = d.language || ""; // the API's own label ("hebrew" for the Old Testament, "greek" for the New)
+  const rtl = lang === "hebrew", la = rtl ? "he" : "grc", dir = rtl ? "rtl" : "ltr";
+  const rows = words.map(w => {
+    const p = w.pronun && typeof w.pronun === "object" ? w.pronun : {};
+    const say = p.dic || p.sbl || "";
+    // The word on top (with its Strong's chip at the far end), its pronunciation / gloss / grammar underneath.
+    return `<div class="sc-ow"><div class="sc-ow-head"><div class="sc-ow-orig" lang="${la}" dir="${dir}">${escHtml(w.word)}</div>`
+      + (w.strongs_id ? `<button type="button" class="sc-ow-strongs" onclick="scWordStudy('${escAttr(w.strongs_id)}')" aria-label="Full lexicon entry for ${escAttr(w.strongs_id)}">${escHtml(w.strongs_id)}</button>` : "") + `</div>`
+      + `<div class="sc-ow-mid">`
+      + (say ? `<span class="sc-ow-pron"${p.ipa ? ` title="${escAttr(p.ipa)}"` : ""}>${escHtml(say)}</span>` : "")
+      + (w.glossary ? `<span class="sc-ow-gloss">${escHtml(w.glossary)}</span>` : "")
+      + (w.morph ? `<span class="sc-ow-morph">${escHtml(w.morph)}</span>` : "") + `</div></div>`;
+  }).join("");
+  // The peek is the verse itself in the original script, as one running line — the API's words in order.
+  const line = `<div class="sc-orig-line" lang="${la}" dir="${dir}">${words.map(w => escHtml(w.word)).join(" ")}</div>`
+    + `<div class="sc-orig-count">${words.length} word${words.length === 1 ? "" : "s"} — open for each one</div>`;
+  return scAccordion("original", "rows", `In the original${lang ? ` <span class="sc-tag">${escHtml(humanizeToken(lang))}</span>` : ""}`,
+    line + `<div class="sc-ow-rows">${rows}</div>`, { fade: false });
 }
-function scToggleComm() {
-  const el = scById("scComm"), more = scById("scCommMore");
-  const open = el.classList.toggle("open");
-  more.textContent = open ? "Show less" : "Read more";
-  more.setAttribute("aria-expanded", open ? "true" : "false");
+function scRelatedHtml(total) {
+  const title = `Related verses${total ? ` <span class="sc-tag">${total}</span>` : ""}`;
+  if (!total) return scPlainSection("related", "Related verses", `<p class="sc-none">No cross-references for this verse.</p>`);
+  const list = `<div id="scRefsList"></div>`;
+  const more = `<button type="button" class="sc-textbtn" id="scRefsMore" onclick="scMoreRefs()" hidden></button>`;
+  // Two rows or fewer is already the whole list: nothing to open.
+  return total <= 2 ? scPlainSection("related", title, list)
+    : scAccordion("related", "rows", title, list, { post: more });
 }
+
 async function scSetCommentary(id) {
   localStorage.setItem(SC_COMM_KEY, id);
   const ref = scExplain.ref, gen = scExplain.gen;
-  const sec = scById("scCommSec");
+  const sec = scById("scSec-meaning");
   if (!sec) return;
   sec.insertAdjacentHTML("beforeend", `<div class="spin" role="status" aria-label="Loading"></div>`);
   try {
     const d = await apiJSONCached(scExplainPath(ref, "commentary", id));
     if (gen !== scExplain.gen) return;
-    sec.outerHTML = await scCommentaryHtml(d.commentary, id);
-    if (gen === scExplain.gen) requestAnimationFrame(scFitCommentary);
+    const html = await scCommentaryHtml(d.commentary, id);
+    if (gen !== scExplain.gen) return;
+    // A source with no entry drops to the bottom; one with an entry comes back to the top.
+    const slot = scById((d.commentary || []).length ? "scCommTop" : "scCommBottom");
+    sec.remove();
+    slot.innerHTML = html;
+    requestAnimationFrame(() => scSettleSection(scById("scSec-meaning")));
   } catch (e) {
     if (gen !== scExplain.gen) return;
     const sp = sec.querySelector(".spin"); if (sp) sp.remove();
@@ -570,9 +645,11 @@ async function scMoreRefs() {
     return `<div class="sc-xref"><div class="sc-xref-text">${text ? escHtml(text) : `<span class="sc-none">Text unavailable</span>`}</div>`
       + `<button type="button" class="sc-xref-ref"${citeAttr} onclick="scJumpToRef('${t.book}',${t.chapter},${t.verse})">${escHtml(label)}</button></div>`;
   }).join(""));
-  const left = scExplain.refs.length - scExplain.shown;
-  more.hidden = left <= 0;
-  more.textContent = `Show ${Math.min(left, SC_REFS_PAGE)} more`;
+  if (more) {
+    const left = scExplain.refs.length - scExplain.shown;
+    more.hidden = left <= 0;
+    more.textContent = `Show ${Math.min(left, SC_REFS_PAGE)} more`;
+  }
 }
 function scJumpToRef(book, chapter, verse) {
   hideFloatingTooltip();
@@ -600,18 +677,30 @@ async function scRenderExplain() {
   if (gen !== scExplain.gen) return;
   scExplain.refs = (d.cross_references || []).map(e => e.reference).filter(Boolean);
   scExplain.shown = 0;
-  const total = scExplain.refs.length;
+  const hasComm = (d.commentary || []).length > 0;
   body.innerHTML =
     (d.text ? `<blockquote class="sc-quote">${escHtml(d.text.replace(/¶\s*/g, ""))}</blockquote>` : "")
-    + scOriginalHtml(d) + comm
-    + `<section class="sc-sec"><h3>Related verses${total ? ` <span class="sc-tag">${total}</span>` : ""}</h3>`
-    + (total ? `<div id="scRefsList"></div><button type="button" class="sc-textbtn" id="scRefsMore" onclick="scMoreRefs()" hidden></button>` : `<p class="sc-none">No cross-references for this verse.</p>`) + `</section>`
+    + `<div id="scCommTop">${hasComm ? comm : ""}</div>`
+    + scOriginalHtml(d)
+    + scRelatedHtml(scExplain.refs.length)
+    + `<div id="scCommBottom">${hasComm ? "" : comm}</div>`
     + (d.errors && Object.keys(d.errors).length ? `<p class="sc-none">Some parts are temporarily unavailable.</p>` : "")
     + `<p class="sc-foot">Original-language text, glosses, commentary and cross-references come from the IQ Bible API. Nothing here is AI-generated.</p>`;
-  requestAnimationFrame(scFitCommentary);
-  if (total) scMoreRefs();
+  requestAnimationFrame(() => scSettleSection(scById("scSec-meaning")));
+  if (scExplain.refs.length) scMoreRefs();
 }
 scById("scExplainBody").addEventListener("scroll", () => hideFloatingTooltip(), { passive: true });
+// A collapsed peek opens when you tap anywhere on it, not just on the heading —
+// except on something with its own action (a citation, a reference button, a
+// Strong's chip) or while selecting text. A pointer convenience only: the
+// heading button is the real control (keyboard, screen readers).
+scById("scExplainBody").addEventListener("click", e => {
+  const sec = e.target.closest(".sc-acc-body") && e.target.closest(".sc-acc");
+  if (!sec || sec.classList.contains("open")) return;
+  if (e.target.closest("button, a, input, select, textarea, [data-cite-id]")) return;
+  if (window.getSelection().toString()) return;
+  scToggleSec(sec.dataset.sec);
+});
 
 /* ── pickers ── */
 async function scOpenJump() {
