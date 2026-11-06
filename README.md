@@ -87,6 +87,15 @@ If you want anonymous end users to skip that step (a consumer app rather than a 
   whatever language/audio filter is currently active in the list)
 - Full chapter reading with paragraph markers, a drop cap, and inline Schnorr illustrations
 - Inline story titles (e.g. "The Flood") resolved from free-text references
+- **Scroll the Bible** (`/scroll/`): a second, much smaller front end on the same API — one verse
+  per full-screen card, read by scrolling. It's a separate entry (`scroll/index.html`,
+  `css/scroll.css`, `js/scroll.js`) that loads only `config.js`, `api.js`, `catalog.js` and `previews.js`, none of
+  the reader. Chapters are fetched one call each and cut into cards, appended and prepended as you
+  scroll. Bookmarks and highlights use the same `localStorage` keys as the main app, so they show up
+  in My Library. **Explain** assembles, from one `GET /ai/context` call, the verse's original-language
+  words (with Strong's glosses), a classic commentary entry, and its cross-references — nothing
+  generated. Listen plays the whole chapter, with a narrator picker where a translation has more than
+  one voice: the API's narration is per chapter, not per verse, so the cards can't follow along
 - Inline audio narration playback where available, with a narrator picker when a version has more
   than one recorded. Narration URLs are short-lived signed links, so the app re-requests one
   transparently (keeping your place) if it lapses while a chapter is paused — the listener never
@@ -160,11 +169,13 @@ a file**: place it after everything it depends on.
 | `js/config.js` | The constants a fork actually edits — `BASE_PATH` (GitHub Pages subpath), `FEATURE_SEARCH_ALL_VERSIONS`, `APP_VERSION` (offline version fallback) — plus the `api.iqbible.com` endpoint and the hosted-instance switch. |
 | `js/api.js` | Shared mutable state (loaded first, so it exists before anything reads it), the API-key and `localStorage` helpers, the `apiFetch` / `apiJSON` wrappers every request goes through, Settings, and `openModal` / `closeModal`. |
 | `js/catalog.js` | Version / book / chapter pickers; the ISO-639-3 → BCP-47 language map. |
-| `js/reader.js` | Chapter rendering, inline illustrations and story titles, the book icon, the audio player, the chapter-context row — plus the shared verse-preview helpers (`linkifyCitations`, `registerCiteId`, `fetchVersePreviews`). |
+| `js/previews.js` | The shared verse-preview helpers — the floating tooltip, `linkifyCitations`, `linkifyPreParsedCitations`, `registerCiteId`, `fetchVersePreviews`. Split out of the reader so `/scroll/` can use them too. |
+| `js/reader.js` | Chapter rendering, inline illustrations and story titles, the book icon, the audio player, the chapter-context row, Verse Tools. |
 | `js/search.js` | The full-text search overlay (Verses and People tabs). |
 | `js/notes.js`, `js/notesdrawer.js` | The My Library overlay (Notes / Bookmarks / Highlights / History) and the dockable Notes drawer. |
 | `js/devotionals.js`, `js/profile.js`, `js/share.js`, `js/explore.js`, `js/study.js`, `js/plans.js`, `js/progress.js` | One feature area each — devotionals, the profile popover, Share Tools, Explore, Study Tools, Reading Plans, My Progress. |
 | `js/router.js` | Deep-link path parsing (`/gen/1/1`) and keeping the URL in sync via `pushState` / `popstate`. |
+| `scroll/index.html`, `css/scroll.css`, `js/scroll.js` | Scroll the Bible (`/scroll/`) — its own page and script, independent of the reader. Loads only `config.js`, `api.js`, `catalog.js` and `previews.js`. |
 | `js/tour.js` | The guided tour; `TOUR_STEPS` targets nav-rail and topbar elements by CSS selector. |
 | `js/main.js` | Global event wiring and the init sequence. Loaded last — it assumes every function above already exists. |
 

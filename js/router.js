@@ -37,7 +37,16 @@ function currentPath() {
 // redundant duplicate entry pointing at the same content once its URL is
 // filled in.
 let urlSynced = false;
+// Points every "Scroll the Bible" link (nav rail, mobile top bar) at the verse
+// being read, so switching views lands in the same place. Scroll's own start-up
+// reads ?ref=BOOK.CH[.V] — see scStartRef, js/scroll.js.
+function syncScrollLinks() {
+  const ref = `${current.book}.${current.chapter}${current.verse ? "." + current.verse : ""}`;
+  const href = `${BASE_PATH}/scroll/?ref=${ref}&ver=${encodeURIComponent(current.version)}`;
+  document.querySelectorAll("[data-scroll-link]").forEach(a => { a.href = href; });
+}
 function syncURL() {
+  syncScrollLinks();
   const path = currentPath();
   if (location.pathname + location.search === path) { urlSynced = true; return; }
   // Keep any menu-view hash (/gen/38/26#explore) across the rewrite — a bare
@@ -93,6 +102,14 @@ function openHashRoute() {
     let name;
     try { name = decodeURIComponent(r.rest[0]); } catch (e) { name = r.rest[0]; }
     openTopicFromLink(name, r.rest[1] === "nave-torrey" ? "nave-torrey" : null);
+    return;
+  }
+  // #study-tools/word/G25 opens Word Study on that Strong's entry — what Scroll's
+  // Explain sheet links to for a full lexicon entry.
+  if (r.key === "study" && r.tab === "word" && r.rest[0]) {
+    let id;
+    try { id = decodeURIComponent(r.rest[0]); } catch (e) { id = r.rest[0]; }
+    openWordStudy(id);
     return;
   }
   navMenuClick(r.key, r.tab);

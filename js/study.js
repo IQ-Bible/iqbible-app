@@ -207,7 +207,7 @@ async function runWordStudy(key) {
    counterpart to the reader's dictionary-term modal (openDictTermModal,
    js/reader.js), which can only be reached by clicking a word the chapter
    text already marked — this lets a reader look up anything. Reuses
-   DICT_SOURCES and linkifyPreParsedCitations from reader.js. Search-only:
+   DICT_SOURCES from reader.js and linkifyPreParsedCitations from previews.js. Search-only:
    the API exposes no browse/A–Z term index, so this doesn't invent one. ── */
 let dictStudyQuery = "";
 let dictStudyToken = 0;

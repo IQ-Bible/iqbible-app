@@ -12,7 +12,7 @@
  *
  * Bump CACHE_VERSION on every deploy so clients pick up new shell assets.
  */
-const CACHE_VERSION = "1.26.2";
+const CACHE_VERSION = "1.27.0";
 const CACHE = `iqbible-shell-${CACHE_VERSION}`;
 
 // Local development: serving from localhost/127.0.0.1 means every edit to a
@@ -29,6 +29,9 @@ const CORE = [
   "/index.html",
   "/404.html",
   "/css/styles.css",
+  "/css/scroll.css",
+  "/scroll/",
+  "/scroll/index.html",
   "/manifest.webmanifest",
   "/img/logo.png",
   "/img/icon-192.png",
@@ -64,9 +67,11 @@ self.addEventListener("fetch", e => {
 
   // Navigations: network first, fall back to the cached shell so a deep link
   // still opens offline (the app's own no-connection states handle the rest).
+  // /scroll/ is its own page, so it falls back to its own shell, not the reader's.
   if (req.mode === "navigate") {
+    const shell = url.pathname.startsWith("/scroll") ? "/scroll/index.html" : "/index.html";
     e.respondWith(
-      fetch(req).catch(() => caches.match("/index.html"))
+      fetch(req).catch(() => caches.match(shell))
     );
     return;
   }

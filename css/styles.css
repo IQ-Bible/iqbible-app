@@ -76,6 +76,11 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{ outline:2px sol
 .dictbody p a,.hint a,.view-desc a,.about-runs a,.help-faq-a a,.about-callout-body a,
 #keyBanner p a,#dataBackupBanner p a,.navfoot-ver a,.emptynote a,.tool-hint a{ text-decoration:underline; }
 
+/* Same-origin page-to-page navigations (the main app <-> /scroll/) cross-fade
+   natively where the browser supports it; elsewhere they're ordinary loads.
+   Skipped for reduced motion. */
+@media (prefers-reduced-motion:no-preference){ @view-transition{ navigation:auto; } }
+
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; scroll-behavior:auto !important; }
   html{ scroll-behavior:auto; }
@@ -110,8 +115,8 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{ outline:2px sol
 .wm span{ color:var(--ink); }
 .logo-icon{ width:26px; height:26px; border-radius:var(--r-sm); flex-shrink:0; }
 #topActions{ margin-left:auto; display:flex; align-items:center; gap:10px; }
-#searchTrigger,#fontSizeTrigger,#themeTrigger,#profileTrigger,#displayBtn{ display:flex; align-items:center; justify-content:center; width:34px; height:34px; flex-shrink:0; background:none; border:1px solid var(--divider); border-radius:var(--r-sm); color:var(--muted); transition:all .2s; }
-#searchTrigger:hover,#fontSizeTrigger:hover,#themeTrigger:hover,#profileTrigger:hover,#displayBtn:hover{ border-color:var(--brand); color:var(--brand); }
+#searchTrigger,#fontSizeTrigger,#themeTrigger,#profileTrigger,#displayBtn,#scrollTrigger{ text-decoration:none; display:flex; align-items:center; justify-content:center; width:34px; height:34px; flex-shrink:0; background:none; border:1px solid var(--divider); border-radius:var(--r-sm); color:var(--muted); transition:all .2s; }
+#searchTrigger:hover,#fontSizeTrigger:hover,#themeTrigger:hover,#profileTrigger:hover,#displayBtn:hover,#scrollTrigger:hover{ border-color:var(--brand); color:var(--brand); }
 #searchTrigger svg,#fontSizeTrigger svg,#themeTrigger svg,#profileTrigger svg{ opacity:.7; }
 .aa-label{ font-family:var(--font-ui); font-weight:800; letter-spacing:-.03em; font-size:.82rem; line-height:1; }
 .aa-label span{ font-size:.62rem; }
@@ -120,7 +125,7 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{ outline:2px sol
 /* Desktop: the translation pick sits in the reading header (#btnPickVersion,
    right after "Book Chapter"). Mobile: it's the #topVersionBtn pill in the top
    bar (the slim header has no room). reader.js keeps both labels in sync. */
-#displayBtn{ display:none; } /* mobile-only "Aa" — shown < 1180px */
+#displayBtn,#scrollTrigger{ display:none; } /* mobile-only "Aa" and Scroll link — shown < 1180px */
 #topVersionBtn{ display:none; align-items:center; gap:4px; flex-shrink:0; padding:5px 10px; border:1px solid var(--brand-line); border-radius:var(--r-pill); background:var(--brand-soft); color:var(--brand); font-family:var(--font-ui); font-weight:700; font-size:.64rem; letter-spacing:.08em; text-transform:uppercase; white-space:nowrap; max-width:min(38vw,220px); overflow:hidden; }
 #topVersionBtn:hover{ border-color:var(--brand); background:var(--brand-soft); }
 #topVersionBtn svg{ width:8px; height:8px; flex-shrink:0; stroke:currentColor; }
@@ -285,7 +290,7 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{ outline:2px sol
   /* Topbar consolidation < 1180px: version pill + one "Aa" (font size +
      day/night); the two separate font/theme icons and the profile icon move
      off the bar (profile → the "More" sheet's #mm-profile row). */
-  #displayBtn{ display:flex; }
+  #displayBtn,#scrollTrigger{ display:flex; }
   #fontSizeTrigger,#themeTrigger,#profileTrigger{ display:none; }
   /* #profileWrap stays (0-size relative box); the panel it holds becomes a
      bottom sheet (opened from the "More" sheet's row) rather than a topbar
@@ -352,6 +357,7 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{ outline:2px sol
 /* ── left nav menu ── */
 .navmenu{ width:150px; flex-shrink:0; display:flex; flex-direction:column; padding-bottom:24px; min-height:100%; }
 .navitem{ display:block; width:100%; text-align:left; background:none; border:none; border-left:2px solid transparent; font-family:var(--font-ui); font-weight:600; font-size:.82rem; letter-spacing:-.005em; color:var(--muted); line-height:1.4; padding:10px 12px; border-radius:0 var(--r-sm) var(--r-sm) 0; transition:background .15s,color .15s,border-color .15s; }
+a.navitem{ text-decoration:none; } /* the Scroll link is an <a> so it's a real link, styled as a nav item */
 .navitem:hover{ background:var(--brand-soft); color:var(--brand); }
 .navitem.active{ color:var(--brand); border-left-color:var(--brand); background:var(--brand-soft); font-weight:600; }
 /* A nav item that opens a tabbed overlay (Explore / Study Tools / My Library)

@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Scroll the Bible — IQ Bible</title>
+<meta name="description" content="Read the Bible one verse at a time, just by scrolling. Free, no account, in 1,400+ translations — an open-source app built on the IQ Bible API.">
+<!-- Same root-relative <base> as the main app (see ../index.html): this page is
+     served from /scroll/ but every css/js/img ref below is written relative to
+     the site root, so the shared files are the app's own, not copies. -->
+<base href="/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/scroll.css">
+<link rel="icon" type="image/png" href="img/logo.png">
+<link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+<meta name="theme-color" content="#6d28d9">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="IQ Bible">
+<meta property="og:title" content="Scroll the Bible — IQ Bible">
+<meta property="og:description" content="Read the Bible one verse at a time, just by scrolling. Free, no account, in 1,400+ translations.">
+<meta property="og:url" content="https://app.iqbible.com/scroll/">
+<meta property="og:image" content="https://app.iqbible.com/img/iqbible-og-card.png?v=1">
+<meta name="twitter:card" content="summary_large_image">
+<script>
+// Applied before first paint so a stored dark-mode preference doesn't flash
+// light on load — the same preference the main app uses (shared origin).
+try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme") || "light"; } catch (e) { }
+</script>
+</head>
+<body class="scroll-app">
+<a class="skip-link" href="#scFeed">Skip to the verses</a>
+
+<div id="scStage">
+
+  <header id="scTop">
+    <button type="button" id="scChip" class="sc-pill" onclick="scOpenJump()" aria-label="Loading, jump to a book and chapter">
+      <span id="scChipText">Loading…</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="sc-top-actions">
+      <button type="button" id="scVersionBtn" class="sc-pill sc-pill-brand" onclick="scOpenVersions()" aria-label="KJV, choose a translation">
+        <span id="scVersionText">KJV</span>
+      </button>
+      <!-- A plain link, not a toggle: Page view is a different page (the main
+           app), and href is kept pointed at the verse on screen by scSyncUI(). -->
+      <a id="scPageLink" class="sc-iconbtn" href="/" aria-label="Switch to Page view" title="Switch to Page view">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      </a>
+      <button type="button" id="scDisplayBtn" class="sc-iconbtn" onclick="scOpenDisplay()" aria-label="Display options">
+        <span class="sc-aa" aria-hidden="true">A<span>a</span></span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Chapter-level narration (the API has audio per chapter, not per verse), so
+       this says what is actually playing. Hidden until Listen is pressed. -->
+  <div id="scPlayer" hidden>
+    <button type="button" id="scPlayBtn" class="sc-play" onclick="scToggleAudio()" aria-label="Pause narration"></button>
+    <div class="sc-player-text">
+      <span id="scPlayerLabel">Listening to John 3</span>
+      <div class="sc-player-track" aria-hidden="true"><div id="scPlayerFill"></div></div>
+    </div>
+    <!-- Only shown when the translation has more than one recorded narrator. -->
+    <button type="button" id="scVoiceBtn" class="sc-voice" onclick="scOpenVoices()" hidden aria-label="Choose narration voice">
+      <span id="scVoiceName">Voice</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <button type="button" class="sc-iconbtn sc-sm" onclick="scStopAudio()" aria-label="Stop narration and close the player">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+
+  <main id="scFeed" tabindex="0" aria-label="Bible verses"><div class="spin" role="status" aria-label="Loading"></div></main>
+
+  <div id="scRail" role="group" aria-label="Verse actions">
+    <button type="button" id="scBtnBookmark" class="sc-rail-btn" onclick="scToggleBookmark()" aria-pressed="false" aria-label="Bookmark this verse">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4h12v17l-6-4-6 4z"/></svg>
+    </button>
+    <button type="button" id="scBtnHighlight" class="sc-rail-btn" onclick="scOpenHighlight()" aria-label="Highlight this verse">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h6M14 4l6 6-9 9H5v-6z"/></svg>
+    </button>
+    <button type="button" id="scBtnExplain" class="sc-rail-btn" onclick="scOpenExplain()" aria-label="Explain this verse">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>
+    </button>
+    <button type="button" id="scBtnShare" class="sc-rail-btn" onclick="scShare()" aria-label="Share this verse">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4M5 13v7h14v-7"/></svg>
+    </button>
+    <button type="button" id="scBtnListen" class="sc-rail-btn sc-rail-primary" onclick="scToggleAudio()" aria-label="Listen to this chapter">
+      <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M8 5l11 7-11 7z"/></svg>
+    </button>
+  </div>
+
+  <div id="scBottom">
+    <p id="scPeek" aria-hidden="true"></p>
+    <div class="sc-progress">
+      <div class="sc-progress-track" id="scProgressTrack" role="progressbar" aria-label="Position in this chapter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="scProgressBar"></div></div>
+      <span id="scProgressLabel"></span>
+    </div>
+  </div>
+
+</div>
+
+<audio id="scAudioEl" preload="none"></audio>
+
+<!-- Key gate. The hosted instance never shows it (its proxy supplies a key);
+     everywhere else this is the only place a key is entered — Scroll has no
+     Settings page, so the field lives right here. -->
+<div id="keyBanner">
+  <div class="kb-box" role="dialog" aria-modal="true" aria-labelledby="keyBannerHeading">
+    <h2 id="keyBannerHeading" class="kb-heading">Add an API key to start reading</h2>
+    <p>Get a free key at <a href="https://developer.iqbible.com" target="_blank" rel="noopener">developer.iqbible.com</a>. It's stored only in this browser and never sent anywhere but the IQ Bible API.</p>
+    <input type="text" id="scKeyInput" class="sc-key-input" autocomplete="off" spellcheck="false" aria-label="IQ Bible API key" placeholder="Paste your API key">
+    <button type="button" onclick="scSaveKey()">Save and start reading</button>
+  </div>
+</div>
+
+<div class="modalscrim" id="scJumpScrim">
+  <div class="modal narrow">
+    <div class="mhead"><div class="row">
+      <button type="button" class="closebtn" id="scJumpBack" onclick="scJumpBooks()" aria-label="Back to books" hidden>&lsaquo;</button>
+      <h2 id="scJumpTitle">Choose a book</h2>
+      <button type="button" class="closebtn" onclick="closeModal('scJumpScrim')" aria-label="Close">&times;</button>
+    </div></div>
+    <div id="scJumpBody" class="sc-modal-body"></div>
+  </div>
+</div>
+
+<div class="modalscrim" id="scVerScrim">
+  <div class="modal narrow">
+    <div class="mhead">
+      <div class="row">
+        <h2>Choose a translation</h2>
+        <button type="button" class="closebtn" onclick="closeModal('scVerScrim')" aria-label="Close">&times;</button>
+      </div>
+      <div class="msearch">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8"/></svg>
+        <input type="text" id="scVerSearch" oninput="scRenderVersions()" placeholder="Search by name, language, or code" aria-label="Search translations" autocomplete="off">
+      </div>
+    </div>
+    <div id="scVerList" class="sc-modal-body"></div>
+  </div>
+</div>
+
+<!-- Explain this verse — assembled from API data only (original-language words,
+     classic commentary, cross-references); nothing here is AI-generated. -->
+<div class="modalscrim" id="scExplainScrim">
+  <div class="modal narrow sc-explain-modal">
+    <div class="mhead"><div class="row">
+      <h2 id="scExplainTitle">Explain</h2>
+      <button type="button" class="closebtn" onclick="closeModal('scExplainScrim')" aria-label="Close">&times;</button>
+    </div></div>
+    <div id="scExplainBody" class="sc-modal-body"></div>
+  </div>
+</div>
+
+<div class="modalscrim" id="scVoiceScrim">
+  <div class="modal narrow sc-small-modal">
+    <div class="mhead"><div class="row">
+      <h2>Narration voice</h2>
+      <button type="button" class="closebtn" onclick="closeModal('scVoiceScrim')" aria-label="Close">&times;</button>
+    </div></div>
+    <div id="scVoiceList" class="sc-modal-body"></div>
+  </div>
+</div>
+
+<div class="modalscrim" id="scHlScrim">
+  <div class="modal narrow sc-small-modal">
+    <div class="mhead"><div class="row">
+      <h2 id="scHlTitle">Highlight</h2>
+      <button type="button" class="closebtn" onclick="closeModal('scHlScrim')" aria-label="Close">&times;</button>
+    </div></div>
+    <div class="sc-modal-body sc-hl-body">
+      <div class="sc-swatches" id="scSwatches">
+        <button type="button" class="sc-swatch hl-yellow" data-color="yellow" onclick="scSetHighlight('yellow')" aria-label="Yellow"></button>
+        <button type="button" class="sc-swatch hl-green" data-color="green" onclick="scSetHighlight('green')" aria-label="Green"></button>
+        <button type="button" class="sc-swatch hl-blue" data-color="blue" onclick="scSetHighlight('blue')" aria-label="Blue"></button>
+        <button type="button" class="sc-swatch hl-pink" data-color="pink" onclick="scSetHighlight('pink')" aria-label="Pink"></button>
+      </div>
+      <button type="button" class="sc-textbtn" onclick="scSetHighlight(null)">Remove highlight</button>
+    </div>
+  </div>
+</div>
+
+<div class="modalscrim" id="scDisplayScrim">
+  <div class="modal narrow sc-small-modal">
+    <div class="mhead"><div class="row">
+      <h2>Display</h2>
+      <button type="button" class="closebtn" onclick="closeModal('scDisplayScrim')" aria-label="Close">&times;</button>
+    </div></div>
+    <div class="sc-modal-body sc-display-body">
+      <div class="sc-field">
+        <span class="sc-label" id="scThemeLabel">Theme</span>
+        <div class="sc-seg" role="group" aria-labelledby="scThemeLabel">
+          <button type="button" id="scThemeLight" onclick="scSetTheme('light')">Light</button>
+          <button type="button" id="scThemeDark" onclick="scSetTheme('dark')">Dark</button>
+        </div>
+      </div>
+      <div class="sc-field">
+        <label class="sc-label" for="scFontRange">Text size</label>
+        <input type="range" id="scFontRange" min="22" max="46" step="2" oninput="scSetFont(this.value)">
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modalscrim" id="apiErrorScrim">
+  <div class="modal narrow" role="alertdialog">
+    <div class="mhead"><div class="row"><h2 id="apiErrorTitle">API Error</h2><button type="button" class="closebtn" onclick="closeModal('apiErrorScrim')" aria-label="Close">&times;</button></div></div>
+    <div class="dictbody" id="apiErrorBody"></div>
+    <div style="padding:0 24px 24px"><button type="button" class="setsave" style="margin-bottom:0" onclick="closeModal('apiErrorScrim')">Dismiss</button></div>
+  </div>
+</div>
+
+<!-- The shared hover/tap preview popup (js/previews.js) — every verse reference in
+     the Explain sheet uses it. -->
+<div id="dictTooltip" class="dict-tooltip"></div>
+<div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+<!-- Only what Scroll needs, in dependency order: config → shared state/helpers/
+     auth → the catalog (version + book lists) → the shared verse-preview helpers
+     → Scroll itself. Nothing from the reader, search, notes or plans — that
+     isolation is the point of /scroll/. -->
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script src="js/catalog.js"></script>
+<script src="js/previews.js"></script>
+<script src="js/scroll.js"></script>
+</body>
+</html>

@@ -521,7 +521,7 @@ function importNotesFile(input) {
 
 /* ── Bookmarks tab — getBookmarks() (reader.js) is a flat
    {key:{createdAt,groupId}} map with no cached text, so previews are fetched
-   via the shared fetchVersePreviews() (reader.js) batched call, one request
+   via the shared fetchVersePreviews() (previews.js) batched call, one request
    for every bookmarked verse rather than one per card. Verses bookmarked in
    a single action share a groupId and collapse into one entry. ── */
 // Collapses the flat bookmark map into one entry per bookmarking action

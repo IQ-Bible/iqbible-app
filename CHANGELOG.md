@@ -3,6 +3,34 @@
 All notable changes to this project will be documented in this file. This CHANGELOG follows SemVer, see https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
+
+## [1.27.0] - 2026-11-06
+- **added:** Scroll the Bible, at `/scroll/` — read one verse at a time, just by scrolling. Each
+  verse is a full-screen card; chapters load as you near either end, with a chapter title card at
+  the start of each. Bookmark, highlight (four colors), and share the verse on screen; jump to any
+  book and chapter; switch translation; light/dark and text size. Bookmarks and highlights are the
+  same ones the main app keeps, so they appear in My Library. It starts where you were reading
+  (or from a `?ref=` link) and a "Page view" button returns to the same verse in the main app.
+- **added:** Scroll opens from a "Scroll" link in the left nav and a stacked-cards button in the
+  top bar on a phone, both kept pointed at the verse you're reading; Help lists it.
+- **added:** Listen in Scroll plays the whole chapter's narration in a small player, with a Voice
+  picker when the translation has more than one narrator (your choice is remembered per
+  translation). The API's audio is per chapter, not per verse, so the cards don't follow along.
+- **added:** Explain, in Scroll — a lightbulb on each verse opens a sheet with the verse's original
+  Hebrew or Greek words (pronunciation, gloss, Strong's number, grammar), an excerpt of Matthew
+  Henry's or John Gill's commentary on it, and its cross-references with each verse's text. All of
+  it comes from the API's own data (one `GET /ai/context` call); nothing is AI-generated. A
+  Strong's number links to its full entry in Study Tools > Word Study, which now also opens from a
+  link: `#study-tools/word/G25`.
+- **added:** Moving between the main app and Scroll cross-fades in browsers that support it
+  (skipped for reduced motion).
+- **fixed:** Tapping a verse reference in prose (a commentary or definition citation) on a phone
+  showed nothing the first time and only opened the preview on the second tap — the browser's
+  hover event opened it and the click then closed it again. A tap now opens it, and a tap
+  elsewhere closes it.
+- **changed:** The verse-preview helpers (the tooltip, `linkifyCitations`, `fetchVersePreviews`,
+  and friends) moved out of `reader.js` into their own `js/previews.js`, so Scroll can use them
+  without loading the reader. No behavior change in the main app.
 - **added:** README now opens with a "Call the API in 60 seconds" section: a curl call and a Node
   fetch call that read a chapter, with the key header and a note not to put a key in a public page.
 
