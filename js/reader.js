@@ -31,6 +31,7 @@ async function loadChapter(chapter, refreshMeta, verse, verseEnd) {
   // Otherwise the previous chapter's prompt (or its "done" state) stays
   // visible behind the spinner until renderChapterReadPrompt() below re-runs.
   document.getElementById("chapterReadPrompt").className = "";
+  document.getElementById("chapterQuizCard").className = "";
   document.getElementById("chapterReadStamp").className = "";
   document.getElementById("chapterEndNav").hidden = true;
   // Paint the context row at full height right now — just the "About" glyph,
@@ -2511,6 +2512,7 @@ function notebookName(id) {
 const EXPORT_REMINDER_INTERVAL_MS = 14 * 24 * 60 * 60 * 1000;
 function totalSavedItemCount() { return Object.keys(getBookmarks()).length + Object.keys(getHighlights()).length + getNotes().length; }
 function showDataBackupBanner(text) {
+  if (typeof hideAnnouncement === "function") hideAnnouncement(); // js/announcements.js — never two banners at once
   document.getElementById("dataBackupBannerText").textContent = text;
   document.getElementById("dataBackupBanner").classList.add("show");
 }

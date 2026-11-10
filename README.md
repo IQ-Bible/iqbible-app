@@ -89,10 +89,12 @@ If you want anonymous end users to skip that step (a consumer app rather than a 
 - Inline story titles (e.g. "The Flood") resolved from free-text references
 - **Scroll the Bible** (`/scroll/`): a second, much smaller front end on the same API — one verse
   per full-screen card, read by scrolling. It's a separate entry (`scroll/index.html`,
-  `css/scroll.css`, `js/scroll.js`) that loads only `config.js`, `api.js`, `catalog.js` and `previews.js`, none of
+  `css/scroll.css`, `js/scroll.js`) that loads only `config.js`, `api.js`, `readstate.js`, `catalog.js`, `previews.js`, `share.js` and `quiz.js`, none of
   the reader. Chapters are fetched one call each and cut into cards, appended and prepended as you
   scroll. Bookmarks and highlights use the same `localStorage` keys as the main app, so they show up
-  in My Library. **Explain** assembles, from one `GET /ai/context` call, the verse's original-language
+  in My Library. Tapping a verse copies it and double-tapping bookmarks it; **Share** offers the same
+  image (light or dark), link and embed options as the reader's Verse Tools (`js/share.js`, shared). The last verse of a chapter that has questions offers a "Take a quiz" button that opens the same chapter quiz
+  as the reader (`js/quiz.js`, shared), and a read chapter says so under its title; scrolling through to a chapter's last verse, or on into the next chapter, counts it as read (jumping there doesn't); a long verse is shrunk to fit its card. **Explain** assembles, from one `GET /ai/context` call, the verse's original-language
   words (with Strong's glosses), a classic commentary entry, and its cross-references — nothing
   generated. Listen plays the whole chapter, with a narrator picker where a translation has more than
   one voice: the API's narration is per chapter, not per verse, so the cards can't follow along
@@ -138,7 +140,16 @@ If you want anonymous end users to skip that step (a consumer app rather than a 
 - A reading-dashboard popover on the profile icon — streak, counts, and a continue-reading shortcut,
   built entirely from data already tracked locally
 - **My Progress**: a full screen for that same local reading data — a streak calendar, confirmed
-  chapter/devotional read counts, active-plan completion, and a recent-activity feed
+  chapter/devotional read counts, chapter-quiz scores, active-plan completion, and a recent-activity feed
+- **Chapter quiz**: an optional quiz at the end of a chapter (`GET /quiz/coverage` for the question
+  count, `GET /books/{book}/chapters/{n}/quiz` for the questions) — right or wrong after each answer,
+  the verse when you miss one, and finishing marks the chapter read. Scores stay in the browser.
+- **What's new**: a short, dismissible note about a new feature, one at a time, plus a "What's new"
+  list in Help. The content is a plain static file, [`announcements.json`](announcements.json) (newest
+  first; each entry has an `id`, `date`, `title`, `body`, and optionally a `cta`, `hostedOnly` and
+  `expires`) — not an API call. A first-time visitor sees none (they get the tour). **Forks:** the file
+  comes along with the code; replace its contents with `[]` to show nothing, or edit it to announce
+  your own changes. `hostedOnly` entries show only on `app.iqbible.com`.
 - **Take a Tour**: a guided walkthrough that spotlights the app's main features in place, offered once
   on first visit and re-launchable any time from the new **Help** page (getting-started steps, a
   feature guide, and an FAQ)
@@ -168,14 +179,16 @@ a file**: place it after everything it depends on.
 |---|---|
 | `js/config.js` | The constants a fork actually edits — `BASE_PATH` (GitHub Pages subpath), `FEATURE_SEARCH_ALL_VERSIONS`, `APP_VERSION` (offline version fallback) — plus the `api.iqbible.com` endpoint and the hosted-instance switch. |
 | `js/api.js` | Shared mutable state (loaded first, so it exists before anything reads it), the API-key and `localStorage` helpers, the `apiFetch` / `apiJSON` wrappers every request goes through, Settings, and `openModal` / `closeModal`. |
+| `js/readstate.js` | The DOM-free "chapter read" core — the `iqb_progress` map, the stored reading plans, and `recordChapterRead()` (marks a chapter and completes a plan day). Shared by the reader's `markChapterRead` and Scroll. |
 | `js/catalog.js` | Version / book / chapter pickers; the ISO-639-3 → BCP-47 language map. |
 | `js/previews.js` | The shared verse-preview helpers — the floating tooltip, `linkifyCitations`, `linkifyPreParsedCitations`, `registerCiteId`, `fetchVersePreviews`. Split out of the reader so `/scroll/` can use them too. |
 | `js/reader.js` | Chapter rendering, inline illustrations and story titles, the book icon, the audio player, the chapter-context row, Verse Tools. |
 | `js/search.js` | The full-text search overlay (Verses and People tabs). |
 | `js/notes.js`, `js/notesdrawer.js` | The My Library overlay (Notes / Bookmarks / Highlights / History) and the dockable Notes drawer. |
-| `js/devotionals.js`, `js/profile.js`, `js/share.js`, `js/explore.js`, `js/study.js`, `js/plans.js`, `js/progress.js` | One feature area each — devotionals, the profile popover, Share Tools, Explore, Study Tools, Reading Plans, My Progress. |
+| `js/devotionals.js`, `js/profile.js`, `js/share.js`, `js/explore.js`, `js/study.js`, `js/plans.js`, `js/quiz.js`, `js/progress.js` | One feature area each — devotionals, the profile popover, Share Tools, Explore, Study Tools, Reading Plans, Chapter quiz, My Progress. |
+| `js/announcements.js`, `announcements.json` | The "What's new" banner and Help list (`announcements.json` is the content, at the repo root). Not loaded by `/scroll/`. |
 | `js/router.js` | Deep-link path parsing (`/gen/1/1`) and keeping the URL in sync via `pushState` / `popstate`. |
-| `scroll/index.html`, `css/scroll.css`, `js/scroll.js` | Scroll the Bible (`/scroll/`) — its own page and script, independent of the reader. Loads only `config.js`, `api.js`, `catalog.js` and `previews.js`. |
+| `scroll/index.html`, `css/scroll.css`, `js/scroll.js` | Scroll the Bible (`/scroll/`) — its own page and script, independent of the reader. Loads only `config.js`, `api.js`, `readstate.js`, `catalog.js`, `previews.js`, `share.js` and `quiz.js`. |
 | `js/tour.js` | The guided tour; `TOUR_STEPS` targets nav-rail and topbar elements by CSS selector. |
 | `js/main.js` | Global event wiring and the init sequence. Loaded last — it assumes every function above already exists. |
 

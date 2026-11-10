@@ -45,21 +45,8 @@ let plansRenderGen = 0;
 function openPlans() { switchMainView("plans"); renderPlansView(); }
 function closePlans() { switchMainView("read"); }
 
-/* ── storage — a list of plans, each independently completable/deletable,
-   at most one active at a time (zero is a valid state: no plan feeds the
-   reader's chapter-end prompt). ── */
-function getPlans() { try { return JSON.parse(localStorage.getItem("iqb_plans") || "[]"); } catch (e) { return []; } }
-function setPlans(plans) { localStorage.setItem("iqb_plans", JSON.stringify(plans)); }
-function getActivePlan() { return getPlans().find(p => p.active) || null; }
-function setPlanCompletedDays(planId, arr) {
-  const plans = getPlans();
-  const p = plans.find(x => x.id === planId);
-  if (!p) return;
-  p.completedDays = arr;
-  setPlans(plans);
-}
-function getProgress() { try { return JSON.parse(localStorage.getItem("iqb_progress") || "{}"); } catch (e) { return {}; } }
-function setProgress(m) { localStorage.setItem("iqb_progress", JSON.stringify(m)); }
+// Storage (getPlans/setPlans/getActivePlan/getProgress/setProgress…) and the
+// DOM-free "mark a chapter read" core live in js/readstate.js, shared with Scroll.
 
 // One-time migration from the old single-plan storage (iqb_active_plan +
 // iqb_plan_completed_days) into iqb_plans, so a visitor who already had a
@@ -942,32 +929,13 @@ document.addEventListener("click", e => {
    calls renderChapterReadPrompt() after every chapter render. Only the
    active plan (if any) is checked — a visitor can hold several plans, but
    only one at a time feeds this prompt. ── */
-function findMatchingPlanDay(book, chapter) {
-  const plan = getActivePlan();
-  // Topic mode's days are verse-level (no single chapter they "cover"), so
-  // there's no clean chapter-level match to offer there.
-  if (!plan || (plan.mode !== "general" && plan.mode !== "mcheyne")) return null;
-  const completed = new Set(plan.completedDays || []);
-  for (const d of plan.days) {
-    if (completed.has(d.day)) continue;
-    const refs = plan.mode === "mcheyne" ? [...(d.family || []), ...(d.secret || [])] : (d.chapters || []);
-    if (refs.some(r => r.book === book && r.chapter === chapter)) return d.day;
-  }
-  return null;
-}
+// (findMatchingPlanDay lives in js/readstate.js.)
 // Compact "you've read this" line below the chapter header (#chapterReadStamp
 // in index.html — its own row, so it never resizes .chhead or the audio
 // player). Shown only once the chapter's been read and only when the Settings
 // toggle is on; the unread call-to-action stays #chapterReadPrompt's job at
 // the foot of the text.
-function formatReadStamp(ts) {
-  const d = new Date(ts);
-  if (isNaN(d)) return "Read";
-  const wd = d.toLocaleDateString("en-US", { weekday: "short" });
-  const date = d.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" });
-  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).toLowerCase();
-  return `Read on ${wd}. ${date} at ${time}`;
-}
+// (formatReadStamp lives in js/readstate.js, shared with Scroll.)
 // Mobile keeps this inline at the right of the slim .chhead row; desktop keeps
 // it on its own row below. The element is shared — this just relocates it.
 function positionReadStamp() {
@@ -993,10 +961,15 @@ function renderChapterReadStamp() {
   // bottom "Undo" while the stamp is showing — see renderChapterReadPrompt).
   el.innerHTML = `<button type="button" class="read-check" onclick="unmarkChapterRead()" title="Mark chapter unread" aria-label="Mark chapter unread"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9.5"/></svg></button>`
     + `<span class="read-label">${escHtml(text)}</span>`
-    + `<span class="read-label-short">${escHtml(shortText)}</span>`;
+    + `<span class="read-label-short">${escHtml(shortText)}</span>`
+    // Best chapter-quiz score (js/quiz.js); .read-label so it drops out with the long label on a phone.
+    + (quizBestLabel(current.book, current.chapter)
+      ? `<span class="read-label" aria-hidden="true">·</span><span class="read-label quiz-best">Quiz best ${escHtml(quizBestLabel(current.book, current.chapter))}</span>`
+      : "");
 }
 function renderChapterReadPrompt() {
   renderChapterReadStamp();
+  renderChapterQuizCard(); // js/quiz.js — the "Quiz yourself" card, shown only once the chapter is read
   const el = document.getElementById("chapterReadPrompt");
   if (!el) return;
   const key = `${current.book}.${current.chapter}`;
@@ -1015,48 +988,30 @@ function renderChapterReadPrompt() {
     ? "Did you read this chapter? We'll count it toward your reading plan and add it to your Progress."
     : "Did you read this chapter? We'll add it to your Progress.";
   el.className = "show";
-  el.innerHTML = `<p>${escHtml(text)}</p><button class="setsave" onclick="markChapterRead()">Yes, mark as read</button>`;
-}
-// Every chapter a given plan day schedules (Family + Secret merged for
-// M'Cheyne). Topic mode's verse-level days never reach here.
-function planDayChapterRefs(plan, dayObj) {
-  return plan.mode === "mcheyne"
-    ? [...(dayObj.family || []), ...(dayObj.secret || [])]
-    : (dayObj.chapters || []);
-}
-// A day only auto-completes once *every* chapter it lists has been
-// confirmed read — marking one chapter of a multi-chapter day (or one
-// that isn't the last) must not check the whole day off.
-function planDayFullyRead(plan, dayObj) {
-  const progress = getProgress();
-  const refs = planDayChapterRefs(plan, dayObj);
-  return refs.length > 0 && refs.every(r => progress[`${r.book}.${r.chapter}`]);
+  // js/quiz.js adds a "Take a quiz" button beside this one once it knows the
+  // chapter has questions (null until then, and for a chapter with none).
+  const quizParts = quizPromptParts();
+  el.innerHTML = quizParts
+    ? `<p>${escHtml(text)}</p><div class="read-prompt-actions"><button class="setsave" onclick="markChapterRead()">Yes, mark as read</button>${quizParts.buttonHtml}</div>${quizParts.noteHtml}`
+    : `<p>${escHtml(text)}</p><button class="setsave" onclick="markChapterRead()">Yes, mark as read</button>`;
 }
 // opts.fromAudio (handleAudioEnded, continuous listening) suppresses the
 // per-chapter "Added to your Progress" toast — a "Day N complete!" milestone
-// still shows — and no-ops if the chapter's already marked.
+// still shows — and no-ops if the chapter's already marked. opts.quiet does
+// the same for the quiz (js/quiz.js), which says so in its own results panel;
+// opts.book/chapter let it mark the chapter it was opened on, not whatever
+// `current` has moved to since.
 function markChapterRead(opts) {
-  const quiet = !!(opts && opts.fromAudio);
-  const key = `${current.book}.${current.chapter}`;
-  const progress = getProgress();
-  if (progress[key]) return;
-  progress[key] = Date.now();
-  setProgress(progress);
-  const dayMatch = findMatchingPlanDay(current.book, current.chapter);
-  if (dayMatch != null) {
-    const plan = getActivePlan();
-    const dayObj = plan.days.find(d => d.day === dayMatch);
-    if (dayObj && planDayFullyRead(plan, dayObj)) {
-      const completed = plan.completedDays || [];
-      if (!completed.includes(dayMatch)) completed.push(dayMatch);
-      setPlanCompletedDays(plan.id, completed);
-      toast(`Day ${dayMatch} marked complete!`);
-    } else if (!quiet) {
-      const remaining = dayObj ? planDayChapterRefs(plan, dayObj).filter(r => !progress[`${r.book}.${r.chapter}`]).length : 0;
-      toast(remaining ? `Checked off — ${remaining} more chapter${remaining === 1 ? "" : "s"} to finish Day ${dayMatch}` : "Added to your Progress");
-    }
-  } else if (!quiet) {
-    toast("Added to your Progress");
+  const quiet = !!(opts && (opts.fromAudio || opts.quiet));
+  const book = (opts && opts.book) || current.book;
+  const chapter = (opts && opts.chapter) || current.chapter;
+  const r = recordChapterRead(book, chapter);
+  if (!r) return;
+  if (r.dayComplete) toast(`Day ${r.dayMatch} marked complete!`);
+  else if (!quiet) {
+    toast(r.dayMatch != null && r.remaining
+      ? `Checked off — ${r.remaining} more chapter${r.remaining === 1 ? "" : "s"} to finish Day ${r.dayMatch}`
+      : "Added to your Progress");
   }
   renderChapterReadPrompt();
 }

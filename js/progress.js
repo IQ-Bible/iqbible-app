@@ -5,7 +5,7 @@
    plan is active (js/plans.js). No API calls of its own. Richer than the
    profile popover's "Your Reading" quick-glance stats (js/profile.js),
    which stays as the compact version. */
-let progressActivityFilter = "all"; // "all" | "chapter" | "devo"
+let progressActivityFilter = "all"; // "all" | "chapter" | "devo" | "quiz"
 
 function confirmedReadDaySet() {
   const set = new Set();
@@ -64,6 +64,7 @@ function buildActivityEntries() {
     const tab = parts.pop();
     entries.push({ ts, type: "devo", month: Number(parts[0]), day: Number(parts[1]), tab });
   });
+  quizActivityEntries().forEach(e => entries.push(e)); // js/quiz.js — one per quizzed chapter
   entries.sort((a, b) => b.ts - a.ts);
   return entries;
 }
@@ -95,6 +96,19 @@ function openDevotionalAtKey(month, day, tab) {
 // there too when no verse is specified).
 function activityRowHtml(e, citeIdByChapterKey) {
   const time = formatActivityTime(e.ts);
+  if (e.type === "quiz") {
+    const title = `${notesBookName(e.book)} ${e.chapter}`;
+    const citeId = citeIdByChapterKey[`${e.book}.${e.chapter}`];
+    const citeAttr = citeId ? ` data-cite-id="${citeId}"` : "";
+    const perfect = e.best === e.of;
+    const tries = e.attempts > 1 ? ` <small>· ${e.attempts} tries</small>` : "";
+    return `<div class="progress-activity-row" style="cursor:pointer" onclick="switchMainView('read');jumpToVerse('${e.book}',${e.chapter},null)">
+      <div class="progress-activity-icon">${QUIZ_ICON}</div>
+      <div class="progress-activity-title"${citeAttr}>${escHtml(title)}</div>
+      <span class="quiz-pill${perfect ? " perfect" : ""}">${e.best}/${e.of}${perfect ? " · perfect" : ""}${tries}</span>
+      <span class="progress-activity-time">${escHtml(time)}</span>
+    </div>`;
+  }
   if (e.type === "chapter") {
     const title = `${notesBookName(e.book)} ${e.chapter}`;
     const citeId = citeIdByChapterKey[`${e.book}.${e.chapter}`];
@@ -130,11 +144,17 @@ async function renderMyProgress() {
     ? `${(activePlan.completedDays || []).length}<small>/${activePlan.days.length}</small>`
     : `<small style="font-size:.7rem">No active plan</small>`;
 
+  const quizTotals = quizStats();
   const allEntries = buildActivityEntries();
   const entries = progressActivityFilter === "all" ? allEntries : allEntries.filter(e => e.type === progressActivityFilter);
   const visible = entries.slice(0, 30);
 
-  const chapterRefs = visible.filter(e => e.type === "chapter").map(e => ({ book: e.book, chapter: Number(e.chapter), verse: 1 }));
+  // A chapter that was both read and quizzed has two rows but needs only one
+  // preview lookup — dedupe so the batch call gets each ref once.
+  const seenChapterKeys = new Set();
+  const chapterRefs = visible.filter(e => e.type === "chapter" || e.type === "quiz")
+    .filter(e => { const k = `${e.book}.${e.chapter}`; if (seenChapterKeys.has(k)) return false; seenChapterKeys.add(k); return true; })
+    .map(e => ({ book: e.book, chapter: Number(e.chapter), verse: 1 }));
   const previewByRef = await fetchVersePreviews(chapterRefs);
   const citeIdByChapterKey = {};
   chapterRefs.forEach(r => {
@@ -147,6 +167,7 @@ async function renderMyProgress() {
     <button class="filter-chip${progressActivityFilter === "all" ? " active" : ""}" onclick="setProgressFilter('all')">All</button>
     <button class="filter-chip${progressActivityFilter === "chapter" ? " active" : ""}" onclick="setProgressFilter('chapter')">Chapters</button>
     <button class="filter-chip${progressActivityFilter === "devo" ? " active" : ""}" onclick="setProgressFilter('devo')">Devotionals</button>
+    <button class="filter-chip${progressActivityFilter === "quiz" ? " active" : ""}" onclick="setProgressFilter('quiz')">Quizzes</button>
   </div>`;
 
   const activityHtml = allEntries.length === 0
@@ -172,6 +193,14 @@ async function renderMyProgress() {
       <div class="progress-stat">
         <div class="progress-stat-num">${planStatHtml}</div>
         <div class="progress-stat-label">${activePlan ? escHtml(planModeLabel(activePlan.mode)) + " Days" : "Reading Plan"}</div>
+      </div>
+      <div class="progress-stat">
+        <div class="progress-stat-num">${quizTotals.taken}</div>
+        <div class="progress-stat-label">Chapter Quizzes Taken</div>
+      </div>
+      <div class="progress-stat">
+        <div class="progress-stat-num">${quizTotals.avgPct === null ? "—" : `${quizTotals.avgPct}<small>%</small>`}</div>
+        <div class="progress-stat-label">Average Best Score</div>
       </div>
     </div>
 

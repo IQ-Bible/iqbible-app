@@ -46,7 +46,7 @@ const TOUR_STEPS = [
   { selector: "#readNavRow, #readCol .chhead", title: "Reading", body: "Pick your translation, book and chapter, then just start reading. On a phone the book/chapter picker and the prev/next arrows sit in the bar just above the nav, and the translation is the pill in the top bar; on desktop all three are together in the reading header." },
   // Phone: the stacked-cards button in the top bar. Desktop: the nav rail's Scroll link.
   // Both carry no data-nav, so no other step's selector can match them.
-  { selector: "#scrollTrigger, a.navitem[data-scroll-link]", title: "Scroll the Bible", body: "Prefer to read one verse at a time? Scroll opens a full-screen feed built for a phone: swipe through the verses, tap the lightbulb for the original Hebrew or Greek words and a classic commentary, bookmark, highlight or share, and listen to the chapter. It picks up where you were reading." },
+  { selector: "#scrollTrigger, a.navitem[data-scroll-link]", title: "Scroll the Bible", body: "Prefer to read one verse at a time? Scroll opens a full-screen feed built for a phone: swipe through the verses, tap the lightbulb for the original Hebrew or Greek words and a classic commentary, tap a verse to copy it or double-tap to bookmark it, highlight or share it, and listen to the chapter. A quiz closes each chapter that has questions, and a chapter you scroll through to its last verse counts as read. It picks up where you were reading." },
   { selector: "#audioDot, #audioPlayer", title: "Audio Narration", body: "When a chapter has narration a round play button appears (on a phone, in the bar above the nav; on desktop, a player in the reading header). Press it to listen — on a phone the bar becomes the full player while it's playing. It has a voice picker (if more than one narrator was recorded), a clock button for a sleep timer, and there's a Settings option to keep playing into the next chapter." },
   // #cardStack (desktop's always-visible rail) or #chapterChips (the mobile
   // chip row below the slim header) — never both at once. Not auto-opened: both
@@ -63,7 +63,7 @@ const TOUR_STEPS = [
   // 1180px) #moreMenuSheet, both as .navitem — opening the "More" dropup
   // first is what makes the mobile copy the visible one of the two.
   { selector: '.navitem[data-nav="library"]', title: "My Library", body: "Every note, bookmark, highlight and visit you make lives here.", before: () => openMoreMenu(true) },
-  { selector: '.navitem[data-nav="progress"]', title: "My Progress", body: "A streak calendar, read counts and your active plan's progress, all in one place.", before: () => openMoreMenu(true) },
+  { selector: '.navitem[data-nav="progress"]', title: "My Progress", body: "A streak calendar, read counts, chapter-quiz scores and your active plan's progress, all in one place.", before: () => openMoreMenu(true) },
   { selector: '.navitem[data-nav="plans"]', title: "Reading Plans", body: "Build or import a reading plan, then track it day by day on a calendar.", before: () => openMoreMenu(true) },
   { selector: '.navitem[data-nav="devotionals"]', title: "Devotionals", body: "A new reading each morning and evening, with its own progress tracking.", before: () => openMoreMenu(true) },
   // Desktop: the topbar profile icon. Mobile: a row at the top of the "More"

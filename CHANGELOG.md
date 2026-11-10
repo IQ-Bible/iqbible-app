@@ -4,6 +4,62 @@ All notable changes to this project will be documented in this file. This CHANGE
 
 ## [Unreleased]
 
+## [1.28.0] - 2026-11-10
+- **fixed:** Opening a link straight to `#settings` with no API key no longer buries the Settings page
+  under the "Add an API key" prompt, so the key field is right there.
+- **added:** "What's new" announcements. A short, dismissible note about a new feature appears at the
+  top of the reading page — one at a time, newest first, never alongside the API-key prompt, the
+  welcome tour or the backup reminder — and Help has a "What's new" list so a dismissed one can be
+  found again. A first-time visitor sees none; someone who's used the app before sees the newest one
+  they haven't dismissed. The notes come from a plain `announcements.json` (not an API call), which
+  forks can empty or edit; an entry can be limited to app.iqbible.com or given an expiry date. The
+  first one introduces Scroll the Bible and the chapter quizzes. Not in Scroll.
+- **changed:** Help's topic cards are now a single column instead of three across.
+- **changed:** Help and the tour now mention that Scroll counts a chapter you scroll through as read
+  and that its quiz sits on the last verse, and the new tap, double-tap and Share options; Help has a
+  "How does a chapter get marked as read?" answer; the My Progress tour step mentions quiz scores.
+- **added:** Chapter quizzes in Scroll the Bible. On the last verse of a chapter that has questions, a
+  "Take a quiz" button (with the real question count, and your best score once you have one) takes
+  the place of the faint next-verse excerpt and opens the same quiz as the main app; "Next" carries
+  on to the next chapter. Finishing a quiz there marks the chapter read.
+- **changed:** The row of verse buttons on the right in Scroll (bookmark, highlight, Explain, share,
+  listen) is now vertically centered on the screen instead of sitting low, and the toasts there sit
+  high enough to clear the "Take a quiz" button.
+- **added:** Tap a verse in Scroll to copy it (as "verse" — Book 1:1) and double-tap it to bookmark it
+  (tap again to remove the bookmark); a toast confirms either. Taps on a button or while you're
+  selecting text are left alone, and a hint on each chapter's title card says so. The rail's
+  Bookmark button and Share > Copy Verse are the keyboard routes.
+- **changed:** Share in Scroll now opens the same options as the reader's Verse Tools > Share instead
+  of a bare share sheet: the verse as an image (light or dark) with open, download and copy-link,
+  the embed code and a live embed preview, copy verse / copy link, email, X and WhatsApp, plus the
+  device's own share sheet where there is one. Links point at the main app's verse page. Scroll
+  now loads `js/share.js` for this.
+- **added:** A chapter you've read now says so under its title in Scroll — "Read on Mon. 11/09/2026 at
+  3:12 pm", plus your best quiz score — like the reader's read-status line, and it follows the same
+  Settings toggle. (`formatReadStamp` moved into `js/readstate.js` so both pages share it.)
+- **added:** Scroll now counts a chapter as read when you scroll through to its last verse — or on into the next chapter, which also catches a quick scroll that skips past the last verse — so it
+  shows in My Progress and ticks off a reading-plan day like the main app's button does (a short "… added to
+  your Progress" toast confirms it, or "Day N marked complete!" when it finishes a plan day). Only a chapter
+  you actually scrolled through counts — jumping straight to a last verse, opening a deep link to
+  one, or following an Explain cross-reference doesn't. The "mark as read" core moved to a new
+  DOM-free `js/readstate.js`, shared with the reader.
+- **fixed:** Long verses in Scroll were cut off at the bottom of their card — and, scrolling back up
+  to one, cut off at the top. A verse too long for one screen is now shrunk (down to a floor of 15px)
+  until it fits, and re-fitted when you change the text size or rotate the phone.
+- **added:** Chapter quiz. A "Take a quiz" button now sits beside "Yes, mark as read" at the end of
+  a chapter (and a "Quiz yourself" card under one you've already read) for chapters that have
+  questions, labelled with the real count — a chapter can have as few as 1. The quiz asks up to 10
+  multiple-choice and true/false questions, shows right or wrong after each answer, and on a miss
+  shows the correct answer, a hover-previewable reference and the verse itself (plus the
+  explanation, when the question has one). The results screen scores it, lists what you missed,
+  and offers a retake — a different mix when the chapter has more than 10 questions, the same
+  questions otherwise — or the next chapter. Finishing at any score marks the chapter read; the quiz
+  itself doesn't count toward the streak. Questions are in English and follow the KJV wording, so
+  on another translation it says so. A bottom sheet on a phone.
+- **added:** Your best quiz score shows in the "Read on…" line, My Progress gains "Chapter Quizzes
+  Taken" and "Average Best Score" tiles and a Quizzes filter on Recent Activity, and Help describes
+  the quiz. The My Progress tiles are now three across (six in all).
+
 ## [1.27.1] - 2026-11-06
 - **changed:** The Explain sheet in Scroll is now three collapsible sections — What it means, In
   the original, Related verses — each showing a short peek until you open it, and starting

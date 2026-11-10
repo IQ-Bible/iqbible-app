@@ -1,0 +1,9 @@
+[
+  {
+    "id": "scroll-and-quizzes-2026-11",
+    "date": "2026-11-10",
+    "title": "New: Scroll the Bible and chapter quizzes",
+    "body": "Scroll the Bible is a new way to read: one verse at a time, just by scrolling, with the original-language words, commentary and audio a tap away. And chapters now have a short quiz, in the reader and in Scroll.",
+    "cta": { "label": "Try Scroll", "route": "/scroll/" }
+  }
+]

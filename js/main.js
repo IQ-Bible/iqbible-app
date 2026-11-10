@@ -424,7 +424,7 @@ document.addEventListener("keydown", e => {
     closeDiscoverHub();
     closeCardsSheet();
     if (tourActive) endTour();
-    ["navPickerScrim", "versionPickerScrim", "narrationPickerScrim", "sleepTimerScrim", "dictTermScrim", "placesScrim", "propheciesScrim", "timelineScrim", "chapterInfoScrim", "apiErrorScrim", "peopleScrim", "fontSizeScrim", "vtShareScrim", "vtOrigLangScrim", "bookInfoScrim", "dayDrawerScrim", "ndMdHelpScrim", "tourWelcomeScrim", "tourAdvancedOfferScrim"].forEach(closeModal);
+    ["navPickerScrim", "versionPickerScrim", "narrationPickerScrim", "sleepTimerScrim", "dictTermScrim", "placesScrim", "propheciesScrim", "timelineScrim", "chapterInfoScrim", "apiErrorScrim", "peopleScrim", "fontSizeScrim", "vtShareScrim", "vtOrigLangScrim", "bookInfoScrim", "dayDrawerScrim", "ndMdHelpScrim", "tourWelcomeScrim", "tourAdvancedOfferScrim", "quizScrim"].forEach(closeModal);
     closeVerseTools();
     setMenuHash(null);
     // Escape bypasses closeSettings() (goes straight to switchMainView above),
@@ -467,6 +467,7 @@ async function refreshAppVersionFromChangelog() {
   document.querySelectorAll("[data-app-year]").forEach(el => el.textContent = new Date().getFullYear());
   setAppVersionText(APP_VERSION);
   refreshAppVersionFromChangelog();
+  startAnnouncements(); // before anything sets iqb_tour_seen — it tells a new visitor from a returning one
   setTheme(getTheme());
   setFontSize(getFontSize());
   setUiFontSize(getUiFontSize());
@@ -474,7 +475,12 @@ async function refreshAppVersionFromChangelog() {
   syncNavGroups(); // set the collapsed submenus inert before anything can tab into them
   updateLibraryCounts();
   // The hosted instance never gates on a key — its proxy supplies one.
-  if (!IS_HOSTED_INSTANCE && !getApiKey()) { showKeyBanner(); openHashRoute(); return; }
+  if (!IS_HOSTED_INSTANCE && !getApiKey()) {
+    showKeyBanner(); openHashRoute();
+    // A link straight to #settings is the visitor already heading to the key field — don't bury it under the gate that points there.
+    if ((parseHashRoute() || {}).key === "settings") hideKeyBanner();
+    return;
+  }
   await Promise.all([loadCatalog(), loadBookAbbreviations()]);
   applyStoredVersion();
   const route = parsePathRoute();
@@ -490,6 +496,7 @@ async function refreshAppVersionFromChangelog() {
   openHashRoute();
   maybeShowPeriodicBackupReminder();
   maybeShowTourWelcome();
+  maybeShowAnnouncement(); // last: it yields to the key gate, the tour welcome and the backup banner
 })();
 
 // PWA: register the app-shell service worker (sw.js). It caches only static

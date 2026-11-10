@@ -1,10 +1,13 @@
 /* ═══════════════════════════════════════════════════════════════════════
    SCROLL THE BIBLE (/scroll/) — one verse per full-screen card, read by
    scrolling. A deliberately separate entry from the main app: it loads only
-   config.js / api.js / catalog.js (shared state, auth, version + book lists)
-   and none of the reader, so it carries none of the reader's one-chapter-on-
+   config.js / api.js / readstate.js / catalog.js / share.js (shared state, auth,
+   read progress, version + book lists, the share-image helpers) and none of the reader, so it carries none of the reader's one-chapter-on-
    screen assumptions. Chapters are fetched one call each and cut into cards;
    they're appended as you near the end and prepended as you near the top.
+
+   A chapter's last verse offers a "Take a quiz" button when the API has questions
+   for it; the quiz itself is js/quiz.js, shared with the reader (see quizHost, further down).
 
    Bookmarks and highlights live in the same localStorage keys as the main app
    (same origin), so what you mark here shows up in My Library there. The
@@ -14,6 +17,8 @@ const SC_POS_KEY = "iqb_scroll_pos";
 const SC_FONT_KEY = "iqb_scroll_font_size";
 const SC_HL_COLORS = ["yellow", "green", "blue", "pink"];
 const SC_HL_SWATCH = { yellow: "#eab308", green: "#22c55e", blue: "#3b82f6", pink: "#ec4899" };
+const SC_MIN_FONT = 15;           // the floor a long verse is shrunk to so it still fits one screen
+let scBaseFont = 30;              // the reader's chosen size (Display > Text size)
 const SC_BOOKMARK_SVG = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v17l-6-4-6 4z"/></svg>`;
 const SC_PLAY_SVG = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5l11 7-11 7z"/></svg>`;
 const SC_PAUSE_SVG = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>`;
@@ -45,8 +50,28 @@ function scTitleCard(ref, count) {
   s.innerHTML = `<div class="sc-body"><div class="sc-eyebrow">Chapter ${ref.chapter}</div>
     <h2 class="sc-title-h">${escHtml(ref.bookName)} ${ref.chapter}</h2>
     <div class="sc-sub">${count} verse${count === 1 ? "" : "s"}</div>
-    <div class="sc-hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>Scroll to read</div></div>`;
+    <div class="sc-readstamp" hidden></div>
+    <div class="sc-hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>Scroll to read</div>
+    <div class="sc-tip">Tap a verse to copy it · double-tap to bookmark it</div></div>`;
+  scPaintReadStamp(s);
   return s;
+}
+// The "Read on …" line on a chapter's title card, as in the reader (same Settings
+// toggle, same iqb_progress), plus the chapter's best quiz score.
+const SC_CHECK_SVG = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5l4 4 8-9.5"/></svg>`;
+function scPaintReadStamp(card) {
+  const el = card.querySelector(".sc-readstamp");
+  if (!el) return;
+  const d = card.dataset, ts = getReadStampEnabled() ? getProgress()[`${d.book}.${d.chapter}`] : null;
+  if (!ts) { el.hidden = true; el.innerHTML = ""; return; }
+  const best = quizBestLabel(d.book, +d.chapter);
+  el.hidden = false;
+  el.innerHTML = `${SC_CHECK_SVG}<span>${escHtml(typeof ts === "number" ? formatReadStamp(ts) : "Read")}</span>`
+    + (best ? `<span aria-hidden="true">·</span><span class="sc-quizbest">Quiz best ${escHtml(best)}</span>` : "");
+}
+function scRepaintReadStamp(book, chapter) {
+  const c = scFeed.querySelector(`.sc-title[data-book="${book}"][data-chapter="${chapter}"]`);
+  if (c) scPaintReadStamp(c);
 }
 function scVerseCard(ref, n, text, count) {
   const s = document.createElement("section");
@@ -73,10 +98,51 @@ function scCardsFor(ref, verses) {
   const frag = document.createDocumentFragment();
   const entries = verses.map(v => ({ n: v.verse_number ?? v.verse, text: v.text }));
   frag.appendChild(scTitleCard(ref, entries.length));
-  entries.forEach(e => frag.appendChild(scVerseCard(ref, e.n, e.text, entries.length)));
+  entries.forEach((e, i) => {
+    const card = scVerseCard(ref, e.n, e.text, entries.length);
+    // Flagged here rather than inferred from the verse number, which a version can skip or number oddly.
+    if (i === entries.length - 1) card.dataset.last = "1";
+    frag.appendChild(card);
+  });
   frag.querySelectorAll(".sc-card").forEach(c => scObserver.observe(c));
   return frag;
 }
+// Puts a built fragment into the feed (via `place`) and then fits its cards to
+// one screen — so a caller that measures positions afterwards sees final heights.
+function scAddCards(frag, place) {
+  const cards = [...frag.children];
+  place(frag);
+  scFitCards(cards);
+}
+
+/* ── one card = one screen ── */
+// A card is min-height one screen, so a long verse used to grow past it and the
+// snap points (card tops) put the rest of its text off-screen: cut off at the
+// bottom going down, and its top hidden coming back up. Shrink such a verse's
+// text (or a heading), a pixel at a time, until the card is exactly one screen again (the
+// padding already keeps clear of the top bar and the bottom overlay). The
+// floor is SC_MIN_FONT; below that a verse is left to overflow rather than
+// become unreadable.
+function scFitCards(cards) {
+  const vh = scFeed.clientHeight;
+  if (!vh) return;
+  const fitEl = c => c.querySelector(".sc-verse, .sc-title-h"); // verse text, else the chapter title card's heading
+  cards.forEach(c => { const p = fitEl(c); if (p && p.style.fontSize) p.style.fontSize = ""; });
+  cards.filter(c => c.offsetHeight > vh + 1).forEach(c => {
+    const p = fitEl(c);
+    if (!p) return;
+    let px = parseFloat(getComputedStyle(p).fontSize);
+    while (px > SC_MIN_FONT && c.offsetHeight > vh + 1) { px -= 1; p.style.fontSize = px + "px"; }
+  });
+}
+let scFitTimer = 0;
+// Everything already in the feed, after the size, the viewport or the web font changes.
+function scFitAllSoon(delay = 0) {
+  clearTimeout(scFitTimer);
+  scFitTimer = setTimeout(() => scFitCards([...scFeed.querySelectorAll(".sc-card")]), delay);
+}
+new ResizeObserver(() => scFitAllSoon(120)).observe(scFeed);
+if (document.fonts) document.fonts.addEventListener("loadingdone", () => scFitAllSoon(0));
 function scMessageCard(html) {
   const s = document.createElement("section");
   s.className = "sc-card sc-msg";
@@ -91,9 +157,48 @@ const scObserver = new IntersectionObserver(entries => {
 }, { root: scFeed, rootMargin: "-45% 0px -45% 0px", threshold: 0 });
 
 function scSetCurrent(card) {
+  const prev = sc.cur;
   sc.cur = card;
   scSyncUI();
   scSavePos();
+  scCountRead(card, prev);
+}
+
+/* ── counting a chapter as read ── */
+// A chapter counts as read when the reader reaches its last verse, or moves on
+// from it into the next chapter (which also covers a quick scroll that never
+// lands on the last verse's card) — but only if they scrolled through it:
+// scStarted holds the chapters whose opening card (the title, or verse 1) has
+// been on screen this session, so landing on a last verse by a jump, a ?ref=
+// link or an Explain cross-reference doesn't count. A one-verse chapter has no
+// verse 1 to scroll past, so only its title card starts it. `prev` is the card
+// that was current before this one: only a forward move from the previous chapter
+// into a title card counts, never scrolling back up to one (or a fresh jump, where
+// sc.cur was cleared).
+const scStarted = new Set();
+function scCountRead(card, prev) {
+  const d = card.dataset;
+  const key = `${d.book}.${d.chapter}`;
+  if (+d.verse === 0 || (+d.verse === 1 && +d.count > 1)) scStarted.add(key);
+  if (d.last && scStarted.has(key)) scMarkRead(d.book, +d.chapter);
+  const p = prev && prev.dataset;
+  if (+d.verse === 0 && p && p.book && (p.book !== d.book || p.chapter !== d.chapter) && scStarted.has(`${p.book}.${p.chapter}`)) {
+    scMarkRead(p.book, +p.chapter);
+  }
+}
+// Finishing a plan day gets its milestone toast; a plain mark gets a short one
+// so the reader knows it was counted. `quiet` (the quiz) skips that one — its
+// results screen already says so.
+function scMarkRead(book, chapter, quiet) {
+  const r = recordChapterRead(book, chapter);
+  if (!r) return false;
+  scRepaintReadStamp(book, chapter);
+  if (r.dayComplete) toast(`Day ${r.dayMatch} marked complete!`);
+  else if (!quiet) {
+    const b = bookList.find(x => x.usfm === book);
+    toast(`${b ? b.name + " " : ""}${chapter} added to your Progress`);
+  }
+  return true;
 }
 function scSyncUI() {
   const card = sc.cur;
@@ -107,9 +212,7 @@ function scSyncUI() {
   scById("scProgressBar").style.width = pct + "%";
   scById("scProgressTrack").setAttribute("aria-valuenow", pct);
   scById("scProgressLabel").textContent = verse ? `${verse} of ${count}` : `${count} verses`;
-  const next = card.nextElementSibling;
-  const nt = next && next.querySelector(".sc-vt");
-  scById("scPeek").textContent = nt ? nt.textContent : "";
+  scSyncPeek(card);
   // Verse tools need a verse; the chapter title card has none (Listen still works — it's per chapter).
   const isVerse = verse > 0;
   const k = scKey(d.book, d.chapter, d.verse);
@@ -126,6 +229,29 @@ function scSyncUI() {
   }
   scById("scPageLink").href = `/${d.book.toLowerCase()}/${d.chapter}${isVerse ? "/" + verse : ""}?v=${encodeURIComponent(current.version)}`;
   scSyncAudioButton();
+}
+// The strip above the progress bar: the next verse's text, or — on a chapter's
+// last verse of a chapter that has questions — a real button that opens the quiz.
+function scSyncPeek(card) {
+  const next = card.nextElementSibling;
+  const peek = scById("scPeek"), btn = scById("scQuizPrompt");
+  const o = card.dataset.last ? quizOffer(card.dataset.book, +card.dataset.chapter) : null;
+  if (o) {
+    const rec = quizBestFor(card.dataset.book, +card.dataset.chapter);
+    btn.innerHTML = `${QUIZ_ICON}<span class="sc-qp-text"><span class="sc-qp-main">${rec ? "Retake the quiz" : "Take a quiz"}</span><span class="sc-qp-sub">${escHtml(quizCountText(o))}${rec ? ` · best ${rec.best}/${rec.bestOf}` : ""}</span></span>`;
+    btn.hidden = false;
+    peek.hidden = true;
+    peek.textContent = "";
+    return;
+  }
+  btn.hidden = true;
+  peek.hidden = false;
+  const nt = next && next.querySelector(".sc-vt");
+  peek.textContent = nt ? nt.textContent : "";
+}
+function scStartQuizFromPrompt() {
+  const d = sc.cur && sc.cur.dataset;
+  if (d) startQuiz(d.book, +d.chapter, d.bookName);
 }
 let scSaveTimer = 0;
 function scSavePos() {
@@ -146,6 +272,14 @@ async function scFetchChapter(ref) {
   const d = await apiJSONCached(`/bibles/${current.version}/${ref.book}/${ref.chapter}`);
   const verses = d.data || [];
   if (!verses.length) throw Object.assign(new Error("chapter_not_found"), { status: 404 });
+  return verses;
+}
+// The chapter's verses, with the book's quiz coverage fetched alongside so the
+// chapter's quiz button (or its absence) is settled before the cards go in, so
+// the last verse's strip never changes after the fact. Coverage never rejects:
+// if it fails the chapter simply has no quiz button this time.
+async function scFetchWithQuiz(ref) {
+  const [verses] = await Promise.all([scFetchChapter(ref), ensureQuizCoverage(ref.book)]);
   return verses;
 }
 async function scBookLastChapter(usfm) {
@@ -186,9 +320,9 @@ async function scLoadNext() {
       scFeed.appendChild(end);
       return;
     }
-    const verses = await scFetchChapter(next);
+    const verses = await scFetchWithQuiz(next);
     if (gen !== sc.gen) return;
-    scFeed.appendChild(scCardsFor(next, verses));
+    scAddCards(scCardsFor(next, verses), f => scFeed.appendChild(f));
     sc.last = next;
     more = true;
   } catch (e) {
@@ -206,14 +340,14 @@ async function scLoadPrev() {
     const prev = await scAdjacent(sc.first, -1);
     if (gen !== sc.gen) return;
     if (!prev) { sc.atStart = true; return; }
-    const verses = await scFetchChapter(prev);
+    const verses = await scFetchWithQuiz(prev);
     if (gen !== sc.gen) return;
     // Prepending shoves everything down; re-pin the card the reader is on so the
     // screen doesn't jump. Snap is off for the move so it can't re-snap mid-way.
     const anchor = sc.cur || scFeed.querySelector(".sc-card");
     const before = anchor ? anchor.getBoundingClientRect().top : 0;
     scFeed.style.scrollSnapType = "none";
-    scFeed.insertBefore(scCardsFor(prev, verses), scFeed.firstChild);
+    scAddCards(scCardsFor(prev, verses), f => scFeed.insertBefore(f, scFeed.firstChild));
     if (anchor) scFeed.scrollTop += anchor.getBoundingClientRect().top - before;
     requestAnimationFrame(() => { scFeed.style.scrollSnapType = ""; });
     sc.first = prev;
@@ -243,7 +377,7 @@ async function scGoTo(book, chapter, verse) {
   if (!b) { scShowProblem(`${escHtml(book)} isn't in ${escHtml(current.versionTitle)}.`); return; }
   const ref = { book: b.usfm, bookName: b.name, chapter };
   let verses;
-  try { verses = await scFetchChapter(ref); }
+  try { verses = await scFetchWithQuiz(ref); }
   catch (e) {
     if (gen !== sc.gen) return;
     if (e.status === 404) scShowProblem(`${escHtml(b.name)} ${chapter} isn't in ${escHtml(current.versionTitle)}.`);
@@ -252,7 +386,7 @@ async function scGoTo(book, chapter, verse) {
   }
   if (gen !== sc.gen) return;
   scFeed.innerHTML = "";
-  scFeed.appendChild(scCardsFor(ref, verses));
+  scAddCards(scCardsFor(ref, verses), f => scFeed.appendChild(f));
   sc.first = sc.last = ref;
   const target = (verse && scFeed.querySelector(`.sc-card[data-verse="${verse}"]`)) || scFeed.querySelector(".sc-card");
   scFeed.style.scrollSnapType = "none";
@@ -295,15 +429,43 @@ function scCurVerse() {
   const d = sc.cur && sc.cur.dataset;
   return d && +d.verse > 0 ? d : null;
 }
-function scToggleBookmark() {
-  const d = scCurVerse();
-  if (!d) return;
-  const m = scRead("iqb_bookmarks"), k = scKey(d.book, d.chapter, d.verse);
-  if (m[k]) { delete m[k]; toast("Bookmark removed"); }
-  else { m[k] = { createdAt: Date.now(), groupId: scGroupId() }; toast("Bookmarked"); }
+function scToggleBookmark() { if (sc.cur) scBookmarkCard(sc.cur); }
+// Toggles the bookmark on a given verse card (the rail button's current verse, or the card that was double-tapped).
+function scBookmarkCard(card) {
+  const d = card.dataset;
+  if (!(+d.verse > 0)) return;
+  const m = scRead("iqb_bookmarks"), k = scKey(d.book, d.chapter, d.verse), ref = `${d.bookName} ${d.chapter}:${d.verse}`;
+  if (m[k]) { delete m[k]; toast(`Bookmark removed — ${ref}`); }
+  else { m[k] = { createdAt: Date.now(), groupId: scGroupId() }; toast(`Bookmarked ${ref}`); }
   scWrite("iqb_bookmarks", m);
-  scPaintCard(sc.cur); scSyncUI();
+  scPaintCard(card);
+  if (card === sc.cur) scSyncUI();
 }
+
+/* ── tap to copy, double-tap to bookmark ── */
+// A pointer convenience on a verse card; the keyboard route to both is the rail's
+// Bookmark button and Share > Copy Verse. The copy waits a beat so a second tap can
+// turn it into a bookmark instead of copying twice. Taps on a control, or while text
+// is selected, are left alone so selecting a verse by hand still works.
+const SC_DOUBLE_TAP_MS = 260;
+let scTapTimer = 0, scTapCard = null;
+const scVerseQuote = card => `"${card.querySelector(".sc-vt").textContent}" — ${card.dataset.bookName} ${card.dataset.chapter}:${card.dataset.verse}`;
+async function scCopyVerse(card) {
+  try { await navigator.clipboard.writeText(scVerseQuote(card)); toast(`Copied ${card.dataset.bookName} ${card.dataset.chapter}:${card.dataset.verse}`); }
+  catch (e) { toast("Couldn't copy — select the verse text instead"); }
+}
+// Stops the browser's own double-click word selection from fighting the gesture.
+scFeed.addEventListener("mousedown", e => { if (e.detail > 1 && e.target.closest(".sc-card[data-verse]:not(.sc-title)")) e.preventDefault(); });
+scFeed.addEventListener("click", e => {
+  const card = e.target.closest(".sc-card");
+  if (!card || !(+card.dataset.verse > 0) || !card.querySelector(".sc-vt")) return;
+  if (e.target.closest("button, a, input, select, textarea, [data-cite-id]")) return;
+  if (window.getSelection().toString()) return;
+  clearTimeout(scTapTimer);
+  if (scTapCard === card && scTapTimer) { scTapTimer = 0; scTapCard = null; scBookmarkCard(card); return; }
+  scTapCard = card;
+  scTapTimer = setTimeout(() => { scTapTimer = 0; scTapCard = null; scCopyVerse(card); }, SC_DOUBLE_TAP_MS);
+});
 function scOpenHighlight() {
   const d = scCurVerse();
   if (!d) return;
@@ -322,17 +484,56 @@ function scSetHighlight(color) {
   closeModal("scHlScrim");
   scPaintCard(sc.cur); scSyncUI();
 }
-async function scShare() {
+/* ── share ── */
+// The same Share options as the reader's Verse Tools > Share: the verse as an
+// image (light or dark) with open / download / copy-link, the embed code and its
+// live preview, and copy / send links, driven by the shared helpers in js/share.js
+// (shareImageURL, shareEmbedSrc, copyShareLink, copyShareEmbed, downloadShareImage).
+// Links point at the main app's verse URL, not Scroll's, so a pasted link gets the
+// verse's preview card where the host provides one.
+let scShareCard = null;
+function scVerseLink(d) {
+  return `${location.origin}${BASE_PATH}/${d.book.toLowerCase()}/${d.chapter}/${d.verse}?v=${encodeURIComponent(current.version)}`;
+}
+function scShare() {
   const d = scCurVerse();
   if (!d) return;
-  const text = `“${sc.cur.querySelector(".sc-vt").textContent}” — ${d.bookName} ${d.chapter}:${d.verse} (${shortVersionLabel(current.versionTitle)})`;
-  const url = `${location.origin}${BASE_PATH}/scroll/?ref=${d.book}.${d.chapter}.${d.verse}&ver=${encodeURIComponent(current.version)}`;
-  if (navigator.share) {
-    try { await navigator.share({ text, url }); } catch (e) { /* dismissed */ }
-    return;
-  }
-  try { await navigator.clipboard.writeText(`${text}\n${url}`); toast("Copied to clipboard"); }
-  catch (e) { toast("Couldn't copy — select the verse text instead"); }
+  scShareCard = sc.cur;
+  shareToolRef = { book: d.book, chapter: +d.chapter, verse: +d.verse };
+  shareToolTheme = getTheme() === "dark" ? "dark" : "light";
+  scById("scShareTitle").textContent = `Share ${d.bookName} ${d.chapter}:${d.verse}`;
+  openModal("scShareScrim");
+  scRenderShare();
+}
+function scRenderShare() {
+  const card = scShareCard, d = card.dataset;
+  const ref = `${d.bookName} ${d.chapter}:${d.verse}`, quote = scVerseQuote(card), url = scVerseLink(d);
+  const img = shareImageURL();
+  const chip = t => `<button type="button" class="filter-chip${shareToolTheme === t ? " active" : ""}" aria-pressed="${shareToolTheme === t}" onclick="scSetShareTheme('${t}')">${t === "light" ? "Light" : "Dark"}</button>`;
+  scById("scShareBody").innerHTML = `
+    <div class="share-fields" role="group" aria-label="Image theme" style="margin-bottom:10px">${chip("light")}${chip("dark")}</div>
+    <img class="share-preview" src="${escHtml(img)}" alt="Image of ${escHtml(ref)}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'dd-empty',textContent:'Could not render a preview for this verse.'}))">
+    <div class="share-actions">
+      ${navigator.share ? `<button type="button" onclick="scNativeShare()">Share…</button>` : ""}
+      <button type="button" onclick="scCopyVerse(scShareCard)">Copy Verse</button>
+      <button type="button" onclick="scCopyLink()">Copy Link</button>
+      <a href="${escHtml(img)}" target="_blank" rel="noopener">Open Full Image ↗</a>
+      <button type="button" onclick="downloadShareImage()">Download</button>
+      <button type="button" onclick="copyShareLink()">Copy Image Link</button>
+      <button type="button" onclick="copyShareEmbed()">Copy Embed Code</button>
+      <a href="mailto:?subject=${encodeURIComponent(ref)}&body=${encodeURIComponent(quote + "\n" + url)}">Email</a>
+      <a href="https://twitter.com/intent/tweet?text=${encodeURIComponent(quote)}&url=${encodeURIComponent(url)}" target="_blank" rel="noopener">X / Twitter</a>
+      <a href="https://api.whatsapp.com/send?text=${encodeURIComponent(quote + " " + url)}" target="_blank" rel="noopener">WhatsApp</a>
+    </div>
+    <iframe class="share-embed-frame" src="${escHtml(shareEmbedSrc())}" title="Verse embed preview"></iframe>`;
+}
+function scSetShareTheme(t) { shareToolTheme = t; scRenderShare(); }
+async function scCopyLink() {
+  try { await navigator.clipboard.writeText(scVerseLink(scShareCard.dataset)); toast("Link copied to clipboard"); }
+  catch (e) { toast("Could not copy"); }
+}
+async function scNativeShare() {
+  try { await navigator.share({ text: scVerseQuote(scShareCard), url: scVerseLink(scShareCard.dataset) }); } catch (e) { /* dismissed */ }
 }
 
 /* ── narration — per chapter (the API has no per-verse audio), so this says so
@@ -702,6 +903,35 @@ scById("scExplainBody").addEventListener("click", e => {
   scToggleSec(sec.dataset.sec);
 });
 
+/* ── chapter quiz (js/quiz.js) ── */
+// Scroll has no chapter-end nav, so "Next" scrolls on to the next chapter's title
+// card (a plain Done if that chapter isn't loaded yet). A finished quiz marks the chapter read through the same DOM-free core
+// (js/readstate.js) as the reader.
+// The next chapter's title card, if it's loaded (it follows the quizzed chapter's last verse).
+const scNextTitleOf = q => {
+  const last = scFeed.querySelector(`.sc-card[data-last="1"][data-book="${q.book}"][data-chapter="${q.chapter}"]`);
+  const next = last && last.nextElementSibling;
+  return next && next.classList.contains("sc-title") ? next : null;
+};
+Object.assign(quizHost, {
+  markRead(q) { return scMarkRead(q.book, q.chapter, true); },
+  coverageLoaded() { },
+  nextLabel(q) {
+    const next = scNextTitleOf(q);
+    return next ? `${next.dataset.bookName} ${next.dataset.chapter}` : "";
+  },
+  goNext() {
+    const next = quiz && scNextTitleOf(quiz);
+    if (next) next.scrollIntoView({ block: "start", behavior: prefersReducedMotion() ? "auto" : "smooth" });
+  },
+  // Show the new best on the chapter's title card and on the last verse's prompt.
+  scoresChanged(q) {
+    scRepaintReadStamp(q.book, q.chapter);
+    if (sc.cur) scSyncPeek(sc.cur);
+  },
+  focusAfterClose: "#scQuizPrompt",
+});
+
 /* ── pickers ── */
 async function scOpenJump() {
   openModal("scJumpScrim");
@@ -778,10 +1008,11 @@ function scApplyVersionUI() {
 /* ── display ── */
 function scApplyFont() {
   const px = parseInt(localStorage.getItem(SC_FONT_KEY), 10) || 30;
+  scBaseFont = px;
   document.documentElement.style.setProperty("--sc-font", px + "px");
   return px;
 }
-function scSetFont(px) { localStorage.setItem(SC_FONT_KEY, px); scApplyFont(); }
+function scSetFont(px) { localStorage.setItem(SC_FONT_KEY, px); scApplyFont(); scFitAllSoon(); }
 function scSetTheme(t) { setTheme(t); scSyncTheme(); }
 function scSyncTheme() {
   const dark = getTheme() === "dark";

@@ -94,13 +94,29 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
   </div>
 
   <div id="scBottom">
-    <p id="scPeek" aria-hidden="true"></p>
+    <!-- The next verse's text, decorative — or, on a chapter's last verse that is followed
+         by a chapter that has a quiz, a real "Take a quiz" button (js/scroll.js scSyncUI). -->
+    <div id="scPeekSlot">
+      <p id="scPeek" aria-hidden="true"></p>
+      <button type="button" id="scQuizPrompt" hidden onclick="scStartQuizFromPrompt()"></button>
+    </div>
     <div class="sc-progress">
       <div class="sc-progress-track" id="scProgressTrack" role="progressbar" aria-label="Position in this chapter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="scProgressBar"></div></div>
       <span id="scProgressLabel"></span>
     </div>
   </div>
 
+</div>
+
+<!-- Share (the reader's Verse Tools > Share, driven by js/share.js) — filled by scRenderShare(). -->
+<div class="modalscrim" id="scShareScrim">
+  <div class="modal" style="width:640px">
+    <div class="mhead"><div class="row">
+      <h2 id="scShareTitle">Share</h2>
+      <button type="button" class="closebtn" onclick="closeModal('scShareScrim')" aria-label="Close">&times;</button>
+    </div></div>
+    <div class="dictbody" id="scShareBody"></div>
+  </div>
 </div>
 
 <audio id="scAudioEl" preload="none"></audio>
@@ -206,6 +222,23 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
   </div>
 </div>
 
+<!-- Chapter quiz (js/quiz.js, shared with the main app) — opened from the "Take a quiz"
+     button on a chapter's last verse. Filled per phase by renderQuiz(). -->
+<div class="modalscrim" id="quizScrim">
+  <div class="modal quiz-modal">
+    <div class="mhead quiz-head">
+      <div class="quiz-head-row">
+        <div class="quiz-head-titles"><span class="quiz-kicker">Chapter quiz</span><h2 id="quizTitle"></h2></div>
+        <span class="quiz-count" id="quizCount"></span>
+        <button type="button" class="closebtn" aria-label="Close quiz" onclick="closeQuiz()">&times;</button>
+      </div>
+    </div>
+    <div class="quiz-progress" id="quizProgress" role="progressbar" aria-label="Quiz progress" aria-valuemin="0" aria-valuemax="10" aria-valuenow="0" hidden><div id="quizProgressFill"></div></div>
+    <div class="quiz-body" id="quizBody"></div>
+    <div class="quiz-foot" id="quizFoot"></div>
+  </div>
+</div>
+
 <div class="modalscrim" id="apiErrorScrim">
   <div class="modal narrow" role="alertdialog">
     <div class="mhead"><div class="row"><h2 id="apiErrorTitle">API Error</h2><button type="button" class="closebtn" onclick="closeModal('apiErrorScrim')" aria-label="Close">&times;</button></div></div>
@@ -220,13 +253,19 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
 <!-- Only what Scroll needs, in dependency order: config → shared state/helpers/
-     auth → the catalog (version + book lists) → the shared verse-preview helpers
-     → Scroll itself. Nothing from the reader, search, notes or plans — that
-     isolation is the point of /scroll/. -->
+     auth → the DOM-free read-state core (readstate.js: progress + plan days, so a
+     scrolled-through chapter counts as read) → the catalog (version + book lists)
+     → the shared verse-preview helpers → the share-image helpers (share.js: URL
+     builders and copy/download, nothing page-specific) → the chapter quiz (shared with the reader;
+     it needs only the helpers above) → Scroll itself. Nothing from the reader,
+     search, notes or plans.js — that isolation is the point of /scroll/. -->
 <script src="js/config.js"></script>
 <script src="js/api.js"></script>
+<script src="js/readstate.js"></script>
 <script src="js/catalog.js"></script>
 <script src="js/previews.js"></script>
+<script src="js/share.js"></script>
+<script src="js/quiz.js"></script>
 <script src="js/scroll.js"></script>
 </body>
 </html>

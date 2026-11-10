@@ -200,6 +200,11 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
           <button onclick="dismissDataBackupBanner()">Got it</button>
         </div>
 
+        <!-- "What's new" note (js/announcements.js): one dismissible announcement at a
+             time, filled from announcements.json. The role="status" wrapper is always
+             in the DOM so a banner added to it is announced; empty, it takes no space. -->
+        <div id="announcementBanner" role="status"></div>
+
         <div id="readCol">
           <div class="chhead">
             <h1 id="readingHeading" class="sr-only">Genesis 1</h1>
@@ -267,6 +272,10 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
                renderChapter()'s innerHTML replacement never wipes it. Sits
                above #chapterEndNav: finish the chapter, mark it, then move on. -->
           <div id="chapterReadPrompt"></div>
+          <!-- "Quiz yourself on …" card for a chapter that's already read
+               (js/quiz.js, renderChapterQuizCard) — its own sibling so the
+               prompt above can stay empty when the read stamp is on. -->
+          <div id="chapterQuizCard"></div>
           <!-- End-of-chapter prev/next — a sibling of #readingText (not a
                child) so renderChapter()'s innerHTML swap never wipes it;
                labels/disabled state filled by renderChapterEndNav (reader.js).
@@ -391,6 +400,24 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
           <div class="bp-version-note" id="searchBookFilterNote"></div>
           <div class="mlist" id="searchBookFilterBody"></div>
           <div style="padding:0 24px 24px"><button class="setsave" style="margin-bottom:0" onclick="closeSearchBookPicker()">Done</button></div>
+        </div>
+      </div>
+
+      <!-- Chapter quiz (js/quiz.js) — a centered dialog on desktop, a bottom
+           sheet on a phone. Header, progress bar, body and footer are filled
+           per phase (loading / question / results / error) by renderQuiz(). -->
+      <div class="modalscrim" id="quizScrim">
+        <div class="modal quiz-modal">
+          <div class="mhead quiz-head">
+            <div class="quiz-head-row">
+              <div class="quiz-head-titles"><span class="quiz-kicker">Chapter quiz</span><h2 id="quizTitle"></h2></div>
+              <span class="quiz-count" id="quizCount"></span>
+              <button type="button" class="closebtn" aria-label="Close quiz" onclick="closeQuiz()">&times;</button>
+            </div>
+          </div>
+          <div class="quiz-progress" id="quizProgress" role="progressbar" aria-label="Quiz progress" aria-valuemin="0" aria-valuemax="10" aria-valuenow="0" hidden><div id="quizProgressFill"></div></div>
+          <div class="quiz-body" id="quizBody"></div>
+          <div class="quiz-foot" id="quizFoot"></div>
         </div>
       </div>
 
@@ -843,7 +870,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
             <div class="help-card">
               <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="8" rx="2"/><rect x="6" y="13" width="12" height="8" rx="2"/></svg></div>
               <div class="help-card-title">Scroll</div>
-              <div class="help-card-body">Read one verse at a time, just by scrolling — a full-screen feed built for a phone. Bookmark, highlight, or share the verse on screen, tap the lightbulb for the original Hebrew or Greek words, a classic commentary and related verses, and listen to the chapter in your choice of voice. Open it from the Scroll link in the left nav (or the stacked-cards button in the top bar on a phone); it picks up where you were reading, and your bookmarks and highlights are shared with the main app.</div>
+              <div class="help-card-body">Read one verse at a time, just by scrolling — a full-screen feed built for a phone. Tap a verse to copy it, or double-tap it to bookmark it. Highlight or share the verse on screen — Share has the same image, link and embed options as Verse Tools — and tap the lightbulb for the original Hebrew or Greek words, a classic commentary and related verses, listen to the chapter in your choice of voice, and take the chapter's quiz from the button on its last verse. Scrolling through a chapter to its last verse, or on into the next chapter, counts it as read in My Progress and your reading plan (jumping straight to the end doesn't). Open it from the Scroll link in the left nav (or the stacked-cards button in the top bar on a phone); it picks up where you were reading, and your bookmarks and highlights are shared with the main app.</div>
             </div>
             <div class="help-card">
               <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></div>
@@ -885,7 +912,12 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
             <div class="help-card">
               <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg></div>
               <div class="help-card-title">My Progress</div>
-              <div class="help-card-body">A streak calendar, read counts and your active plan's progress, all in one place.</div>
+              <div class="help-card-body">A streak calendar, read counts, chapter-quiz scores and your active plan's progress, all in one place.</div>
+            </div>
+            <div class="help-card">
+              <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></div>
+              <div class="help-card-title">Chapter quiz</div>
+              <div class="help-card-body">At the end of a chapter, tap “Take a quiz” beside “Yes, mark as read” (or “Quiz yourself” under a chapter you’ve already read) for up to 10 multiple-choice and true/false questions on it. You see right or wrong after each answer — with the verse when you miss one — and finishing at any score marks the chapter read. In Scroll the quiz is the button on a chapter's last verse. Chapters with more questions than one quiz holds give a different mix on a retake. Questions are in English and follow the King James wording whichever translation you read; your best scores show beside the chapter and in My Progress.</div>
             </div>
             <div class="help-card">
               <div class="help-card-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div>
@@ -904,6 +936,12 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
             </div>
           </div>
 
+          <!-- Filled by js/announcements.js from announcements.json; hidden when there is nothing to list. -->
+          <div id="helpWhatsNew" hidden>
+            <div class="about-section-label" style="text-align:left">What's new</div>
+            <div id="helpWhatsNewList"></div>
+          </div>
+
           <div class="about-section-label" style="text-align:left">Frequently Asked</div>
           <div class="help-faq-item">
             <div class="help-faq-q">Do I need an account or an API key?</div>
@@ -912,6 +950,10 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
           <div class="help-faq-item">
             <div class="help-faq-q">Why is a feature missing something I expected?</div>
             <div class="help-faq-a">Every feature here is a direct call to the IQ Bible API — if the data isn't in the API's response, it isn't shown.</div>
+          </div>
+          <div class="help-faq-item">
+            <div class="help-faq-q">How does a chapter get marked as read?</div>
+            <div class="help-faq-a">In the reader, tap “Yes, mark as read” at the end of the chapter, or finish its quiz. If you turn on “Mark a chapter read when I finish listening to it” in Settings, finishing its narration counts too. In Scroll the Bible nothing needs tapping: scrolling through a chapter to its last verse (or on into the next chapter) marks it read, and finishing its quiz does as well. Each of these adds the chapter to My Progress and checks off your active reading plan's day once all of its chapters are read.</div>
           </div>
           <div class="help-faq-item">
             <div class="help-faq-q">Does this include audio narration?</div>
@@ -1527,6 +1569,7 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
      references state and helpers defined in the ones before it. -->
 <script src="js/config.js"></script>
 <script src="js/api.js"></script>
+<script src="js/readstate.js"></script>
 <script src="js/catalog.js"></script>
 <script src="js/previews.js"></script>
 <script src="js/reader.js"></script>
@@ -1539,7 +1582,9 @@ try { document.documentElement.dataset.theme = localStorage.getItem("iqb_theme")
 <script src="js/explore.js"></script>
 <script src="js/study.js"></script>
 <script src="js/plans.js"></script>
+<script src="js/quiz.js"></script>
 <script src="js/progress.js"></script>
+<script src="js/announcements.js"></script>
 <script src="js/router.js"></script>
 <script src="js/tour.js"></script>
 <script src="js/main.js"></script>
